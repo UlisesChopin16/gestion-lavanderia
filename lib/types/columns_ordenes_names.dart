@@ -1,5 +1,9 @@
+import 'package:gestion_lavanderia/types/sortable_column.dart';
+
+export 'package:gestion_lavanderia/types/sortable_column.dart';
+
 /// Columnas por las que puede ordenarse la lista de órdenes.
-enum ColumnsOrdenesNames {
+enum ColumnsOrdenesNames implements SortableColumn {
   id(title: '#'),
   folio(title: 'Folio'),
   cliente(title: 'Cliente'),
@@ -11,6 +15,7 @@ enum ColumnsOrdenesNames {
   ultimaInteraccion(title: 'Última interacción'),
   fechaCierre(title: 'Fecha de Cierre');
 
+  @override
   final String title;
 
   const ColumnsOrdenesNames({required this.title});

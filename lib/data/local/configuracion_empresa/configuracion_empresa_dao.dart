@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/tables/configuracion_empresa/configuracion_empresa.dart';
 
 part 'configuracion_empresa_dao.g.dart';
@@ -25,12 +26,31 @@ class ConfiguracionEmpresaDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  /// Recibe la fila concreta y no un `Insertable`: una firma que acepte
-  /// cualquier `Insertable` obliga a castear a `ConfiguracionEmpresaEntry`, y
-  /// ese casteo revienta en tiempo de ejecución si le llega un companion.
-  Future<bool> updateConfig(ConfiguracionEmpresaEntry row) {
-    return update(
-      configuracionEmpresa,
-    ).replace(row.copyWith(fechaActualizacion: Value(DateTime.now())));
+  /// Escribe sobre la configuración [id] las columnas que traiga [row]; las que
+  /// vengan ausentes se quedan como están.
+  ///
+  /// Recibe el companion y el id por separado en lugar de la fila completa: la
+  /// pantalla de configuración edita unos pocos campos y así no tiene que
+  /// acarrear la contraseña ni las fechas de auditoría para guardar un teléfono.
+  Future<void> updateConfig({
+    required int id,
+    required ConfiguracionEmpresaCompanion row,
+  }) async {
+    final statement = update(configuracionEmpresa)
+      ..where((t) => t.id.equals(id));
+
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'La configuración que se intentó actualizar ya no existe.',
+    );
   }
 }

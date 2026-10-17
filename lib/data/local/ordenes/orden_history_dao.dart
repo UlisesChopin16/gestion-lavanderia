@@ -3,6 +3,7 @@ import 'package:gestion_lavanderia/data/local/ordenes/orden_con_detalles_entry.d
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/shared/query_ordering.dart';
 import 'package:gestion_lavanderia/data/local/shared/text_search.dart';
+import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/filtros_ordenes.dart';
 import 'package:gestion_lavanderia/models/tables/ordenes/orden_history.dart';
 
@@ -66,8 +67,24 @@ class OrdenHistoryDao extends DatabaseAccessor<AppDatabase>
     return into(ordenHistory).insert(row);
   }
 
-  Future<bool> updateHistory(OrdenHistoryEntry row) {
-    return update(ordenHistory).replace(row);
+  /// Escribe sobre el movimiento [id] las columnas que traiga [row].
+  ///
+  /// Es lo que se usa al guardar una orden sin abono: el último movimiento se
+  /// corrige en lugar de duplicarse.
+  Future<void> updateHistory({
+    required int id,
+    required OrdenHistoryCompanion row,
+  }) async {
+    final statement = update(ordenHistory)..where((t) => t.id.equals(id));
+    final escritas = await statement.write(
+      row.copyWith(id: const Value.absent()),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'El movimiento que se intentó actualizar ya no existe.',
+    );
   }
 
   /// Órdenes con su cliente y su último movimiento de pago.
@@ -95,7 +112,7 @@ class OrdenHistoryDao extends DatabaseAccessor<AppDatabase>
     final query = _queryJoined();
 
     if (filtros.estatus != EstatusOrdenType.todos) {
-      query.where(ordenServicio.estatus.equals(filtros.estatus.value));
+      query.where(ordenServicio.estatus.equalsValue(filtros.estatus));
     }
 
     if (filtros.busqueda.isNotEmpty) {
@@ -110,7 +127,7 @@ class OrdenHistoryDao extends DatabaseAccessor<AppDatabase>
 
     final metodoPago = filtros.metodoPago;
     if (metodoPago != null) {
-      query.where(ordenHistory.metodoPago.equals(metodoPago.value));
+      query.where(ordenHistory.metodoPago.equalsValue(metodoPago));
     }
 
     final rango = _rangoFechas(filtros.fechaInicio, filtros.fechaFin);

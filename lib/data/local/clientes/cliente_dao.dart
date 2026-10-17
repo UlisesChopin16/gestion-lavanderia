@@ -86,16 +86,48 @@ class ClientesDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  Future<bool> updateCliente(ClienteEntry row) async {
+  /// Escribe sobre el cliente [id] las columnas que traiga [row]; las que
+  /// vengan ausentes se quedan como están.
+  ///
+  /// El duplicado se busca contra la fila *como quedará*: lo que el companion
+  /// no manda se toma de la fila actual, porque editar sólo el teléfono debe
+  /// comparar el correo que el cliente ya tenía y no una cadena vacía.
+  Future<void> updateCliente({
+    required int id,
+    required ClienteCompanion row,
+  }) async {
+    final actual = await _filaActual(id);
+
     await _ensureContactoUnico(
-      correo: row.correo,
-      telefono: row.telefono,
-      excluyendoId: row.id,
+      correo: row.correo.present ? row.correo.value : actual.correo,
+      telefono: row.telefono.present ? row.telefono.value : actual.telefono,
+      excluyendoId: id,
     );
 
-    return update(
-      cliente,
-    ).replace(row.copyWith(fechaActualizacion: Value(DateTime.now())));
+    final statement = update(cliente)..where((t) => t.id.equals(id));
+
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'El cliente que se intentó actualizar ya no existe.',
+    );
+  }
+
+  Future<ClienteEntry> _filaActual(int id) async {
+    final fila = await getById(id);
+    if (fila != null) return fila;
+
+    throw const SQLException(
+      message: 'El cliente que se intentó actualizar ya no existe.',
+    );
   }
 
   /// Dos clientes no pueden compartir correo ni teléfono.

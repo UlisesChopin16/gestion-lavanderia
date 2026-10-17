@@ -38,9 +38,19 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<PrecioConDetallesEntry>> getAll() async {
     final query = _queryJoined()
-      ..where(preciosConceptos.estatus.equals(EstatusType.activo.value));
+      ..where(preciosConceptos.estatus.equalsValue(EstatusType.activo));
 
     return _toDetalles(await query.get());
+  }
+
+  /// Un concepto con su categoría, que es como lo necesita toda pantalla: el
+  /// nombre de la categoría se muestra junto al del concepto.
+  Future<PrecioConDetallesEntry?> getById(int id) async {
+    final query = _queryJoined()..where(preciosConceptos.id.equals(id));
+    final fila = await query.getSingleOrNull();
+
+    if (fila == null) return null;
+    return PrecioConDetallesEntry.fromRow(fila, attachedDatabase);
   }
 
   /// Listado de la pantalla de precios, con los filtros ya aplicados.
@@ -79,35 +89,83 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  Future<bool> updatePrecio(PreciosConceptosEntry row) async {
+  /// Escribe sobre el concepto [id] las columnas que traiga [row].
+  ///
+  /// Las reglas se verifican contra la fila *como quedará*: el companion puede
+  /// traer sólo lo que cambió, así que lo ausente se toma de la fila actual.
+  /// Sin esa mezcla, editar únicamente el importe compararía la unicidad contra
+  /// una categoría y un nombre que nadie mandó.
+  Future<void> updatePrecio({
+    required int id,
+    required PreciosConceptosCompanion row,
+  }) async {
+    final actual = await _filaActual(id);
+
+    final categoriaId = row.categoriaId.present
+        ? row.categoriaId.value
+        : actual.categoriaId;
+    final clotheSize = row.clotheSize.present
+        ? row.clotheSize.value
+        : actual.clotheSize;
+    final nombreConcepto = row.nombreConcepto.present
+        ? row.nombreConcepto.value
+        : actual.nombreConcepto;
+
     await _ensureCategoriaActiva(
-      categoriaId: row.categoriaId,
-      nombreConcepto: row.nombreConcepto,
+      categoriaId: categoriaId,
+      nombreConcepto: nombreConcepto,
       accion: 'actualizar',
     );
     await _ensureUnico(
-      categoriaId: row.categoriaId,
-      clotheSize: row.clotheSize,
-      nombreConcepto: row.nombreConcepto,
-      excluyendoId: row.id,
+      categoriaId: categoriaId,
+      clotheSize: clotheSize,
+      nombreConcepto: nombreConcepto,
+      excluyendoId: id,
     );
 
-    return update(
-      preciosConceptos,
-    ).replace(row.copyWith(fechaActualizacion: Value(DateTime.now())));
+    await _escribir(
+      id,
+      row.copyWith(fechaActualizacion: Value(DateTime.now())),
+    );
   }
 
   /// Baja lógica de un concepto: escribe `estatus` y `fechaEliminacion` en la
   /// misma operación para que no puedan quedar desalineados.
-  Future<bool> deletePrecio(PreciosConceptosEntry row) {
+  Future<void> deletePrecio(int id) {
     final now = DateTime.now();
-    final updated = row.copyWith(
-      estatus: EstatusType.inactivo.value,
-      fechaEliminacion: Value(now),
-      fechaActualizacion: Value(now),
+
+    return _escribir(
+      id,
+      PreciosConceptosCompanion(
+        estatus: const Value(EstatusType.inactivo),
+        fechaEliminacion: Value(now),
+        fechaActualizacion: Value(now),
+      ),
+    );
+  }
+
+  /// Reactiva un concepto: lo inverso de [deletePrecio].
+  ///
+  /// Un concepto no puede volver sin su categoría. Reactivarlo dentro de una
+  /// categoría inactiva lo dejaría cobrable en una categoría que no lo está, y
+  /// es la misma regla que impide crearlo o editarlo ahí.
+  Future<void> activatePrecio(int id) async {
+    final actual = await _filaActual(id);
+
+    await _ensureCategoriaActiva(
+      categoriaId: actual.categoriaId,
+      nombreConcepto: actual.nombreConcepto,
+      accion: 'activar',
     );
 
-    return update(preciosConceptos).replace(updated);
+    return _escribir(
+      id,
+      PreciosConceptosCompanion(
+        estatus: const Value(EstatusType.activo),
+        fechaEliminacion: const Value(null),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
+    );
   }
 
   /// Reactiva en una sola sentencia los conceptos dados de baja junto con su
@@ -115,12 +173,13 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
   Future<int> activatePreciosByCategoria(int categoriaId) {
     final statement = update(preciosConceptos)
       ..where(
-        (t) => t.categoriaId.equals(categoriaId) & t.fechaEliminacion.isNotNull(),
+        (t) =>
+            t.categoriaId.equals(categoriaId) & t.fechaEliminacion.isNotNull(),
       );
 
     return statement.write(
       PreciosConceptosCompanion(
-        estatus: Value(EstatusType.activo.value),
+        estatus: const Value(EstatusType.activo),
         fechaEliminacion: const Value(null),
         fechaActualizacion: Value(DateTime.now()),
       ),
@@ -137,7 +196,7 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
 
     return statement.write(
       PreciosConceptosCompanion(
-        estatus: Value(EstatusType.inactivo.value),
+        estatus: const Value(EstatusType.inactivo),
         fechaEliminacion: Value(now),
         fechaActualizacion: Value(now),
       ),
@@ -145,13 +204,19 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
   }
 
   /// Propaga los días de entrega de la categoría a todos sus conceptos.
-  Future<int> changeDiasPreciosByCategoria(CategoriaServicioEntry categoria) {
+  ///
+  /// Recibe los días y no la fila de la categoría, para que quien acaba de
+  /// actualizarla propague el valor nuevo sin volver a leerla.
+  Future<int> changeDiasPreciosByCategoria({
+    required int categoriaId,
+    required int diasEntrega,
+  }) {
     final statement = update(preciosConceptos)
-      ..where((t) => t.categoriaId.equals(categoria.id));
+      ..where((t) => t.categoriaId.equals(categoriaId));
 
     return statement.write(
       PreciosConceptosCompanion(
-        diasEntrega: Value(categoria.diasEntrega),
+        diasEntrega: Value(diasEntrega),
         fechaActualizacion: Value(DateTime.now()),
       ),
     );
@@ -186,11 +251,11 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
 
     final clotheSize = filtros.clotheSize;
     if (clotheSize != null) {
-      query.where(preciosConceptos.clotheSize.equals(clotheSize.description));
+      query.where(preciosConceptos.clotheSize.equalsValue(clotheSize));
     }
 
     if (filtros.estatus != EstatusType.todos) {
-      query.where(preciosConceptos.estatus.equals(filtros.estatus.value));
+      query.where(preciosConceptos.estatus.equalsValue(filtros.estatus));
     }
 
     if (filtros.nombre.isNotEmpty) {
@@ -222,7 +287,7 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
   /// y la unicidad se valida aquí.
   Future<void> _ensureUnico({
     required int categoriaId,
-    required String clotheSize,
+    required ClotheSizeType clotheSize,
     required String nombreConcepto,
     int? excluyendoId,
   }) async {
@@ -230,7 +295,7 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
       ..addColumns([preciosConceptos.id])
       ..where(
         preciosConceptos.categoriaId.equals(categoriaId) &
-            preciosConceptos.clotheSize.equals(clotheSize) &
+            preciosConceptos.clotheSize.equalsValue(clotheSize) &
             preciosConceptos.nombreConcepto.lower().equals(
               nombreConcepto.toLowerCase(),
             ),
@@ -248,7 +313,7 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
       message:
           'Ya hay un registro en la base de datos con el concepto '
           '"$nombreConcepto" en la categoria "$categoria" y con el tamaño '
-          '"$clotheSize".',
+          '"${clotheSize.description}".',
     );
   }
 
@@ -265,7 +330,7 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
             .getSingleOrNull();
 
     if (categoria == null) return;
-    if (categoria.estatus != EstatusType.inactivo.value) return;
+    if (categoria.estatus != EstatusType.inactivo) return;
 
     throw SQLException(
       message:
@@ -283,6 +348,39 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
 
     final fila = await query.getSingleOrNull();
     return fila?.read(categoriaServicio.nombre) ?? '';
+  }
+
+  Future<PreciosConceptosEntry> _filaActual(int id) async {
+    final fila =
+        await (select(preciosConceptos)
+              ..where((t) => t.id.equals(id))
+              ..limit(1))
+            .getSingleOrNull();
+
+    if (fila != null) return fila;
+
+    throw const SQLException(
+      message: 'El concepto que se intentó actualizar ya no existe.',
+    );
+  }
+
+  /// Escribe sobre la fila [id], descartando el id y la fecha de creación: son
+  /// las dos columnas que una actualización nunca debe tocar.
+  Future<void> _escribir(int id, PreciosConceptosCompanion row) async {
+    final statement = update(preciosConceptos)..where((t) => t.id.equals(id));
+
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+      ),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'El concepto que se intentó actualizar ya no existe.',
+    );
   }
 
   List<PrecioConDetallesEntry> _toDetalles(List<TypedResult> rows) {

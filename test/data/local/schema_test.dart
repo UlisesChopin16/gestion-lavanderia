@@ -1,6 +1,7 @@
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/models/tables/tables.dart';
 
 /// Comprueba que el esquema que drift crea sea el documentado en DATABASE.md:
 /// las ocho tablas, sus índices y las claves ajenas activas.
@@ -51,19 +52,20 @@ void main() {
         'idx_orden_fecha_creacion',
         'idx_item_orden',
         'idx_item_precio_concepto',
+        'idx_item_history',
         'idx_history_orden_fecha',
         'idx_direccion_empresa',
       ]),
     );
   });
 
-  test('nace en la versión 2 del esquema', () async {
+  test('nace en la versión 3 del esquema', () async {
     final version = await db
         .customSelect('PRAGMA user_version')
         .map((fila) => fila.read<int>('user_version'))
         .getSingle();
 
-    expect(version, 2);
+    expect(version, 3);
   });
 
   test('las claves ajenas están activas', () async {
@@ -90,7 +92,7 @@ void main() {
       OrdenServicioCompanion.insert(
         clienteId: clienteId,
         folio: '',
-        estatus: 'En curso',
+        estatus: EstatusOrdenType.enCurso,
         total: 100,
         restante: 0,
         fechaCreacion: DateTime.now(),
@@ -100,7 +102,7 @@ void main() {
       OrdenServicioCompanion.insert(
         clienteId: clienteId,
         folio: '',
-        estatus: 'En curso',
+        estatus: EstatusOrdenType.enCurso,
         total: 50,
         restante: 50,
         fechaCreacion: DateTime.now(),
@@ -108,8 +110,7 @@ void main() {
     );
 
     final ahora = DateTime.now();
-    final prefijo =
-        '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}-';
+    final prefijo = '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}-';
 
     expect(primera.folio, '${prefijo}0001');
     expect(segunda.folio, '${prefijo}0002');

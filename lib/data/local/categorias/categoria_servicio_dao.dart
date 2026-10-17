@@ -12,6 +12,12 @@ part 'categoria_servicio_dao.g.dart';
 ///
 /// Rige la misma invariante que en los precios: `estatus` decide la visibilidad
 /// y `fechaEliminacion` sólo registra cuándo se dio de baja.
+///
+/// Las lecturas devuelven la fila generada y las escrituras reciben un
+/// companion con el id aparte. Una categoría no tiene más forma que su fila, así
+/// que `CategoriaServicioEntry` es el modelo que viaja hasta la interfaz: un
+/// gemelo campo por campo sólo agregaría un mapeo que el compilador no puede
+/// verificar.
 @DriftAccessor(tables: [CategoriaServicio])
 class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
     with _$CategoriaServicioDaoMixin {
@@ -28,7 +34,7 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
 
   Future<List<CategoriaServicioEntry>> getAll() {
     final query = select(categoriaServicio)
-      ..where((t) => t.estatus.equals(EstatusType.activo.value))
+      ..where((t) => t.estatus.equalsValue(EstatusType.activo))
       ..orderBy([(t) => OrderingTerm.asc(t.nombre)]);
 
     return query.get();
@@ -39,7 +45,7 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
     final query = select(categoriaServicio);
 
     if (filtros.estatus != EstatusType.todos) {
-      query.where((t) => t.estatus.equals(filtros.estatus.value));
+      query.where((t) => t.estatus.equalsValue(filtros.estatus));
     }
 
     if (filtros.nombre.isNotEmpty) {
@@ -74,40 +80,56 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  Future<bool> updateCategoria(CategoriaServicioEntry row) async {
-    await _ensureNombreUnico(row.nombre, excluyendoId: row.id);
+  /// Escribe sobre la categoría [id] las columnas que traiga [row]; las que
+  /// vengan ausentes se quedan como están.
+  ///
+  /// Recibe un companion y el id en lugar de la fila completa para que quien
+  /// llama arme la escritura con lo que cambió, sin reconstruir las columnas de
+  /// auditoría que no muestra ninguna pantalla.
+  Future<void> updateCategoria({
+    required int id,
+    required CategoriaServicioCompanion row,
+  }) async {
+    if (row.nombre.present) {
+      await _ensureNombreUnico(row.nombre.value, excluyendoId: id);
+    }
 
-    return update(
-      categoriaServicio,
-    ).replace(row.copyWith(fechaActualizacion: Value(DateTime.now())));
+    await _escribir(
+      id,
+      row.copyWith(fechaActualizacion: Value(DateTime.now())),
+    );
   }
 
   /// Baja lógica: `estatus` y `fechaEliminacion` se escriben juntos.
   ///
-  /// La baja en cascada de los conceptos de la categoría la coordina la capa
-  /// superior con `PreciosConceptosDao.deactivatePreciosByCategoria`, para que
-  /// ambas escrituras ocurran en una sola transacción.
-  Future<bool> deleteCategoria(CategoriaServicioEntry row) {
+  /// La baja en cascada de los conceptos de la categoría la coordina
+  /// `CategoriasLocalDatasource.desactivar`, que llama a este método y a
+  /// `PreciosConceptosDao.deactivatePreciosByCategoria` dentro de una sola
+  /// transacción.
+  Future<void> deleteCategoria(int id) {
     final now = DateTime.now();
-    final updated = row.copyWith(
-      estatus: EstatusType.inactivo.value,
-      fechaEliminacion: Value(now),
-      fechaActualizacion: Value(now),
-    );
 
-    return update(categoriaServicio).replace(updated);
+    return _escribir(
+      id,
+      CategoriaServicioCompanion(
+        estatus: const Value(EstatusType.inactivo),
+        fechaEliminacion: Value(now),
+        fechaActualizacion: Value(now),
+      ),
+    );
   }
 
   /// Reactivar es lo inverso de [deleteCategoria]: `estatus` vuelve a activo y
   /// `fechaEliminacion` se limpia.
-  Future<bool> activateCategoria(CategoriaServicioEntry row) {
-    final updated = row.copyWith(
-      estatus: EstatusType.activo.value,
-      fechaEliminacion: const Value(null),
-      fechaActualizacion: Value(DateTime.now()),
+  Future<void> activateCategoria(int id) {
+    return _escribir(
+      id,
+      CategoriaServicioCompanion(
+        estatus: const Value(EstatusType.activo),
+        fechaEliminacion: const Value(null),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
     );
-
-    return update(categoriaServicio).replace(updated);
   }
 
   /// El nombre de una categoría es único, sin distinguir mayúsculas. Incluye
@@ -126,6 +148,27 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
 
     throw SQLException(
       message: 'Ya existe una categoría con el nombre "$nombre".',
+    );
+  }
+
+  /// Escribe sobre la fila [id].
+  ///
+  /// El id y la fecha de creación se descartan vengan o no en el companion: son
+  /// las dos columnas que una actualización nunca debe tocar.
+  Future<void> _escribir(int id, CategoriaServicioCompanion row) async {
+    final statement = update(categoriaServicio)..where((t) => t.id.equals(id));
+
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+      ),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'La categoría que se intentó actualizar ya no existe.',
     );
   }
 }

@@ -42,21 +42,36 @@ class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
     });
   }
 
-  /// Actualiza la orden y devuelve la fila tal como quedó escrita.
+  /// Escribe sobre la orden [id] las columnas que traiga [row] y devuelve la
+  /// fila tal como quedó.
   ///
   /// `fechaActualizacion` siempre viene informada, que es lo que la capa
-  /// superior necesita para fechar el movimiento del historial.
-  Future<OrdenServicioEntry> updateOrden(OrdenServicioEntry row) async {
-    final updated = row.copyWith(fechaActualizacion: Value(DateTime.now()));
-    final escrito = await update(ordenServicio).replace(updated);
+  /// superior necesita para fechar el movimiento del historial. La fila se
+  /// vuelve a leer en lugar de construirse aquí, porque el companion puede
+  /// traer sólo una parte de las columnas.
+  Future<OrdenServicioEntry> updateOrden({
+    required int id,
+    required OrdenServicioCompanion row,
+  }) async {
+    final statement = update(ordenServicio)..where((t) => t.id.equals(id));
 
-    if (!escrito) {
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
+    );
+
+    final entry = escritas > 0 ? await getById(id) : null;
+
+    if (entry == null) {
       throw const SQLException(
         message: 'Error al actualizar la orden de servicio',
       );
     }
 
-    return updated;
+    return entry;
   }
 
   /// Folio con formato `AAAA-MM-NNNN`, consecutivo dentro del mes.

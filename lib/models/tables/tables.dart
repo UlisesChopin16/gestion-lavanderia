@@ -7,3 +7,4 @@ export 'package:gestion_lavanderia/models/tables/ordenes/orden_history.dart';
 export 'package:gestion_lavanderia/models/tables/ordenes/orden_servicio.dart';
 export 'package:gestion_lavanderia/models/tables/precios/precios_conceptos.dart';
 export 'package:gestion_lavanderia/models/tables/shared/audit_columns.dart';
+export 'package:gestion_lavanderia/models/tables/shared/enum_converters.dart';

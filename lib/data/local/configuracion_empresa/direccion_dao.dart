@@ -1,5 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/tables/configuracion_empresa/direccion.dart';
 
 part 'direccion_dao.g.dart';
@@ -37,9 +38,26 @@ class DireccionDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
-  Future<bool> updateDireccion(DireccionEntry row) {
-    return update(
-      direccion,
-    ).replace(row.copyWith(fechaActualizacion: Value(DateTime.now())));
+  /// Escribe sobre la dirección [id] las columnas que traiga [row]; las que
+  /// vengan ausentes se quedan como están.
+  Future<void> updateDireccion({
+    required int id,
+    required DireccionCompanion row,
+  }) async {
+    final statement = update(direccion)..where((t) => t.id.equals(id));
+
+    final escritas = await statement.write(
+      row.copyWith(
+        id: const Value.absent(),
+        fechaCreacion: const Value.absent(),
+        fechaActualizacion: Value(DateTime.now()),
+      ),
+    );
+
+    if (escritas > 0) return;
+
+    throw const SQLException(
+      message: 'La dirección que se intentó actualizar ya no existe.',
+    );
   }
 }

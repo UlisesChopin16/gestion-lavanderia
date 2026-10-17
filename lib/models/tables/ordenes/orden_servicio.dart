@@ -1,6 +1,7 @@
 import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/models/tables/clientes/cliente.dart';
 import 'package:gestion_lavanderia/models/tables/shared/audit_columns.dart';
+import 'package:gestion_lavanderia/models/tables/shared/enum_converters.dart';
 
 /// Una orden no se da de baja lógicamente: su ciclo de vida se expresa con
 /// `estatus` (`EstatusOrdenType`) y [fechaCierre], por eso no usa
@@ -20,8 +21,9 @@ class OrdenServicio extends Table with TimestampColumns {
   TextColumn get folio => text()();
   TextColumn get descripcion => text().nullable()();
 
-  /// Valor de `EstatusOrdenType`: "En curso", "Pagado", "Cerrada", "Cancelada".
-  TextColumn get estatus => text()();
+  /// "En curso", "Pagado", "Cerrada" o "Cancelada". El converter la entrega
+  /// ya como `EstatusOrdenType`.
+  TextColumn get estatus => text().map(const EstatusOrdenConverter())();
   RealColumn get total => real()();
 
   /// Saldo pendiente de la orden.

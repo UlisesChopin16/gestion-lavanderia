@@ -37,10 +37,6 @@ class PreciosView extends ConsumerWidget {
             : 'Todavía no hay conceptos de ropa.',
         rowKey: (precio) => precio.id,
 
-        searchLabel: 'Buscar concepto',
-        initialSearch: filtros.nombre,
-        onSearchChanged: notifier.buscar,
-        onClearFilters: notifier.limpiarFiltros,
         title: pestana.title,
         titleIcon: pestana.icon,
         addLabel: 'Agregar concepto',
@@ -49,33 +45,86 @@ class PreciosView extends ConsumerWidget {
         sortedBy: filtros.ordenamiento,
         ascending: filtros.ascendente,
         onSort: notifier.ordenar,
-        filters: [
-          EstatusFilter(
-            estatus: filtros.estatus,
-            onChanged: notifier.filtrarEstatus,
-          ),
-          FiltroCategoria(
-            categorias: estado.categorias,
-            seleccionada: filtros.categoriaId,
-            onChanged: notifier.filtrarPorCategoria,
-            onQuitar: notifier.quitarCategoria,
-          ),
-          SelectorTamano(
-            tamano: filtros.clotheSize,
-            permiteQuitar: true,
-            onQuitar: () => notifier.filtrarTamano(null),
-            onChanged: notifier.filtrarTamano,
-          ),
-          SortDropdown<ColumnPreciosName>(
-            columns: ColumnPreciosName.values,
-            selected: filtros.ordenamiento,
-            ascending: filtros.ascendente,
-            onColumnChanged: (columna) =>
-                notifier.ordenar(columna, filtros.ascendente),
-            onAscendingChanged: (ascendente) =>
-                notifier.ordenar(filtros.ordenamiento, ascendente),
-          ),
-        ],
+        // Es el listado con más filtros —estatus, categoría, tamaño y orden—,
+        // así que el buscador se queda con un tercio del renglón como mucho y
+        // los cuatro desplegables se reparten lo que sobra. Cuando ya no caben
+        // con su ancho mínimo, el renglón se parte en dos.
+        seccionFiltros: VRow(
+          gutter: 12,
+          align: VAlign.center,
+          children: [
+            VCol(
+              cols: 12,
+              md: 5,
+              lg: 4,
+              xl: 3,
+              minWidth: SearchFilter.anchoMinimo,
+              child: SearchFilter(
+                label: 'Buscar concepto',
+                value: filtros.nombre,
+                onChanged: notifier.buscar,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: VCol.grow,
+              minWidth: DropdownMenuBase.anchoMinimo,
+              maxWidth: DropdownMenuBase.anchoMaximo,
+              child: EstatusFilter(
+                estatus: filtros.estatus,
+                onChanged: notifier.filtrarEstatus,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: VCol.grow,
+              minWidth: DropdownMenuBase.anchoMinimo,
+              maxWidth: DropdownMenuBase.anchoMaximo,
+              child: FiltroCategoria(
+                categorias: estado.categorias,
+                seleccionada: filtros.categoriaId,
+                onChanged: notifier.filtrarPorCategoria,
+                onQuitar: notifier.quitarCategoria,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: VCol.grow,
+              minWidth: DropdownMenuBase.anchoMinimo,
+              maxWidth: DropdownMenuBase.anchoMaximo,
+              child: SelectorTamano(
+                tamano: filtros.clotheSize,
+                permiteQuitar: true,
+                onQuitar: () => notifier.filtrarTamano(null),
+                onChanged: notifier.filtrarTamano,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: VCol.grow,
+              minWidth: DropdownMenuBase.anchoMinimo,
+              maxWidth: DropdownMenuBase.anchoMaximo,
+              child: SortDropdown<ColumnPreciosName>(
+                columns: ColumnPreciosName.values,
+                selected: filtros.ordenamiento,
+                ascending: filtros.ascendente,
+                onColumnChanged: (columna) =>
+                    notifier.ordenar(columna, filtros.ascendente),
+                onAscendingChanged: (ascendente) =>
+                    notifier.ordenar(filtros.ordenamiento, ascendente),
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: VCol.auto,
+              child: ButtonClearFilters(onPressed: notifier.limpiarFiltros),
+            ),
+          ],
+        ),
 
         pagination: TablePagination(
           paginacion: estado.paginacion,

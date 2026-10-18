@@ -10,6 +10,8 @@ export 'dropdown_menu_base.dart';
 export 'estatus_chip.dart';
 export 'estatus_filter.dart';
 export 'form_text_field.dart';
+export 'layout/layout.dart';
+export 'search_filter.dart';
 export 'sort_button.dart';
 export 'sort_dropdown.dart';
 export 'table/table.dart';

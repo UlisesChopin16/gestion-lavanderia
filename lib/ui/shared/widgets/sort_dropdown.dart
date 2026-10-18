@@ -21,7 +21,7 @@ class SortDropdown<C extends SortableColumn> extends StatelessWidget {
     required this.onColumnChanged,
     required this.onAscendingChanged,
     this.label = 'Ordenar por',
-    this.width = 220,
+    this.width,
   });
 
   final List<C> columns;
@@ -30,7 +30,9 @@ class SortDropdown<C extends SortableColumn> extends StatelessWidget {
   final ValueChanged<C> onColumnChanged;
   final ValueChanged<bool> onAscendingChanged;
   final String label;
-  final double width;
+
+  /// El ancho del desplegable. En `null` llena la columna que lo reciba.
+  final double? width;
 
   @override
   Widget build(BuildContext context) {

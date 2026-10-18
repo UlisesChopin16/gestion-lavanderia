@@ -19,7 +19,7 @@ class SelectorTamano extends StatelessWidget {
     this.label = 'Tamaño',
     this.permiteQuitar = false,
     this.onQuitar,
-    this.width = _ancho,
+    this.width,
   });
 
   final ClotheSizeType? tamano;
@@ -27,9 +27,11 @@ class SelectorTamano extends StatelessWidget {
   final String label;
   final bool permiteQuitar;
   final VoidCallback? onQuitar;
-  final double width;
 
-  static const _ancho = 220.0;
+  /// El ancho del desplegable. En `null` llena el hueco que recibe: como
+  /// filtro eso es su columna de la rejilla, y en el formulario se le pasa el
+  /// ancho de los demás campos para que todos midan igual.
+  final double? width;
 
   @override
   Widget build(BuildContext context) {

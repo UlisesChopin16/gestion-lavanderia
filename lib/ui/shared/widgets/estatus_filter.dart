@@ -19,7 +19,7 @@ class EstatusFilter extends StatelessWidget {
     required this.estatus,
     required this.onChanged,
     this.label = 'Estatus',
-    this.width = _ancho,
+    this.width,
   });
 
   /// El estatus elegido, o `null` cuando se ven todos.
@@ -29,9 +29,11 @@ class EstatusFilter extends StatelessWidget {
   final ValueChanged<EstatusType?> onChanged;
 
   final String label;
-  final double width;
 
-  static const double _ancho = 200;
+  /// El ancho del desplegable. En `null` llena la columna que lo reciba, que
+  /// es lo que hace falta en un renglón de filtros: con un ancho fijo, el
+  /// filtro se quedaba apretado y dejaba el hueco de al lado vacío.
+  final double? width;
 
   @override
   Widget build(BuildContext context) {

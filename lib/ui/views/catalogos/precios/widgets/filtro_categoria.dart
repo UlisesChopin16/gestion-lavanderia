@@ -15,6 +15,7 @@ class FiltroCategoria extends StatelessWidget {
     required this.seleccionada,
     required this.onChanged,
     required this.onQuitar,
+    this.width,
   });
 
   final Iterable<CategoriaServicioEntry> categorias;
@@ -25,7 +26,8 @@ class FiltroCategoria extends StatelessWidget {
   final ValueChanged<int> onChanged;
   final VoidCallback onQuitar;
 
-  static const _ancho = 220.0;
+  /// El ancho del desplegable. En `null` llena la columna que lo reciba.
+  final double? width;
 
   bool get _hayFiltro => seleccionada != sinCategoria;
 
@@ -33,7 +35,7 @@ class FiltroCategoria extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownMenuBase<int>(
       label: 'Categoría',
-      width: _ancho,
+      width: width,
       // Sin categoría elegida no hay nada que quitar, así que en su lugar va
       // el icono del catálogo.
       showDelete: _hayFiltro,

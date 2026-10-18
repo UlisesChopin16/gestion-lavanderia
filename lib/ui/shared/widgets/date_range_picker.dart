@@ -84,10 +84,12 @@ class _DateRangePickerState extends State<DateRangePicker> {
       decoration: InputDecoration(
         labelText: widget.labelText ?? 'Selecciona las fechas',
         hintText: '01/ene/2026 - 31/ene/2026',
-        constraints: BoxConstraints(
-          maxHeight: 40,
-          maxWidth: widget.width ?? 230,
-        ),
+        // Sin ancho pedido, el campo llena lo que le den y mide de alto lo
+        // que los demás filtros: el tope de 230 por 40 que había antes lo
+        // dejaba más chico que el resto del renglón aunque sobrara sitio.
+        constraints: widget.width == null
+            ? null
+            : BoxConstraints(maxHeight: 40, maxWidth: widget.width!),
         prefixIcon: _prefix,
       ),
       onTap: _openCalendar,

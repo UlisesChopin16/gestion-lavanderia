@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/theme/color_row_theme.dart';
-import 'package:gestion_lavanderia/ui/shared/widgets/button_clear_filters.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_action.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_column.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_small_list.dart';
@@ -23,7 +21,7 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///
 /// 1. el encabezado —el nombre del listado y el botón de agregar—, cerrado por
 ///    una línea;
-/// 2. el buscador y los filtros, juntos en un solo recuadro;
+/// 2. los filtros —el buscador entre ellos—, tal como los arme la pantalla;
 /// 3. la paginación;
 /// 4. la lista.
 ///
@@ -54,9 +52,36 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///   titleIcon: IconsManager.selectedPreciosIcon,
 ///   addLabel: 'Agregar concepto',
 ///   onAdd: _onAgregar,
-///   onSearchChanged: notifier.buscar,
-///   initialSearch: filtros.nombre,
-///   onClearFilters: notifier.limpiarFiltros,
+///   seccionFiltros: VRow(
+///     gutter: 12,
+///     align: VAlign.center,
+///     children: [
+///       VCol(
+///         cols: 12,
+///         md: 5,
+///         lg: 4,
+///         child: SearchFilter(
+///           label: 'Buscar concepto',
+///           value: filtros.nombre,
+///           onChanged: notifier.buscar,
+///         ),
+///       ),
+///       VCol(
+///         cols: 12,
+///         sm: 6,
+///         md: VCol.grow,
+///         child: EstatusFilter(
+///           estatus: filtros.estatus,
+///           onChanged: notifier.filtrar,
+///         ),
+///       ),
+///       VCol(
+///         cols: 12,
+///         sm: VCol.auto,
+///         child: ButtonClearFilters(onPressed: notifier.limpiarFiltros),
+///       ),
+///     ],
+///   ),
 ///   pagination: TablePagination(...),
 ///   rowKey: (precio) => precio.id,
 ///   columns: [
@@ -98,12 +123,7 @@ class DataTableCard<T, C> extends StatefulWidget {
     this.smallItemBuilder,
     this.forceSmall,
     this.smallBreakpoint = ConstantsManager.mediumScreen,
-    this.filters = const [],
-    this.onClearFilters,
-    this.onSearchChanged,
-    this.initialSearch = '',
-    this.searchLabel = 'Buscar',
-    this.searchDebounce = const Duration(milliseconds: 300),
+    this.seccionFiltros,
     this.title,
     this.titleIcon,
     this.addLabel,
@@ -144,26 +164,18 @@ class DataTableCard<T, C> extends StatefulWidget {
   final bool? forceSmall;
   final double smallBreakpoint;
 
-  /// Filtros propios de cada listado. Van en el mismo recuadro que el
-  /// buscador: son lo mismo —formas de acotar la lista— y separados parecían
-  /// dos controles que no tienen que ver uno con otro.
-  final List<Widget> filters;
-
-  /// Devuelve el listado a sus filtros de omisión. El botón que lo hace está
-  /// siempre a la vista mientras haya un listado que limpiar; en `null` no
-  /// aparece, porque no habría nada que pulsar.
-  final VoidCallback? onClearFilters;
-
-  final ValueChanged<String>? onSearchChanged;
-
-  /// Texto con el que arranca el buscador, para los filtros que se guardan
-  /// entre sesiones.
-  final String initialSearch;
-  final String searchLabel;
-
-  /// Cuánto se espera después de la última tecla antes de buscar. Sin esa
-  /// espera, escribir "pantalón" lanza ocho consultas a la base.
-  final Duration searchDebounce;
+  /// Con qué se acota el listado: los filtros, el buscador y el botón de
+  /// limpiarlos, ya armados por la pantalla.
+  ///
+  /// La tarjeta no sabe cuáles son, cómo se ven ni cómo se reparten el ancho:
+  /// los pone tal cual entre el encabezado y la paginación. Quien los arma es
+  /// la pantalla, que es la que sabe por qué se filtra ese listado y cuánto
+  /// sitio merece cada control, así que dos listados con filtros distintos no
+  /// tienen que caber en el mismo molde.
+  ///
+  /// Lo habitual es un `VRow` con una columna por control. En `null` no se
+  /// dibuja nada y la lista queda justo debajo del encabezado.
+  final Widget? seccionFiltros;
 
   /// El nombre del listado, en el encabezado de la tarjeta. En `null` el
   /// encabezado sólo lleva el botón de agregar.
@@ -196,11 +208,7 @@ class DataTableCard<T, C> extends StatefulWidget {
 }
 
 class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
-  late final TextEditingController _search = TextEditingController(
-    text: widget.initialSearch,
-  );
   final ScrollController _horizontal = ScrollController();
-  Timer? _debounce;
 
   /// El aire entre los tres bloques: 1.5 rem.
   ///
@@ -212,16 +220,12 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   /// Lo que separa el contenido del borde de la tarjeta.
   static const double _relleno = 20;
 
-  /// El redondeo de los recuadros: el de los filtros y el de la tabla.
+  /// El redondeo de los recuadros: el del encabezado y el de la tabla.
   static const double _radio = 16;
 
   @override
   void dispose() {
-    // Los tres sobreviven al widget si no se cierran aquí: el temporizador
-    // dispararía una búsqueda sobre un estado ya desmontado, y los dos
-    // controladores quedarían retenidos.
-    _debounce?.cancel();
-    _search.dispose();
+    // El controlador sobrevive al widget si no se cierra aquí.
     _horizontal.dispose();
     super.dispose();
   }
@@ -247,10 +251,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   bool get _hasActions => widget.actionsBuilder != null;
 
   bool get _showAddButton => widget.addLabel != null && widget.onAdd != null;
-
-  bool get _hasFilters => widget.onSearchChanged != null ||
-      widget.filters.isNotEmpty ||
-      widget.onClearFilters != null;
 
   @override
   Widget build(BuildContext context) {
@@ -279,19 +279,10 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
                   addLabel: _showAddButton ? widget.addLabel : null,
                   onAdd: widget.onAdd,
                 ),
-              if (_hasFilters)
-                _BloqueFiltros(
+              if (widget.seccionFiltros != null)
+                KeyedSubtree(
                   key: DataTableCard.llaveFiltros,
-                  radio: _radio,
-                  controller: _search,
-                  label: widget.searchLabel,
-                  onSearchChanged: widget.onSearchChanged == null
-                      ? null
-                      : _onSearchChanged,
-                  filters: widget.filters,
-                  onClearFilters: widget.onClearFilters == null
-                      ? null
-                      : _clearFilters,
+                  child: widget.seccionFiltros!,
                 ),
               if (widget.pagination != null)
                 KeyedSubtree(
@@ -484,26 +475,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
     ];
   }
 
-  void _onSearchChanged(String value) {
-    final onSearchChanged = widget.onSearchChanged;
-    if (onSearchChanged == null) return;
-
-    _debounce?.cancel();
-
-    if (widget.searchDebounce <= Duration.zero) {
-      onSearchChanged(value);
-      return;
-    }
-
-    _debounce = Timer(widget.searchDebounce, () => onSearchChanged(value));
-  }
-
-  /// Limpia el buscador y avisa al listado para que reponga sus filtros.
-  void _clearFilters() {
-    _debounce?.cancel();
-    _search.clear();
-    widget.onClearFilters?.call();
-  }
 }
 
 /// El nombre del listado y el botón de agregar, cerrados por una línea.
@@ -593,68 +564,6 @@ class _Titulo extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-/// El buscador y los filtros del listado, juntos en un solo recuadro.
-class _BloqueFiltros extends StatelessWidget {
-  const _BloqueFiltros({
-    super.key,
-    required this.radio,
-    required this.controller,
-    required this.label,
-    required this.filters,
-    required this.onClearFilters,
-    this.onSearchChanged,
-  });
-
-  final double radio;
-  final TextEditingController controller;
-  final String label;
-  final ValueChanged<String>? onSearchChanged;
-  final List<Widget> filters;
-  final VoidCallback? onClearFilters;
-
-  static const double _anchoBuscador = 320;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: scheme.surfaceContainerLow,
-        borderRadius: BorderRadius.circular(radio),
-        border: Border.all(color: scheme.outlineVariant),
-      ),
-      child: Wrap(
-        spacing: 12,
-        runSpacing: 12,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          if (onSearchChanged != null)
-            SizedBox(
-              width: _anchoBuscador,
-              child: TextField(
-                controller: controller,
-                onChanged: onSearchChanged,
-                textInputAction: TextInputAction.search,
-                decoration: InputDecoration(
-                  labelText: label,
-                  prefixIcon: const Icon(IconsManager.search),
-                ),
-              ),
-            ),
-          ...filters,
-          // Al final de todo, que es donde se busca lo que deshace lo que uno
-          // acaba de hacer, y siempre en el mismo sitio: un botón que aparece
-          // y desaparece mueve los demás controles de lugar.
-          if (onClearFilters != null)
-            ButtonClearFilters(onPressed: onClearFilters),
-        ],
-      ),
     );
   }
 }

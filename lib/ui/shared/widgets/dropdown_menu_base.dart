@@ -8,6 +8,11 @@ import 'package:gestion_lavanderia/ui/shared/widgets/delete_button.dart';
 /// y le escribía el texto dentro de `build`: escribir en un controlador
 /// durante la construcción reinicia la selección del campo y vuelve a
 /// notificar a sus escuchas en medio del dibujado.
+///
+/// Sin [width] ocupa todo el hueco que le den. Eso lo mide un `LayoutBuilder`,
+/// así que no sabe decir cuánto mediría por su cuenta: dentro de una rejilla
+/// no se le puede poner en una columna `VCol.auto`, que es justo la que
+/// pregunta eso.
 class DropdownMenuBase<T> extends StatefulWidget {
   const DropdownMenuBase({
     super.key,
@@ -22,6 +27,20 @@ class DropdownMenuBase<T> extends StatefulWidget {
     this.width,
   });
 
+  /// Lo que un desplegable necesita para que se lea la opción elegida.
+  ///
+  /// Las pantallas se lo pasan como `minWidth` a la columna que lo lleva: por
+  /// debajo de eso, el renglón de filtros se parte antes que aplastarlo.
+  static const double anchoMinimo = 200;
+
+  /// Lo que no pasa aunque le sobre sitio.
+  ///
+  /// Un desplegable que se queda solo en el último renglón se llevaría todo el
+  /// ancho de la tarjeta, y uno de media pantalla no parece un desplegable.
+  /// Está por encima de lo que mide una tarjeta en una ventana angosta, donde
+  /// el filtro sí ocupa el renglón entero junto a los demás.
+  static const double anchoMaximo = 460;
+
   final List<DropdownMenuEntry<T>> items;
   final ValueChanged<T?> onChanged;
   final T? value;
@@ -33,6 +52,8 @@ class DropdownMenuBase<T> extends StatefulWidget {
   final VoidCallback? onDelete;
 
   final bool enableSearch;
+
+  /// El ancho del control. En `null` llena el hueco que recibe.
   final double? width;
 
   @override
@@ -75,8 +96,24 @@ class _DropdownMenuBaseState<T> extends State<DropdownMenuBase<T>> {
 
   @override
   Widget build(BuildContext context) {
+    final width = widget.width;
+    if (width != null) return _menu(context, width);
+
+    // `DropdownMenu` se mide por su opción más larga y se queda de ese ancho
+    // aunque le sobre sitio: no hay forma de decirle "llena lo que te den"
+    // más que pasándole el ancho ya medido. Por eso el hueco se mide aquí y
+    // se le entrega hecho un número.
+    return LayoutBuilder(
+      builder: (context, constraints) => _menu(
+        context,
+        constraints.hasBoundedWidth ? constraints.maxWidth : null,
+      ),
+    );
+  }
+
+  Widget _menu(BuildContext context, double? width) {
     return DropdownMenu<T>(
-      width: widget.width,
+      width: width,
       enableSearch: widget.enableSearch,
       requestFocusOnTap: widget.enableSearch,
       controller: _controller,

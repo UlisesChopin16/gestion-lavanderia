@@ -35,10 +35,6 @@ class ClientesView extends ConsumerWidget {
             : 'Todavía no hay clientes registrados.',
         rowKey: (cliente) => cliente.id,
 
-        searchLabel: 'Buscar cliente',
-        initialSearch: filtros.nombre,
-        onSearchChanged: notifier.buscar,
-        onClearFilters: notifier.limpiarFiltros,
         title: pestana.title,
         titleIcon: pestana.icon,
         addLabel: 'Agregar cliente',
@@ -47,17 +43,43 @@ class ClientesView extends ConsumerWidget {
         sortedBy: filtros.ordenamiento,
         ascending: filtros.ascendente,
         onSort: notifier.ordenar,
-        filters: [
-          SortDropdown<ColumnClientesName>(
-            columns: ColumnClientesName.values,
-            selected: filtros.ordenamiento,
-            ascending: filtros.ascendente,
-            onColumnChanged: (columna) =>
-                notifier.ordenar(columna, filtros.ascendente),
-            onAscendingChanged: (ascendente) =>
-                notifier.ordenar(filtros.ordenamiento, ascendente),
-          ),
-        ],
+        // Clientes sólo se acota por el nombre y por el orden, así que el
+        // buscador se queda con más renglón que en los demás listados.
+        seccionFiltros: VRow(
+          gutter: 12,
+          align: VAlign.center,
+          children: [
+            VCol(
+              cols: 12,
+              md: 4,
+              child: SearchFilter(
+                label: 'Buscar cliente',
+                value: filtros.nombre,
+                onChanged: notifier.buscar,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: 4,
+              child: SortDropdown<ColumnClientesName>(
+                columns: ColumnClientesName.values,
+                selected: filtros.ordenamiento,
+                ascending: filtros.ascendente,
+                onColumnChanged: (columna) =>
+                    notifier.ordenar(columna, filtros.ascendente),
+                onAscendingChanged: (ascendente) =>
+                    notifier.ordenar(filtros.ordenamiento, ascendente),
+              ),
+            ),
+            VCol(
+              cols: 12,
+              md: 4,
+              sm: 6,
+              child: ButtonClearFilters(onPressed: notifier.limpiarFiltros),
+            ),
+          ],
+        ),
 
         pagination: TablePagination(
           paginacion: estado.paginacion,

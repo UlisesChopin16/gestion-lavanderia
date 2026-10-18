@@ -36,10 +36,6 @@ class CategoriasView extends ConsumerWidget {
             : 'Todavía no hay categorías de ropa.',
         rowKey: (categoria) => categoria.id,
 
-        searchLabel: 'Buscar categoría',
-        initialSearch: filtros.nombre,
-        onSearchChanged: notifier.buscar,
-        onClearFilters: notifier.limpiarFiltros,
         title: pestana.title,
         titleIcon: pestana.icon,
         addLabel: 'Agregar categoría',
@@ -48,21 +44,57 @@ class CategoriasView extends ConsumerWidget {
         sortedBy: filtros.ordenamiento,
         ascending: filtros.ascendente,
         onSort: notifier.ordenar,
-        filters: [
-          EstatusFilter(
-            estatus: filtros.estatus,
-            onChanged: notifier.filtrarEstatus,
-          ),
-          SortDropdown<ColumnsCategoriaType>(
-            columns: ColumnsCategoriaType.values,
-            selected: filtros.ordenamiento,
-            ascending: filtros.ascendente,
-            onColumnChanged: (columna) =>
-                notifier.ordenar(columna, filtros.ascendente),
-            onAscendingChanged: (ascendente) =>
-                notifier.ordenar(filtros.ordenamiento, ascendente),
-          ),
-        ],
+        // Los filtros y su reparto: el buscador se lleva una fracción fija del
+        // renglón —es por donde se empieza a buscar una categoría—, los dos
+        // desplegables se parten lo que sobra y el botón mide lo que su texto.
+        // En una ventana angosta cada uno ocupa la fila entera.
+        seccionFiltros: VRow(
+          gutter: 12,
+          align: VAlign.center,
+          children: [
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: 3,
+              child: SearchFilter(
+                label: 'Buscar categoría',
+                value: filtros.nombre,
+                onChanged: notifier.buscar,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: 3,
+              child: EstatusFilter(
+                estatus: filtros.estatus,
+                onChanged: notifier.filtrarEstatus,
+              ),
+            ),
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: 3,
+              child: SortDropdown<ColumnsCategoriaType>(
+                columns: ColumnsCategoriaType.values,
+                selected: filtros.ordenamiento,
+                ascending: filtros.ascendente,
+                onColumnChanged: (columna) =>
+                    notifier.ordenar(columna, filtros.ascendente),
+                onAscendingChanged: (ascendente) =>
+                    notifier.ordenar(filtros.ordenamiento, ascendente),
+              ),
+            ),
+            // Al final de todo, que es donde se busca lo que deshace lo que
+            // uno acaba de hacer.
+            VCol(
+              cols: 12,
+              sm: 6,
+              md: 3,
+              child: ButtonClearFilters(onPressed: notifier.limpiarFiltros),
+            ),
+          ],
+        ),
 
         pagination: TablePagination(
           paginacion: estado.paginacion,

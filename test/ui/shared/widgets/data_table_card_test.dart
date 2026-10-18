@@ -3,7 +3,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/models/data/precios/precio_data.dart';
 import 'package:gestion_lavanderia/types/column_precios_name.dart';
-import 'package:gestion_lavanderia/ui/shared/widgets/table/table.dart';
+import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 /// Columnas de precios, como las armaría la pantalla.
@@ -233,32 +233,7 @@ void main() {
       ]);
     });
 
-    testWidgets('la búsqueda espera a que se deje de escribir', (tester) async {
-      final buscado = <String>[];
-
-      await mostrar(
-        tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-          forceSmall: false,
-          onSearchChanged: buscado.add,
-        ),
-      );
-
-      await tester.enterText(find.byType(TextField), 'sá');
-      await tester.pump(const Duration(milliseconds: 100));
-      await tester.enterText(find.byType(TextField), 'sába');
-      await tester.pump(const Duration(milliseconds: 100));
-
-      // Todavía no: la espera se reinicia con cada tecla.
-      expect(buscado, isEmpty);
-
-      await tester.pump(const Duration(milliseconds: 300));
-      expect(buscado, ['sába']);
-    });
-
-    testWidgets('arranca con el texto de un filtro ya guardado', (
+    testWidgets('la sección de filtros va tal cual, arriba de la lista', (
       tester,
     ) async {
       await mostrar(
@@ -267,37 +242,34 @@ void main() {
           columns: columnas(),
           rows: precios,
           forceSmall: false,
-          initialSearch: 'sábana',
-          onSearchChanged: (_) {},
+          seccionFiltros: EstatusFilter(
+            estatus: EstatusType.activo,
+            onChanged: (_) {},
+          ),
         ),
       );
 
-      expect(find.text('sábana'), findsOneWidget);
+      // La tarjeta no la envuelve en nada: el hueco de los filtros es el que
+      // ocupa lo que le pasaron.
+      final hueco = tester.getRect(find.byKey(DataTableCard.llaveFiltros));
+      final filtro = tester.getRect(find.byType(EstatusFilter));
+
+      expect(hueco.top, filtro.top);
+      expect(hueco.height, filtro.height);
+      expect(hueco.bottom, lessThan(tester.getRect(find.byType(DataTable)).top));
     });
 
-    testWidgets('limpiar los filtros vacía el buscador', (tester) async {
-      var limpiados = 0;
-
+    testWidgets('sin sección de filtros no se dibuja nada', (tester) async {
       await mostrar(
         tester,
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
           forceSmall: false,
-          initialSearch: 'sábana',
-          onSearchChanged: (_) {},
-          onClearFilters: () => limpiados++,
         ),
       );
 
-      await tester.tap(find.text('Limpiar filtros'));
-      await tester.pumpAndSettle();
-
-      expect(limpiados, 1);
-      expect(
-        tester.widget<TextField>(find.byType(TextField)).controller?.text,
-        isEmpty,
-      );
+      expect(find.byKey(DataTableCard.llaveFiltros), findsNothing);
     });
 
     testWidgets('el botón de agregar necesita texto y callback', (
@@ -380,6 +352,114 @@ void main() {
       expect(find.byType(CircularProgressIndicator), findsOneWidget);
       expect(find.text('No hay elementos disponibles'), findsNothing);
       expect(find.byType(DataTable), findsNothing);
+    });
+  });
+
+  /// El renglón de filtros, medido dentro de la tarjeta.
+  ///
+  /// La sección la arma la pantalla, así que aquí se reproduce la que armaría
+  /// un catálogo: antes el buscador medía 320 y cada filtro 200 o 220, pasara
+  /// lo que pasara, y en una ventana ancha los controles se apelotonaban a la
+  /// izquierda dejando el resto del renglón vacío.
+  group('DataTableCard · renglón de filtros', () {
+    Future<void> mostrarFiltros(WidgetTester tester, Size ventana) async {
+      tester.view.physicalSize = ventana;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      await mostrar(
+        tester,
+        DataTableCard<PrecioData, ColumnPreciosName>(
+          columns: columnas(),
+          rows: precios,
+          forceSmall: false,
+          seccionFiltros: VRow(
+            gutter: 12,
+            align: VAlign.center,
+            children: [
+              VCol(
+                cols: 12,
+                md: 5,
+                lg: 4,
+                xl: 3,
+                minWidth: SearchFilter.anchoMinimo,
+                child: SearchFilter(value: '', onChanged: (_) {}),
+              ),
+              VCol(
+                cols: 12,
+                sm: 6,
+                md: VCol.grow,
+                minWidth: DropdownMenuBase.anchoMinimo,
+                maxWidth: DropdownMenuBase.anchoMaximo,
+                child: EstatusFilter(
+                  estatus: EstatusType.activo,
+                  onChanged: (_) {},
+                ),
+              ),
+              VCol(
+                cols: 12,
+                sm: 6,
+                md: VCol.grow,
+                minWidth: DropdownMenuBase.anchoMinimo,
+                maxWidth: DropdownMenuBase.anchoMaximo,
+                child: SortDropdown<ColumnPreciosName>(
+                  columns: ColumnPreciosName.values,
+                  selected: ColumnPreciosName.nombre,
+                  ascending: true,
+                  onColumnChanged: (_) {},
+                  onAscendingChanged: (_) {},
+                ),
+              ),
+              VCol(
+                cols: 12,
+                sm: VCol.auto,
+                child: ButtonClearFilters(onPressed: () {}),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    testWidgets('en una ventana ancha los controles llenan el renglón', (
+      tester,
+    ) async {
+      await mostrarFiltros(tester, const Size(1400, 900));
+
+      final renglon = tester.getRect(find.byType(VRow));
+      final buscador = tester.getRect(find.byType(TextField).first);
+      final estatus = tester.getRect(find.byType(EstatusFilter));
+      final orden = tester.getRect(
+        find.byType(SortDropdown<ColumnPreciosName>),
+      );
+      final limpiar = tester.getRect(find.byType(ButtonClearFilters));
+
+      // Los cuatro en la misma línea, de un borde al otro del renglón.
+      for (final control in [estatus, orden, limpiar]) {
+        expect(control.center.dy, closeTo(buscador.center.dy, 1));
+      }
+      expect(buscador.left, closeTo(renglon.left, 1));
+      expect(limpiar.right, closeTo(renglon.right, 1));
+
+      // Y los filtros se quedan con lo que el buscador no usa, en lugar de
+      // los 200 de ancho fijo que tenían.
+      expect(estatus.width, greaterThan(220));
+      expect(estatus.width, closeTo(orden.width, 1));
+      expect(buscador.width, greaterThan(estatus.width));
+    });
+
+    testWidgets('en una ventana angosta cada control ocupa el renglón', (
+      tester,
+    ) async {
+      await mostrarFiltros(tester, const Size(500, 900));
+
+      final renglon = tester.getRect(find.byType(VRow));
+      final buscador = tester.getRect(find.byType(TextField).first);
+      final estatus = tester.getRect(find.byType(EstatusFilter));
+
+      expect(buscador.width, closeTo(renglon.width, 1));
+      expect(estatus.width, closeTo(renglon.width, 1));
+      expect(estatus.top, greaterThan(buscador.bottom));
     });
   });
 

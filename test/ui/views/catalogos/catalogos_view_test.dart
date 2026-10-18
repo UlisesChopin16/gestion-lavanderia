@@ -217,6 +217,34 @@ void main() {
     expect(filtros.contains(orden.center), isTrue);
   });
 
+  testWidgets('limpiar los filtros vacía el buscador y repone la lista', (
+    tester,
+  ) async {
+    // El botón lo pone la pantalla junto a sus filtros, así que la vuelta a
+    // empezar se comprueba aquí: la tarjeta ya no sabe de filtros.
+    await sembrarClientes(3);
+    await abrirModulo(tester);
+
+    await escribir(tester, 'Buscar cliente', 'Cliente 3');
+    // El buscador espera a que se deje de escribir antes de consultar.
+    await tester.pump(const Duration(milliseconds: 400));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cliente 1'), findsNothing);
+
+    await tester.tap(find.text('Limpiar filtros'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cliente 1'), findsOneWidget);
+    expect(
+      tester
+          .widget<TextField>(find.widgetWithText(TextField, 'Buscar cliente'))
+          .controller
+          ?.text,
+      isEmpty,
+    );
+  });
+
   testWidgets('la paginación va entre los filtros y la tabla', (tester) async {
     await sembrarClientes(12);
     await abrirModulo(tester);

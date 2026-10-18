@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
-import 'package:gestion_lavanderia/ui/views/catalogos/catalogos_tabs_type.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/clientes/dialogs/cliente_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/clientes/view_model/clientes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/widgets/widgets.dart';
@@ -18,9 +17,6 @@ class ClientesView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // El encabezado de la tarjeta se nombra como la pestaña: dos
-    // etiquetas distintas para lo mismo harían dudar de si son lo mismo.
-    const pestana = CatalogosTabsType.clientes;
     final estado = ref.watch(clientesViewModelProvider);
     final notifier = ref.read(clientesViewModelProvider.notifier);
     final filtros = estado.filtros;
@@ -35,10 +31,23 @@ class ClientesView extends ConsumerWidget {
             : 'Todavía no hay clientes registrados.',
         rowKey: (cliente) => cliente.id,
 
-        title: pestana.title,
-        titleIcon: pestana.icon,
-        addLabel: 'Agregar cliente',
-        onAdd: () => _agregar(context),
+        // El encabezado: las pestañas del módulo a la izquierda —la marcada
+        // dice en qué catálogo está uno— y el alta enfrente. En una ventana
+        // angosta el botón baja al renglón siguiente en lugar de desbordarse.
+        seccionEncabezado: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runAlignment: WrapAlignment.center,
+          spacing: 16,
+          runSpacing: 12,
+          children: [
+            const PestanasCatalogo(),
+            ButtonAdd(
+              label: 'Agregar cliente',
+              onPressed: () => _agregar(context),
+            ),
+          ],
+        ),
 
         sortedBy: filtros.ordenamiento,
         ascending: filtros.ascendente,

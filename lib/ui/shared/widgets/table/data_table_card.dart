@@ -6,7 +6,6 @@ import 'package:gestion_lavanderia/ui/shared/widgets/table/table_action.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_column.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_small_list.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
-import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Qué hacer cuando se pide ordenar por [column].
 ///
@@ -19,8 +18,7 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///
 /// De arriba abajo:
 ///
-/// 1. el encabezado —el nombre del listado y el botón de agregar—, cerrado por
-///    una línea;
+/// 1. el encabezado que arme la pantalla, cerrado por una línea;
 /// 2. los filtros —el buscador entre ellos—, tal como los arme la pantalla;
 /// 3. la paginación;
 /// 4. la lista.
@@ -48,10 +46,13 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///   sortedBy: filtros.ordenamiento,
 ///   ascending: filtros.ascendente,
 ///   onSort: notifier.ordenar,
-///   title: 'Precios de ropa',
-///   titleIcon: IconsManager.selectedPreciosIcon,
-///   addLabel: 'Agregar concepto',
-///   onAdd: _onAgregar,
+///   seccionEncabezado: Wrap(
+///     alignment: WrapAlignment.spaceBetween,
+///     children: [
+///       const PestanasCatalogo(),
+///       ButtonAdd(label: 'Agregar concepto', onPressed: _onAgregar),
+///     ],
+///   ),
 ///   seccionFiltros: VRow(
 ///     gutter: 12,
 ///     align: VAlign.center,
@@ -123,11 +124,8 @@ class DataTableCard<T, C> extends StatefulWidget {
     this.smallItemBuilder,
     this.forceSmall,
     this.smallBreakpoint = ConstantsManager.mediumScreen,
+    this.seccionEncabezado,
     this.seccionFiltros,
-    this.title,
-    this.titleIcon,
-    this.addLabel,
-    this.onAdd,
     this.isLoading = false,
     this.emptyMessage = 'No hay elementos disponibles',
     this.pagination,
@@ -177,15 +175,13 @@ class DataTableCard<T, C> extends StatefulWidget {
   /// dibuja nada y la lista queda justo debajo del encabezado.
   final Widget? seccionFiltros;
 
-  /// El nombre del listado, en el encabezado de la tarjeta. En `null` el
-  /// encabezado sólo lleva el botón de agregar.
-  final String? title;
-  final IconData? titleIcon;
-
-  /// Texto del botón de agregar. El botón aparece sólo si hay texto y [onAdd]:
-  /// sin callback no habría nada que hacer con él.
-  final String? addLabel;
-  final VoidCallback? onAdd;
+  /// Lo que encabeza el listado: cómo se llama, en qué catálogo está uno, el
+  /// botón de agregar... lo que la pantalla decida.
+  ///
+  /// La tarjeta no sabe qué lleva dentro: lo pone arriba del todo y le cierra
+  /// con una línea. En `null` no hay encabezado ni línea, y la tarjeta empieza
+  /// por los filtros.
+  final Widget? seccionEncabezado;
 
   final bool isLoading;
   final String emptyMessage;
@@ -250,8 +246,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
 
   bool get _hasActions => widget.actionsBuilder != null;
 
-  bool get _showAddButton => widget.addLabel != null && widget.onAdd != null;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -270,15 +264,21 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (widget.title != null || _showAddButton)
-                _Encabezado(
+              if (widget.seccionEncabezado != null) ...[
+                KeyedSubtree(
                   key: DataTableCard.llaveEncabezado,
-                  titulo: widget.title,
-                  icono: widget.titleIcon,
-                  radio: _radio,
-                  addLabel: _showAddButton ? widget.addLabel : null,
-                  onAdd: widget.onAdd,
+                  child: widget.seccionEncabezado!,
                 ),
+                // La línea cierra el encabezado: separa lo que el listado es
+                // —su nombre, lo que se hace con él— de lo que se hace con sus
+                // filas. Va aquí y no dentro del encabezado para que se vea de
+                // dónde sale el aire que la rodea.
+                Divider(
+                  height: 1,
+                  thickness: 1,
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ],
               if (widget.seccionFiltros != null)
                 KeyedSubtree(
                   key: DataTableCard.llaveFiltros,
@@ -473,126 +473,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
           ],
         ),
     ];
-  }
-
-}
-
-/// El nombre del listado y el botón de agregar, cerrados por una línea.
-///
-/// El botón vive aquí y no entre los filtros porque no acota la lista, la hace
-/// crecer: puesto junto a ellos parecía uno más. La línea separa lo que el
-/// listado es de lo que se hace con él.
-class _Encabezado extends StatelessWidget {
-  const _Encabezado({
-    super.key,
-    required this.titulo,
-    required this.icono,
-    required this.radio,
-    this.addLabel,
-    this.onAdd,
-  });
-
-  final String? titulo;
-  final IconData? icono;
-  final double radio;
-  final String? addLabel;
-  final VoidCallback? onAdd;
-
-  /// Lo que separa el renglón del título de la línea de abajo.
-  static const double _aire = 16;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final titulo = this.titulo;
-    final addLabel = this.addLabel;
-
-    final boton = addLabel == null
-        ? null
-        : _BotonAgregar(label: addLabel, onPressed: onAdd, radio: radio);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        if (titulo == null)
-          // Sin nombre que poner, el botón se queda solo a la derecha: un
-          // `Wrap` repartido lo dejaría pegado a la izquierda.
-          Align(alignment: Alignment.centerRight, child: boton)
-        else
-          Wrap(
-            // En una ventana angosta el botón no cabe al lado del nombre, y
-            // baja al renglón siguiente en lugar de desbordarse.
-            alignment: WrapAlignment.spaceBetween,
-            crossAxisAlignment: WrapCrossAlignment.center,
-            runAlignment: WrapAlignment.center,
-            spacing: 16,
-            runSpacing: 12,
-            children: [
-              _Titulo(texto: titulo, icono: icono),
-              ?boton,
-            ],
-          ),
-        const SizedBox(height: _aire),
-        Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
-      ],
-    );
-  }
-}
-
-/// El nombre del listado, con el icono con el que se le conoce en la
-/// navegación.
-class _Titulo extends StatelessWidget {
-  const _Titulo({required this.texto, this.icono});
-
-  final String texto;
-  final IconData? icono;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final icono = this.icono;
-
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      spacing: 10,
-      children: [
-        if (icono != null) Icon(icono, color: theme.colorScheme.primary),
-        Text(
-          texto,
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// El botón que da de alta un registro del listado.
-class _BotonAgregar extends StatelessWidget {
-  const _BotonAgregar({
-    required this.label,
-    required this.radio,
-    this.onPressed,
-  });
-
-  final String label;
-  final double radio;
-  final VoidCallback? onPressed;
-
-  @override
-  Widget build(BuildContext context) {
-    return FilledButton.icon(
-      onPressed: onPressed,
-      icon: const Icon(IconsManager.add),
-      label: Text(label),
-      style: FilledButton.styleFrom(
-        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(radio),
-        ),
-      ),
-    );
   }
 }
 

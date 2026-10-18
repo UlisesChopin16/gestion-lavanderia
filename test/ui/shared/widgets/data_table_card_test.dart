@@ -272,7 +272,7 @@ void main() {
       expect(find.byKey(DataTableCard.llaveFiltros), findsNothing);
     });
 
-    testWidgets('el botón de agregar necesita texto y callback', (
+    testWidgets('el encabezado va arriba del todo, cerrado por una línea', (
       tester,
     ) async {
       await mostrar(
@@ -281,24 +281,35 @@ void main() {
           columns: columnas(),
           rows: precios,
           forceSmall: false,
-          addLabel: 'Agregar concepto',
+          seccionEncabezado: const Text('Precios de ropa'),
         ),
       );
 
-      expect(find.text('Agregar concepto'), findsNothing);
+      final encabezado = tester.getRect(
+        find.byKey(DataTableCard.llaveEncabezado),
+      );
+      final linea = tester.getRect(find.byType(Divider));
 
+      expect(find.text('Precios de ropa'), findsOneWidget);
+      expect(linea.top, greaterThan(encabezado.bottom));
+      expect(
+        linea.bottom,
+        lessThan(tester.getRect(find.byType(DataTable)).top),
+      );
+    });
+
+    testWidgets('sin encabezado no hay línea que cerrar', (tester) async {
       await mostrar(
         tester,
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
           forceSmall: false,
-          addLabel: 'Agregar concepto',
-          onAdd: () {},
         ),
       );
 
-      expect(find.text('Agregar concepto'), findsOneWidget);
+      expect(find.byKey(DataTableCard.llaveEncabezado), findsNothing);
+      expect(find.byType(Divider), findsNothing);
     });
 
     testWidgets('en una ventana angosta muestra tarjetas y no la tabla', (

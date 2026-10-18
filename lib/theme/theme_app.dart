@@ -66,8 +66,8 @@ class ThemeApp {
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
       ),
-      // El menú lateral no es un `NavigationRail` sino botones propios, que
-      // toman sus colores del esquema: no hay tema que configurar aquí.
+      // La barra de módulos no es un `NavigationBar` sino botones propios,
+      // que toman sus colores del esquema: no hay tema que configurar aquí.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: esOscuro ? scheme.surface : Colors.white,
         indicatorColor: scheme.primary.withValues(alpha: 0.2),

@@ -130,14 +130,11 @@ void main() {
     await db.close();
   });
 
-  testWidgets('la tarjeta ocupa el espacio que deja la barra de pestañas', (
-    tester,
-  ) async {
+  testWidgets('la tarjeta ocupa el módulo entero', (tester) async {
     await sembrarClientes(3);
     await abrirModulo(tester);
 
     final modulo = tester.getRect(find.byType(CatalogosView));
-    final barra = tester.getRect(find.byType(TabBar));
     final tarjeta = tester.getRect(
       find.descendant(
         of: find.byType(ListadoCatalogo),
@@ -145,18 +142,16 @@ void main() {
       ),
     );
 
-    // Pegada a las orillas del módulo salvo por su propio margen...
+    // Pegada a las cuatro orillas del módulo salvo por su propio margen: las
+    // pestañas ya no se llevan una franja encima.
     const margen = 12.0;
     expect(tarjeta.left, modulo.left + margen);
     expect(tarjeta.right, modulo.right - margen);
+    expect(tarjeta.top, modulo.top + margen);
     expect(tarjeta.bottom, modulo.bottom - margen);
-
-    // ...y empezando justo debajo de la barra, con la línea que la separa.
-    const separador = 1.0;
-    expect(tarjeta.top, barra.bottom + separador + margen);
   });
 
-  testWidgets('el encabezado lleva el nombre del catálogo y el botón', (
+  testWidgets('el encabezado lleva las pestañas y el botón de agregar', (
     tester,
   ) async {
     await sembrarClientes(3);
@@ -167,29 +162,35 @@ void main() {
     );
     final filtros = tester.getRect(find.byKey(DataTableCard.llaveFiltros));
 
-    // El nombre de la pestaña, otra vez en la tarjeta...
-    final titulo = tester.getRect(
+    // Las tres pestañas, en el sitio donde antes iba el nombre del catálogo...
+    expect(find.byType(PestanasCatalogo), findsOneWidget);
+
+    for (final nombre in ['Clientes', 'Categorías de ropa', 'Precios de ropa']) {
+      final pestana = tester.getRect(
+        find.descendant(
+          of: find.byKey(DataTableCard.llaveEncabezado),
+          matching: find.text(nombre),
+        ),
+      );
+      expect(encabezado.contains(pestana.center), isTrue);
+    }
+
+    // ...y el botón de agregar enfrente, en el mismo renglón.
+    final abierta = tester.getRect(
       find.descendant(
         of: find.byKey(DataTableCard.llaveEncabezado),
-        matching: find.text('Clientes'),
+        matching: find.text('Precios de ropa'),
       ),
     );
-    // ...y el botón de agregar enfrente, en el mismo renglón.
     final agregar = tester.getRect(
       find.widgetWithText(FilledButton, 'Agregar cliente'),
     );
 
-    expect(encabezado.contains(titulo.center), isTrue);
     expect(encabezado.contains(agregar.center), isTrue);
-    expect(agregar.left, greaterThan(titulo.right));
+    expect(agregar.left, greaterThan(abierta.right));
 
-    // La línea del encabezado cierra el bloque, por encima de los filtros.
-    final linea = tester.getRect(
-      find.descendant(
-        of: find.byKey(DataTableCard.llaveEncabezado),
-        matching: find.byType(Divider),
-      ),
-    );
+    // La línea cierra el encabezado, por encima de los filtros.
+    final linea = tester.getRect(find.byType(Divider));
 
     expect(linea.top, greaterThan(agregar.bottom));
     expect(linea.bottom, lessThanOrEqualTo(filtros.top));

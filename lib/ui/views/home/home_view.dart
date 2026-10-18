@@ -6,17 +6,16 @@ import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 /// La pantalla principal: la navegación entre módulos y el módulo abierto.
 ///
-/// El módulo ocupa todo el espacio que deja la navegación. Antes el riel iba
-/// dentro de un `SizedBox(width: 80)` mientras él pedía 100 de ancho mínimo y
-/// etiquetas debajo de cada icono, así que se quedaba estrecho y el contenido
-/// empezaba donde no debía.
+/// El módulo ocupa todo el espacio que deja la navegación, que va arriba y no
+/// al costado: las pantallas son listados anchos y un menú lateral les quitaba
+/// el espacio que más falta les hace.
 ///
 /// La navegación cambia de forma con el ancho de la ventana —es una aplicación
 /// de escritorio, y se puede dejar en media pantalla—:
 ///
-/// - angosta: una barra superior con el cajón de módulos, que sólo ocupa
-///   espacio mientras está abierto;
-/// - a partir de ahí: el menú de módulos fijo a la izquierda.
+/// - angosta: una barra con el nombre del módulo y el cajón detrás del botón,
+///   que sólo ocupa espacio mientras está abierto;
+/// - a partir de ahí: la barra de módulos, con los tres a la vista.
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
 
@@ -64,18 +63,13 @@ class _HomeViewState extends ConsumerState<HomeView> {
         }
 
         return Scaffold(
-          body: Row(
-            children: [
-              MenuModulos(
-                pestana: pestana,
-                onSeleccion: notifier.seleccionarPestana,
-                botonTema: botonTema,
-              ),
-              const VerticalDivider(width: 1, thickness: 1),
-              // El módulo se queda con todo el ancho restante.
-              Expanded(child: contenido),
-            ],
+          appBar: BarraModulos(
+            pestana: pestana,
+            onSeleccion: notifier.seleccionarPestana,
+            botonTema: botonTema,
           ),
+          // El módulo se queda con el ancho entero de la ventana.
+          body: contenido,
         );
       },
     );

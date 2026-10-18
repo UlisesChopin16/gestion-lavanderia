@@ -19,9 +19,6 @@ class CategoriasView extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    // El encabezado de la tarjeta se nombra como la pestaña: dos
-    // etiquetas distintas para lo mismo harían dudar de si son lo mismo.
-    const pestana = CatalogosTabsType.categorias;
     final estado = ref.watch(categoriasViewModelProvider);
     final notifier = ref.read(categoriasViewModelProvider.notifier);
     final filtros = estado.filtros;
@@ -36,10 +33,23 @@ class CategoriasView extends ConsumerWidget {
             : 'Todavía no hay categorías de ropa.',
         rowKey: (categoria) => categoria.id,
 
-        title: pestana.title,
-        titleIcon: pestana.icon,
-        addLabel: 'Agregar categoría',
-        onAdd: () => _agregar(context),
+        // El encabezado: las pestañas del módulo a la izquierda —la marcada
+        // dice en qué catálogo está uno— y el alta enfrente. En una ventana
+        // angosta el botón baja al renglón siguiente en lugar de desbordarse.
+        seccionEncabezado: Wrap(
+          alignment: WrapAlignment.spaceBetween,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          runAlignment: WrapAlignment.center,
+          spacing: 16,
+          runSpacing: 12,
+          children: [
+            const PestanasCatalogo(),
+            ButtonAdd(
+              label: 'Agregar categoría',
+              onPressed: () => _agregar(context),
+            ),
+          ],
+        ),
 
         sortedBy: filtros.ordenamiento,
         ascending: filtros.ascendente,

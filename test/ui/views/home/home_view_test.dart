@@ -42,7 +42,7 @@ void main() {
     testWidgets('abre en órdenes y ofrece los tres módulos', (tester) async {
       await abrirAplicacion(tester);
 
-      expect(find.byType(MenuModulos), findsOneWidget);
+      expect(find.byType(BarraModulos), findsOneWidget);
       expect(find.text('Órdenes'), findsWidgets);
       expect(find.text('Catálogos'), findsWidgets);
       expect(find.text('Empresa'), findsWidgets);
@@ -56,9 +56,9 @@ void main() {
 
       await abrirAplicacion(tester);
 
-      // El menú fijo desaparece y queda la barra superior con el nombre del
-      // módulo abierto.
-      expect(find.byType(MenuModulos), findsNothing);
+      // La barra de módulos desaparece y queda la del nombre del módulo
+      // abierto, con el cajón detrás del botón.
+      expect(find.byType(BarraModulos), findsNothing);
       expect(find.byType(AppBar), findsOneWidget);
       expect(find.widgetWithText(AppBar, 'Órdenes'), findsOneWidget);
       expect(find.byType(Drawer), findsNothing);
@@ -83,29 +83,44 @@ void main() {
     });
   });
 
-  group('el menú', () {
-    testWidgets('lleva el nombre del módulo dentro del botón', (tester) async {
+  group('la barra de módulos', () {
+    testWidgets('nombra los módulos sin iconos', (tester) async {
       await abrirAplicacion(tester);
 
       final boton = find.widgetWithText(BotonModulo, 'Empresa');
-      final icono = find.descendant(
-        of: boton,
-        matching: find.byIcon(Icons.business_outlined),
-      );
 
       expect(boton, findsOneWidget);
-      expect(icono, findsOneWidget);
+      expect(
+        find.descendant(of: boton, matching: find.byType(Icon)),
+        findsNothing,
+      );
+    });
 
-      // Y el icono va arriba del nombre.
-      final nombre = find.descendant(of: boton, matching: find.text('Empresa'));
-      expect(tester.getCenter(icono).dy, lessThan(tester.getCenter(nombre).dy));
+    testWidgets('los tres módulos van en un renglón, arriba del contenido', (
+      tester,
+    ) async {
+      await abrirAplicacion(tester);
+
+      final ordenes = tester.getRect(
+        find.widgetWithText(BotonModulo, 'Órdenes'),
+      );
+      final empresa = tester.getRect(
+        find.widgetWithText(BotonModulo, 'Empresa'),
+      );
+
+      expect(empresa.top, ordenes.top);
+      expect(empresa.left, greaterThan(ordenes.right));
+      expect(
+        ordenes.bottom,
+        lessThanOrEqualTo(tester.getRect(find.byType(PantallaPendiente)).top),
+      );
     });
 
     testWidgets('ilumina el botón entero del módulo abierto', (tester) async {
       await abrirAplicacion(tester);
       await abrirPestana(tester, 'Empresa');
 
-      final scheme = Theme.of(tester.element(find.byType(MenuModulos)))
+      final scheme = Theme.of(tester.element(find.byType(BarraModulos)))
           .colorScheme;
 
       Material superficieDe(String titulo) => tester.widget<Material>(
@@ -127,24 +142,25 @@ void main() {
   });
 
   group('el módulo abierto', () {
-    testWidgets('ocupa todo el ancho que deja el menú', (tester) async {
+    testWidgets('ocupa el ancho entero de la ventana', (tester) async {
       await conVentanaDe(tester, const Size(1000, 800));
 
       await abrirAplicacion(tester);
 
-      final anchoMenu = tester.getSize(find.byType(MenuModulos)).width;
-      final anchoModulo = tester.getSize(find.byType(PantallaPendiente)).width;
-
-      // 1 es el divisor vertical entre el menú y el contenido.
-      expect(anchoModulo, 1000 - anchoMenu - 1);
+      // Con la navegación arriba ya no hay menú que le coma ancho: era lo que
+      // se buscaba al subirla.
+      expect(tester.getSize(find.byType(PantallaPendiente)).width, 1000);
     });
 
-    testWidgets('ocupa todo el alto disponible', (tester) async {
+    testWidgets('ocupa todo el alto que deja la barra', (tester) async {
       await conVentanaDe(tester, const Size(1000, 800));
 
       await abrirAplicacion(tester);
 
-      expect(tester.getSize(find.byType(PantallaPendiente)).height, 800);
+      expect(
+        tester.getSize(find.byType(PantallaPendiente)).height,
+        800 - BarraModulos.alto,
+      );
     });
 
     testWidgets('con el cajón escondido ocupa el ancho completo', (

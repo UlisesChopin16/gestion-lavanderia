@@ -30,9 +30,9 @@ export 'package:gestion_lavanderia/types/unit_type.dart';
 /// lugar de `equals`, y sigue sirviendo para `like` y para ordenar porque en
 /// SQL continúa siendo texto.
 
-/// La constante `todos` de [EstatusType] sólo existe como opción de filtro.
-/// Guardarla dejaría en la columna un texto que ninguna consulta busca, así que
-/// [toSql] la rechaza en lugar de escribirla.
+/// Toda constante de [EstatusType] es un estatus que se puede guardar: "ver
+/// todos" no es una de ellas, sino la ausencia de filtro, que los listados
+/// dicen con un `null`. Por eso aquí no hay nada que rechazar.
 class EstatusConverter extends TypeConverter<EstatusType, String> {
   const EstatusConverter();
 
@@ -40,17 +40,7 @@ class EstatusConverter extends TypeConverter<EstatusType, String> {
   EstatusType fromSql(String fromDb) => EstatusType.fromString(fromDb);
 
   @override
-  String toSql(EstatusType value) {
-    if (value == EstatusType.todos) {
-      throw ArgumentError.value(
-        value,
-        'estatus',
-        'es una opción de filtro, no un estatus que se pueda guardar',
-      );
-    }
-
-    return value.value;
-  }
+  String toSql(EstatusType value) => value.value;
 }
 
 /// Mismo criterio que [EstatusConverter] con el ciclo de vida de una orden:

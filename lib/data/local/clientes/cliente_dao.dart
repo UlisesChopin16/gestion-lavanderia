@@ -135,17 +135,28 @@ class ClientesDao extends DatabaseAccessor<AppDatabase>
   /// La comparación es insensible a mayúsculas en ambos casos (alta y edición):
   /// si el alta respetara mayúsculas, `Ana@x.com` podría darse de alta dos
   /// veces y luego fallar al editarla.
+  ///
+  /// Un dato vacío no se compara. El correo es opcional —un cliente de
+  /// mostrador muchas veces sólo deja su teléfono—, y comparándolo tal cual el
+  /// segundo cliente sin correo chocaba con el primero: los dos tienen la
+  /// cadena vacía y la consulta los daba por el mismo.
   Future<void> _ensureContactoUnico({
     required String correo,
     required String telefono,
     int? excluyendoId,
   }) async {
+    final iguales = [
+      if (correo.trim().isNotEmpty)
+        cliente.correo.lower().equals(correo.toLowerCase()),
+      if (telefono.trim().isNotEmpty)
+        cliente.telefono.lower().equals(telefono.toLowerCase()),
+    ];
+
+    if (iguales.isEmpty) return;
+
     final query = selectOnly(cliente)
       ..addColumns([cliente.id])
-      ..where(
-        cliente.correo.lower().equals(correo.toLowerCase()) |
-            cliente.telefono.lower().equals(telefono.toLowerCase()),
-      )
+      ..where(iguales.reduce((a, b) => a | b))
       ..limit(1);
 
     if (excluyendoId != null) {

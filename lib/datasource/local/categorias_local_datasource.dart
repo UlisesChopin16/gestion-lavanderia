@@ -37,6 +37,10 @@ class CategoriasLocalDatasource {
   /// Las categorías activas, para los selectores que piden una.
   Future<List<CategoriaServicioEntry>> activas() => _dao.getAll();
 
+  /// Todas, activas o no, para los filtros: un listado se puede acotar a una
+  /// categoría que ya se dio de baja.
+  Future<List<CategoriaServicioEntry>> todas() => _dao.getTodas();
+
   Future<CategoriaServicioEntry?> porId(int id) => _dao.getById(id);
 
   /// Guarda los filtros y devuelve el listado ya filtrado: sin stream que

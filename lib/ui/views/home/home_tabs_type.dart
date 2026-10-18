@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/ui/shared/views/pantalla_pendiente.dart';
+import 'package:gestion_lavanderia/ui/views/catalogos/catalogos_view.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/configuracion_empresa_view.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
@@ -22,7 +23,7 @@ enum HomeTabsType {
     title: 'Catálogos',
     icon: IconsManager.selectedCatalogoIcon,
     unselectedIcon: IconsManager.unselectedCatalogoIcon,
-    view: PantallaPendiente(modulo: 'Catálogos'),
+    view: CatalogosView(),
   ),
   empresa(
     title: 'Empresa',

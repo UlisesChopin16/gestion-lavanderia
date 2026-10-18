@@ -77,7 +77,8 @@ void main() {
 
       final listado = await datasource.aplicarFiltros(
         const FiltrosCategoria(
-          estatus: EstatusType.todos,
+          // Sin estatus: se ven las activas y las dadas de baja.
+          estatus: null,
           ordenamiento: ColumnsCategoriaType.nombre,
           ascendente: true,
         ),
@@ -88,7 +89,7 @@ void main() {
       // Un datasource nuevo —otra pantalla, u otro arranque— ve los mismos
       // filtros sin que nadie se los pase.
       final otro = construir();
-      expect(otro.filtros.estatus, EstatusType.todos);
+      expect(otro.filtros.estatus, isNull);
       expect(nombresDe(await otro.listado()), ['Planchado', 'Tintorería']);
     },
   );

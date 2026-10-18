@@ -254,8 +254,9 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
       query.where(preciosConceptos.clotheSize.equalsValue(clotheSize));
     }
 
-    if (filtros.estatus != EstatusType.todos) {
-      query.where(preciosConceptos.estatus.equalsValue(filtros.estatus));
+    final estatus = filtros.estatus;
+    if (estatus != null) {
+      query.where(preciosConceptos.estatus.equalsValue(estatus));
     }
 
     if (filtros.nombre.isNotEmpty) {

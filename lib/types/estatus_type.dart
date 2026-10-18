@@ -1,8 +1,9 @@
 /// Visibilidad de un registro con baja lógica.
 ///
-/// `todos` no se guarda nunca en la base: existe sólo como opción de filtro.
+/// No hay una constante para "todos": que un listado no filtre por estatus se
+/// dice con un `null` en sus filtros. Así la ausencia de filtro no se puede
+/// confundir con un estatus, ni acabar escrita en la base como uno más.
 enum EstatusType {
-  todos(value: 'Todos'),
   activo(value: 'Activo'),
   inactivo(value: 'Inactivo');
 

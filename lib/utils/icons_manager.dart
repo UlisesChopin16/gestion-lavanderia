@@ -45,7 +45,7 @@ abstract final class IconsManager {
   static const actionsMenu = Icons.more_vert;
   static const search = Icons.search;
   static const add = Icons.add;
-  static const clearFilters = Icons.clear_rounded;
+  static const clearFilters = Icons.filter_alt_off_rounded;
 
   static IconData getSortIcon(bool isAscending) =>
       isAscending ? orderAZ : orderZA;

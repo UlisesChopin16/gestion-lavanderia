@@ -284,7 +284,6 @@ void main() {
           columns: columnas(),
           rows: precios,
           forceSmall: false,
-          haveFilters: true,
           initialSearch: 'sábana',
           onSearchChanged: (_) {},
           onClearFilters: () => limpiados++,

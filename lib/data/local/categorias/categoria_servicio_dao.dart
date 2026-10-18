@@ -44,8 +44,9 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
   Future<List<CategoriaServicioEntry>> listado(FiltrosCategoria filtros) {
     final query = select(categoriaServicio);
 
-    if (filtros.estatus != EstatusType.todos) {
-      query.where((t) => t.estatus.equalsValue(filtros.estatus));
+    final estatus = filtros.estatus;
+    if (estatus != null) {
+      query.where((t) => t.estatus.equalsValue(estatus));
     }
 
     if (filtros.nombre.isNotEmpty) {
@@ -60,6 +61,18 @@ class CategoriaServicioDao extends DatabaseAccessor<AppDatabase>
         desempate: categoriaServicio.id,
       ),
     );
+
+    return query.get();
+  }
+
+  /// Todas las categorías, estén activas o no, por nombre.
+  ///
+  /// Es lo que necesita un filtro: la lista de precios puede acotarse a una
+  /// categoría dada de baja —para ver qué conceptos se fueron con ella—, y con
+  /// sólo las activas esa opción no aparecería.
+  Future<List<CategoriaServicioEntry>> getTodas() {
+    final query = select(categoriaServicio)
+      ..orderBy([(t) => OrderingTerm.asc(t.nombre)]);
 
     return query.get();
   }

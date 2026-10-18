@@ -85,13 +85,6 @@ void main() {
     expect(categoria.estatus, EstatusType.inactivo);
   });
 
-  test('el estatus "todos" es de filtro y no se puede guardar', () async {
-    await expectLater(
-      crearCategoria(estatus: EstatusType.todos),
-      throwsA(isA<ArgumentError>()),
-    );
-  });
-
   test('el estatus "todos" de una orden tampoco se guarda', () async {
     final clienteId = await db.clientesDao.insertCliente(
       ClienteCompanion.insert(

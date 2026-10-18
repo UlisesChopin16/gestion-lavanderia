@@ -16,8 +16,23 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// invertido, y al tocar otra llega ascendente.
 typedef SortChanged<C> = void Function(C column, bool ascending);
 
-/// El contenido de un listado: buscador, filtros, y la lista como tabla o como
-/// tarjetas según el ancho disponible.
+/// El contenido de un listado: su encabezado, los filtros, la paginación y la
+/// lista como tabla o como tarjetas según el ancho disponible.
+///
+/// De arriba abajo:
+///
+/// 1. el encabezado —el nombre del listado y el botón de agregar—, cerrado por
+///    una línea;
+/// 2. el buscador y los filtros, juntos en un solo recuadro;
+/// 3. la paginación;
+/// 4. la lista.
+///
+/// Los tres últimos van separados por el mismo aire.
+///
+/// La paginación va *antes* de la lista y no al pie: en una tabla de diez
+/// renglones el pie queda a media pantalla, y con la lista larga había que
+/// recorrerla entera para cambiar de página. Arriba está siempre en el mismo
+/// sitio, junto a los filtros con los que se usa.
 ///
 /// Recibe las filas tal como vienen de la base ([T]) y las columnas que las
 /// describen, y arma la tabla. No recibe `DataColumn` ni `DataRow` ya
@@ -34,13 +49,15 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///   rows: precios,
 ///   sortedBy: filtros.ordenamiento,
 ///   ascending: filtros.ascendente,
-///   onSort: notifier.setOrdenAndSort,
+///   onSort: notifier.ordenar,
+///   title: 'Precios de ropa',
+///   titleIcon: IconsManager.selectedPreciosIcon,
 ///   addLabel: 'Agregar concepto',
 ///   onAdd: _onAgregar,
-///   onSearchChanged: notifier.setNombre,
+///   onSearchChanged: notifier.buscar,
 ///   initialSearch: filtros.nombre,
-///   haveFilters: filtros.haveFilters,
-///   onClearFilters: notifier.clearFilters,
+///   onClearFilters: notifier.limpiarFiltros,
+///   pagination: TablePagination(...),
 ///   rowKey: (precio) => precio.id,
 ///   columns: [
 ///     TableColumnDef.text(
@@ -82,17 +99,18 @@ class DataTableCard<T, C> extends StatefulWidget {
     this.forceSmall,
     this.smallBreakpoint = ConstantsManager.mediumScreen,
     this.filters = const [],
-    this.haveFilters = false,
     this.onClearFilters,
     this.onSearchChanged,
     this.initialSearch = '',
     this.searchLabel = 'Buscar',
     this.searchDebounce = const Duration(milliseconds: 300),
+    this.title,
+    this.titleIcon,
     this.addLabel,
     this.onAdd,
     this.isLoading = false,
     this.emptyMessage = 'No hay elementos disponibles',
-    this.footer,
+    this.pagination,
   }) : assert(columns.length > 0, 'La tabla necesita al menos una columna');
 
   final List<TableColumnDef<T, C>> columns;
@@ -126,11 +144,14 @@ class DataTableCard<T, C> extends StatefulWidget {
   final bool? forceSmall;
   final double smallBreakpoint;
 
-  /// Filtros propios de cada listado, sobre la tabla.
+  /// Filtros propios de cada listado. Van en el mismo recuadro que el
+  /// buscador: son lo mismo —formas de acotar la lista— y separados parecían
+  /// dos controles que no tienen que ver uno con otro.
   final List<Widget> filters;
 
-  /// Si hay algún filtro aplicado, para mostrar el botón que los limpia.
-  final bool haveFilters;
+  /// Devuelve el listado a sus filtros de omisión. El botón que lo hace está
+  /// siempre a la vista mientras haya un listado que limpiar; en `null` no
+  /// aparece, porque no habría nada que pulsar.
   final VoidCallback? onClearFilters;
 
   final ValueChanged<String>? onSearchChanged;
@@ -144,6 +165,11 @@ class DataTableCard<T, C> extends StatefulWidget {
   /// espera, escribir "pantalón" lanza ocho consultas a la base.
   final Duration searchDebounce;
 
+  /// El nombre del listado, en el encabezado de la tarjeta. En `null` el
+  /// encabezado sólo lleva el botón de agregar.
+  final String? title;
+  final IconData? titleIcon;
+
   /// Texto del botón de agregar. El botón aparece sólo si hay texto y [onAdd]:
   /// sin callback no habría nada que hacer con él.
   final String? addLabel;
@@ -152,8 +178,18 @@ class DataTableCard<T, C> extends StatefulWidget {
   final bool isLoading;
   final String emptyMessage;
 
-  /// Debajo de la lista: la paginación, un total, un resumen.
-  final Widget? footer;
+  /// Entre los filtros y la lista: la paginación, un total, un resumen.
+  final Widget? pagination;
+
+  /// Las llaves de los tres bloques.
+  ///
+  /// Están para que una prueba pueda medir el aire que los separa sin
+  /// depender de cómo esté armado el interior del componente, que es lo que
+  /// hace que una prueba de disposición se rompa al refactorizar.
+  static const llaveEncabezado = Key('data-table-card-encabezado');
+  static const llaveFiltros = Key('data-table-card-filtros');
+  static const llavePaginacion = Key('data-table-card-paginacion');
+  static const llaveLista = Key('data-table-card-lista');
 
   @override
   State<DataTableCard<T, C>> createState() => _DataTableCardState<T, C>();
@@ -165,6 +201,19 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   );
   final ScrollController _horizontal = ScrollController();
   Timer? _debounce;
+
+  /// El aire entre los tres bloques: 1.5 rem.
+  ///
+  /// Es el mismo entre los controles y la paginación que entre la paginación y
+  /// la lista, para que los tres se lean como tres cosas al mismo nivel y no
+  /// como una pegada a otra.
+  static const double _espacio = 24;
+
+  /// Lo que separa el contenido del borde de la tarjeta.
+  static const double _relleno = 20;
+
+  /// El redondeo de los recuadros: el de los filtros y el de la tabla.
+  static const double _radio = 16;
 
   @override
   void dispose() {
@@ -199,10 +248,14 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
 
   bool get _showAddButton => widget.addLabel != null && widget.onAdd != null;
 
+  bool get _hasFilters => widget.onSearchChanged != null ||
+      widget.filters.isNotEmpty ||
+      widget.onClearFilters != null;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.all(15),
+      padding: const EdgeInsets.all(_relleno),
       // El LayoutBuilder va dentro del Padding para que el ancho que mide sea
       // el que la tabla puede ocupar de verdad.
       child: LayoutBuilder(
@@ -213,33 +266,45 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
           final isSmall = widget.forceSmall ?? width < widget.smallBreakpoint;
 
           return Column(
-            spacing: 10,
+            spacing: _espacio,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             mainAxisSize: MainAxisSize.min,
             children: [
-              _SearchAndAdd(
-                controller: _search,
-                label: widget.searchLabel,
-                onSearchChanged: widget.onSearchChanged == null
-                    ? null
-                    : _onSearchChanged,
-                addLabel: _showAddButton ? widget.addLabel : null,
-                onAdd: widget.onAdd,
-              ),
-              const Divider(height: 0),
-              if (widget.filters.isNotEmpty || widget.haveFilters)
-                _Filters(
+              if (widget.title != null || _showAddButton)
+                _Encabezado(
+                  key: DataTableCard.llaveEncabezado,
+                  titulo: widget.title,
+                  icono: widget.titleIcon,
+                  radio: _radio,
+                  addLabel: _showAddButton ? widget.addLabel : null,
+                  onAdd: widget.onAdd,
+                ),
+              if (_hasFilters)
+                _BloqueFiltros(
+                  key: DataTableCard.llaveFiltros,
+                  radio: _radio,
+                  controller: _search,
+                  label: widget.searchLabel,
+                  onSearchChanged: widget.onSearchChanged == null
+                      ? null
+                      : _onSearchChanged,
                   filters: widget.filters,
-                  haveFilters: widget.haveFilters,
-                  onClearFilters: _clearFilters,
+                  onClearFilters: widget.onClearFilters == null
+                      ? null
+                      : _clearFilters,
+                ),
+              if (widget.pagination != null)
+                KeyedSubtree(
+                  key: DataTableCard.llavePaginacion,
+                  child: widget.pagination!,
                 ),
               AnimatedSize(
+                key: DataTableCard.llaveLista,
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOutCubic,
                 alignment: Alignment.topCenter,
                 child: _body(context, isSmall: isSmall, maxWidth: width),
               ),
-              if (widget.footer != null) widget.footer!,
             ],
           );
         },
@@ -256,23 +321,24 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
     required double maxWidth,
   }) {
     if (widget.isLoading) {
-      return const Padding(
-        padding: EdgeInsets.symmetric(vertical: 32),
-        child: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    if (widget.rows.isEmpty) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Text(
-          widget.emptyMessage,
-          textAlign: TextAlign.center,
-          style: Theme.of(context).textTheme.titleMedium,
+      return _Marco(
+        radio: _radio,
+        child: const Padding(
+          padding: EdgeInsets.symmetric(vertical: 48),
+          child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
 
+    if (widget.rows.isEmpty) {
+      return _Marco(
+        radio: _radio,
+        child: _Vacio(mensaje: widget.emptyMessage),
+      );
+    }
+
+    // Las tarjetas de la vista compacta ya tienen borde propio; enmarcarlas
+    // otra vez sería una caja dentro de otra.
     if (isSmall) {
       return TableSmallList<T, C>(
         columns: widget.columns,
@@ -285,14 +351,38 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
       );
     }
 
-    return _scrollableTable(context, maxWidth);
+    return _Marco(
+      radio: _radio,
+      // El ancho de dentro del marco: el borde se queda con un píxel por lado,
+      // y sin descontarlo la tabla pediría dos de más y nacería desplazable.
+      child: _scrollableTable(context, maxWidth - 2),
+    );
   }
 
   Widget _scrollableTable(BuildContext context, double maxWidth) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
     final table = DataTable(
       sortColumnIndex: _sortColumnIndex,
       sortAscending: widget.ascending,
       showCheckboxColumn: false,
+      // Un renglón alto y sin líneas que lo encajonen: el rayado ya separa una
+      // fila de la siguiente, y la línea encima del rayado ensuciaba la tabla.
+      headingRowHeight: 56,
+      dataRowMinHeight: 52,
+      dataRowMaxHeight: 60,
+      horizontalMargin: 20,
+      columnSpacing: 28,
+      dividerThickness: 0,
+      showBottomBorder: false,
+      headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
+      headingTextStyle: theme.textTheme.labelLarge?.copyWith(
+        color: scheme.onSurfaceVariant,
+        fontWeight: FontWeight.w600,
+        letterSpacing: 0.3,
+      ),
+      dataTextStyle: theme.textTheme.bodyMedium,
       columns: _buildColumns(),
       rows: _buildRows(context),
     );
@@ -316,7 +406,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
         child: SingleChildScrollView(
           controller: _horizontal,
           scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.only(bottom: 12),
           // La tabla ocupa todo el ancho disponible y sólo se desborda —y se
           // desplaza— cuando sus columnas no caben.
           child: ConstrainedBox(
@@ -417,79 +506,243 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   }
 }
 
-class _SearchAndAdd extends StatelessWidget {
-  const _SearchAndAdd({
-    required this.controller,
-    required this.label,
-    this.onSearchChanged,
+/// El nombre del listado y el botón de agregar, cerrados por una línea.
+///
+/// El botón vive aquí y no entre los filtros porque no acota la lista, la hace
+/// crecer: puesto junto a ellos parecía uno más. La línea separa lo que el
+/// listado es de lo que se hace con él.
+class _Encabezado extends StatelessWidget {
+  const _Encabezado({
+    super.key,
+    required this.titulo,
+    required this.icono,
+    required this.radio,
     this.addLabel,
     this.onAdd,
   });
 
-  final TextEditingController controller;
-  final String label;
-  final ValueChanged<String>? onSearchChanged;
+  final String? titulo;
+  final IconData? icono;
+  final double radio;
   final String? addLabel;
   final VoidCallback? onAdd;
 
+  /// Lo que separa el renglón del título de la línea de abajo.
+  static const double _aire = 16;
+
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final titulo = this.titulo;
     final addLabel = this.addLabel;
 
-    return Wrap(
-      alignment: WrapAlignment.end,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      runAlignment: WrapAlignment.end,
-      spacing: 15,
-      runSpacing: 10,
+    final boton = addLabel == null
+        ? null
+        : _BotonAgregar(label: addLabel, onPressed: onAdd, radio: radio);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (onSearchChanged != null)
-          TextField(
-            controller: controller,
-            onChanged: onSearchChanged,
-            decoration: InputDecoration(
-              constraints: const BoxConstraints(maxWidth: 300),
-              labelText: label,
-              suffixIcon: const Icon(IconsManager.search),
-            ),
+        if (titulo == null)
+          // Sin nombre que poner, el botón se queda solo a la derecha: un
+          // `Wrap` repartido lo dejaría pegado a la izquierda.
+          Align(alignment: Alignment.centerRight, child: boton)
+        else
+          Wrap(
+            // En una ventana angosta el botón no cabe al lado del nombre, y
+            // baja al renglón siguiente en lugar de desbordarse.
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            runAlignment: WrapAlignment.center,
+            spacing: 16,
+            runSpacing: 12,
+            children: [
+              _Titulo(texto: titulo, icono: icono),
+              ?boton,
+            ],
           ),
-        if (addLabel != null)
-          FilledButton.icon(
-            onPressed: onAdd,
-            icon: const Icon(IconsManager.add),
-            label: Text(addLabel),
-            style: FilledButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-            ),
-          ),
+        const SizedBox(height: _aire),
+        Divider(height: 1, thickness: 1, color: scheme.outlineVariant),
       ],
     );
   }
 }
 
-class _Filters extends StatelessWidget {
-  const _Filters({
-    required this.filters,
-    required this.haveFilters,
-    required this.onClearFilters,
-  });
+/// El nombre del listado, con el icono con el que se le conoce en la
+/// navegación.
+class _Titulo extends StatelessWidget {
+  const _Titulo({required this.texto, this.icono});
 
-  final List<Widget> filters;
-  final bool haveFilters;
-  final VoidCallback onClearFilters;
+  final String texto;
+  final IconData? icono;
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      alignment: WrapAlignment.end,
-      crossAxisAlignment: WrapCrossAlignment.center,
-      runAlignment: WrapAlignment.end,
+    final theme = Theme.of(context);
+    final icono = this.icono;
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
       spacing: 10,
-      runSpacing: 10,
       children: [
-        if (haveFilters) ButtonClearFilters(onPressed: onClearFilters),
-        ...filters,
+        if (icono != null) Icon(icono, color: theme.colorScheme.primary),
+        Text(
+          texto,
+          style: theme.textTheme.titleMedium?.copyWith(
+            fontWeight: FontWeight.w600,
+          ),
+        ),
       ],
+    );
+  }
+}
+
+/// El buscador y los filtros del listado, juntos en un solo recuadro.
+class _BloqueFiltros extends StatelessWidget {
+  const _BloqueFiltros({
+    super.key,
+    required this.radio,
+    required this.controller,
+    required this.label,
+    required this.filters,
+    required this.onClearFilters,
+    this.onSearchChanged,
+  });
+
+  final double radio;
+  final TextEditingController controller;
+  final String label;
+  final ValueChanged<String>? onSearchChanged;
+  final List<Widget> filters;
+  final VoidCallback? onClearFilters;
+
+  static const double _anchoBuscador = 320;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      decoration: BoxDecoration(
+        color: scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(radio),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: Wrap(
+        spacing: 12,
+        runSpacing: 12,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        children: [
+          if (onSearchChanged != null)
+            SizedBox(
+              width: _anchoBuscador,
+              child: TextField(
+                controller: controller,
+                onChanged: onSearchChanged,
+                textInputAction: TextInputAction.search,
+                decoration: InputDecoration(
+                  labelText: label,
+                  prefixIcon: const Icon(IconsManager.search),
+                ),
+              ),
+            ),
+          ...filters,
+          // Al final de todo, que es donde se busca lo que deshace lo que uno
+          // acaba de hacer, y siempre en el mismo sitio: un botón que aparece
+          // y desaparece mueve los demás controles de lugar.
+          if (onClearFilters != null)
+            ButtonClearFilters(onPressed: onClearFilters),
+        ],
+      ),
+    );
+  }
+}
+
+/// El botón que da de alta un registro del listado.
+class _BotonAgregar extends StatelessWidget {
+  const _BotonAgregar({
+    required this.label,
+    required this.radio,
+    this.onPressed,
+  });
+
+  final String label;
+  final double radio;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilledButton.icon(
+      onPressed: onPressed,
+      icon: const Icon(IconsManager.add),
+      label: Text(label),
+      style: FilledButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 22),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(radio),
+        ),
+      ),
+    );
+  }
+}
+
+/// El recuadro que encierra la lista.
+///
+/// Da a la tabla un contorno propio dentro de la tarjeta: sin él, los
+/// encabezados y el rayado flotaban sobre el fondo y la lista no se distinguía
+/// de los controles de arriba.
+class _Marco extends StatelessWidget {
+  const _Marco({required this.radio, required this.child});
+
+  final double radio;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Container(
+      clipBehavior: Clip.antiAlias,
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(radio),
+        border: Border.all(color: scheme.outlineVariant),
+      ),
+      child: child,
+    );
+  }
+}
+
+/// Lo que se ve cuando no hay nada que listar.
+class _Vacio extends StatelessWidget {
+  const _Vacio({required this.mensaje});
+
+  final String mensaje;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      child: Column(
+        spacing: 12,
+        children: [
+          Icon(
+            Icons.inbox_rounded,
+            size: 44,
+            color: scheme.outline,
+          ),
+          Text(
+            mensaje,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              color: scheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

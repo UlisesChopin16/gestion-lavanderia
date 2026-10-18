@@ -24,7 +24,10 @@ sealed class FiltrosPrecios with _$FiltrosPrecios {
   /// [categoriaId] en [sinCategoria] significa "sin categoría seleccionada".
   const factory FiltrosPrecios({
     @Default('') String nombre,
-    @Default(EstatusType.activo) EstatusType estatus,
+
+    /// En `null` no se filtra por estatus: se ven los activos y los dados de
+    /// baja. El listado arranca en [porOmision], que son sólo los activos.
+    EstatusType? estatus,
     @Default(false) bool ascendente,
     @Default(sinCategoria) int categoriaId,
     ClotheSizeType? clotheSize,
@@ -33,6 +36,14 @@ sealed class FiltrosPrecios with _$FiltrosPrecios {
 
   factory FiltrosPrecios.fromJson(Map<String, dynamic> json) =>
       _$FiltrosPreciosFromJson(json);
+
+  /// Los filtros con los que nace el listado, y a los que vuelve al limpiarlos.
+  ///
+  /// El estatus por omisión no se pone como valor del constructor: entonces
+  /// "sin estatus" —ver todos— no se podría distinguir al releer los filtros
+  /// guardados de "aquí no había nada", y quitar el filtro se desharía solo al
+  /// cerrar la aplicación.
+  static const porOmision = FiltrosPrecios(estatus: EstatusType.activo);
 
   bool get haveFilters {
     return nombre.isNotEmpty ||

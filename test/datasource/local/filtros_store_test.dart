@@ -18,7 +18,7 @@ void main() {
   test('sin nada guardado devuelve los filtros por omisión', () async {
     final filtros = (await store()).precios;
 
-    expect(filtros, const FiltrosPrecios());
+    expect(filtros, FiltrosPrecios.porOmision);
     expect(filtros.haveFilters, isFalse);
   });
 
@@ -26,7 +26,7 @@ void main() {
     final filtrosStore = await store();
     const filtros = FiltrosPrecios(
       nombre: 'sábana',
-      estatus: EstatusType.todos,
+      estatus: null,
       ascendente: true,
       categoriaId: 3,
       clotheSize: ClotheSizeType.king,
@@ -66,7 +66,7 @@ void main() {
       'filtros_precios': jsonEncode({'ordenamiento': 'columnaQueYaNoExiste'}),
     });
 
-    expect(filtrosStore.precios, const FiltrosPrecios());
+    expect(filtrosStore.precios, FiltrosPrecios.porOmision);
 
     // La llave inservible se borra, para no volver a intentar leerla.
     await Future<void>.delayed(Duration.zero);

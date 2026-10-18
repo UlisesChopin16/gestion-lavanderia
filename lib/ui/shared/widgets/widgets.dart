@@ -7,6 +7,8 @@ export 'date_picker_component.dart';
 export 'date_range_picker.dart';
 export 'delete_button.dart';
 export 'dropdown_menu_base.dart';
+export 'estatus_chip.dart';
+export 'estatus_filter.dart';
 export 'form_text_field.dart';
 export 'sort_button.dart';
 export 'sort_dropdown.dart';

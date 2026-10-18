@@ -18,6 +18,7 @@ class BaseDialog extends StatelessWidget {
     this.showCloseButton = true,
     this.onActionPressed,
     this.autofocusAction = false,
+    this.closeOnAction = true,
   });
 
   final String title;
@@ -35,6 +36,13 @@ class BaseDialog extends StatelessWidget {
   /// lo usa no tiene que acordarse de llamar a `pop`.
   final VoidCallback? onActionPressed;
   final bool autofocusAction;
+
+  /// Si el diálogo se cierra solo al aceptar.
+  ///
+  /// En `false` lo cierra [onActionPressed]: es lo que necesita un diálogo que
+  /// valida algo —una contraseña— y tiene que quedarse abierto para avisar que
+  /// el dato no sirve.
+  final bool closeOnAction;
 
   @override
   Widget build(BuildContext context) {
@@ -59,7 +67,7 @@ class BaseDialog extends StatelessWidget {
             autofocus: autofocusAction,
             onPressed: () {
               onActionPressed?.call();
-              Navigator.of(context).pop(true);
+              if (closeOnAction) Navigator.of(context).pop(true);
             },
             child: Text(actionText),
           ),

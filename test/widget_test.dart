@@ -1,30 +1,49 @@
-// This is a basic Flutter widget test.
-//
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
-
+import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/theme/colores_empresa.dart';
+import 'package:gestion_lavanderia/ui/views/home/home_view.dart';
+import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
-import 'package:gestion_lavanderia/main.dart';
+import 'support/app_de_prueba.dart';
+import 'support/inyeccion_de_prueba.dart';
 
+/// Que la aplicación arranque: las dependencias resueltas, el tema armado y el
+/// home en pantalla. Lo que hace cada módulo se prueba en su propio archivo.
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget(const MyApp());
+  TestWidgetsFlutterBinding.ensureInitialized();
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  setUpAll(ConstantsManager.initFormats);
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+  late AppDatabase db;
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+  setUp(() async {
+    db = AppDatabase.forTesting(NativeDatabase.memory());
+    await registrarDependenciasDePrueba(db: db);
+  });
+
+  tearDown(() async {
+    await limpiarDependenciasDePrueba();
+    await db.close();
+  });
+
+  testWidgets('arranca en el home', (tester) async {
+    await abrirAplicacion(tester);
+
+    expect(find.byType(HomeView), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('el tema sale del color de la empresa', (tester) async {
+    // Sin configuración guardada, el color es el que trae `EmpresaData`.
+    await abrirAplicacion(tester);
+
+    final app = tester.widget<MaterialApp>(find.byType(MaterialApp));
+
+    expect(
+      app.theme?.colorScheme,
+      ColorScheme.fromSeed(seedColor: ColoresEmpresa.porOmision),
+    );
   });
 }

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/form_text_field.dart';
+import 'package:gestion_lavanderia/ui/views/configuracion_empresa/widgets/medidas_formulario.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/view_model/configuracion_empresa_view_model.dart';
 
 /// La dirección de la empresa, que es la que sale impresa en el ticket.
@@ -26,8 +27,12 @@ class DatosDireccionForm extends ConsumerWidget {
     void cambiar(DireccionData nueva) => notifier.cambiarDireccion(nueva);
 
     return Wrap(
-      spacing: 15,
-      runSpacing: 15,
+      spacing: MedidasFormulario.separacion,
+      runSpacing: MedidasFormulario.separacion,
+      // Centrado como el encabezado: cuando los campos no caben de dos en dos,
+      // el renglón de uno solo se quedaba pegado a la izquierda con todo el
+      // hueco a la derecha.
+      alignment: WrapAlignment.center,
       children: [
         FormTextField(
           value: direccion.calle,

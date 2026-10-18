@@ -4,6 +4,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/ui/shared/views/pantalla_pendiente.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/configuracion_empresa_view.dart';
+import 'package:gestion_lavanderia/ui/views/home/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 import '../../../support/app_de_prueba.dart';
@@ -41,47 +42,101 @@ void main() {
     testWidgets('abre en órdenes y ofrece los tres módulos', (tester) async {
       await abrirAplicacion(tester);
 
-      expect(find.byType(NavigationRail), findsOneWidget);
+      expect(find.byType(MenuModulos), findsOneWidget);
       expect(find.text('Órdenes'), findsWidgets);
       expect(find.text('Catálogos'), findsWidgets);
       expect(find.text('Empresa'), findsWidgets);
       expect(find.byType(PantallaPendiente), findsOneWidget);
     });
 
-    testWidgets('en una ventana angosta baja a una barra inferior', (
+    testWidgets('en una ventana angosta el menú pasa a un cajón', (
       tester,
     ) async {
       await conVentanaDe(tester, const Size(500, 800));
 
       await abrirAplicacion(tester);
 
-      expect(find.byType(NavigationBar), findsOneWidget);
-      expect(find.byType(NavigationRail), findsNothing);
+      // El menú fijo desaparece y queda la barra superior con el nombre del
+      // módulo abierto.
+      expect(find.byType(MenuModulos), findsNothing);
+      expect(find.byType(AppBar), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Órdenes'), findsOneWidget);
+      expect(find.byType(Drawer), findsNothing);
     });
 
-    testWidgets('en una ventana ancha el riel se extiende', (tester) async {
-      await conVentanaDe(tester, const Size(1400, 900));
+    testWidgets('el cajón abre el módulo elegido y se cierra', (tester) async {
+      await conVentanaDe(tester, const Size(500, 800));
 
       await abrirAplicacion(tester);
 
-      final riel = tester.widget<NavigationRail>(find.byType(NavigationRail));
+      await tester.tap(find.byIcon(Icons.menu));
+      await tester.pumpAndSettle();
 
-      expect(riel.extended, isTrue);
-      expect(find.byType(NavigationBar), findsNothing);
+      expect(find.byType(Drawer), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(ListTile, 'Empresa'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(Drawer), findsNothing);
+      expect(find.byType(ConfiguracionEmpresaView), findsOneWidget);
+      expect(find.widgetWithText(AppBar, 'Empresa'), findsOneWidget);
+    });
+  });
+
+  group('el menú', () {
+    testWidgets('lleva el nombre del módulo dentro del botón', (tester) async {
+      await abrirAplicacion(tester);
+
+      final boton = find.widgetWithText(BotonModulo, 'Empresa');
+      final icono = find.descendant(
+        of: boton,
+        matching: find.byIcon(Icons.business_outlined),
+      );
+
+      expect(boton, findsOneWidget);
+      expect(icono, findsOneWidget);
+
+      // Y el icono va arriba del nombre.
+      final nombre = find.descendant(of: boton, matching: find.text('Empresa'));
+      expect(tester.getCenter(icono).dy, lessThan(tester.getCenter(nombre).dy));
+    });
+
+    testWidgets('ilumina el botón entero del módulo abierto', (tester) async {
+      await abrirAplicacion(tester);
+      await abrirPestana(tester, 'Empresa');
+
+      final scheme = Theme.of(tester.element(find.byType(MenuModulos)))
+          .colorScheme;
+
+      Material superficieDe(String titulo) => tester.widget<Material>(
+        find
+            .descendant(
+              of: find.widgetWithText(BotonModulo, titulo),
+              matching: find.byType(Material),
+            )
+            .first,
+      );
+
+      // El realce cubre el botón, que es el que contiene también el texto.
+      expect(
+        superficieDe('Empresa').color,
+        scheme.primary.withValues(alpha: 0.2),
+      );
+      expect(superficieDe('Órdenes').color, Colors.transparent);
     });
   });
 
   group('el módulo abierto', () {
-    testWidgets('ocupa todo el ancho que deja el riel', (tester) async {
+    testWidgets('ocupa todo el ancho que deja el menú', (tester) async {
       await conVentanaDe(tester, const Size(1000, 800));
 
       await abrirAplicacion(tester);
 
-      final anchoRiel = tester.getSize(find.byType(NavigationRail)).width;
+      final anchoMenu = tester.getSize(find.byType(MenuModulos)).width;
       final anchoModulo = tester.getSize(find.byType(PantallaPendiente)).width;
 
-      // 1 es el divisor vertical entre el riel y el contenido.
-      expect(anchoModulo, 1000 - anchoRiel - 1);
+      // 1 es el divisor vertical entre el menú y el contenido.
+      expect(anchoModulo, 1000 - anchoMenu - 1);
     });
 
     testWidgets('ocupa todo el alto disponible', (tester) async {
@@ -92,7 +147,7 @@ void main() {
       expect(tester.getSize(find.byType(PantallaPendiente)).height, 800);
     });
 
-    testWidgets('con la barra inferior ocupa el ancho completo', (
+    testWidgets('con el cajón escondido ocupa el ancho completo', (
       tester,
     ) async {
       await conVentanaDe(tester, const Size(500, 800));

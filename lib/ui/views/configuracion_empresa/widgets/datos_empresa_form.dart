@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/form_text_field.dart';
+import 'package:gestion_lavanderia/ui/views/configuracion_empresa/widgets/medidas_formulario.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/view_model/configuracion_empresa_view_model.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
@@ -30,7 +31,7 @@ class DatosEmpresaForm extends ConsumerWidget {
     );
 
     return Column(
-      spacing: 15,
+      spacing: MedidasFormulario.separacion,
       mainAxisSize: MainAxisSize.min,
       children: [
         FormTextField(

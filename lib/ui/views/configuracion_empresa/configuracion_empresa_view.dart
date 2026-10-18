@@ -1,5 +1,3 @@
-import 'dart:math' show min;
-
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
@@ -8,6 +6,7 @@ import 'package:gestion_lavanderia/ui/shared/widgets/title_container.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/dialogs/password_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/view_model/configuracion_empresa_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/widgets/widgets.dart';
+import 'package:gestion_lavanderia/utils/constants_manager.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Los datos de la lavandería: contacto, logo, color, contraseña y dirección.
@@ -19,9 +18,15 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 class ConfiguracionEmpresaView extends ConsumerWidget {
   const ConfiguracionEmpresaView({super.key});
 
-  static const _anchoMaximo = 900.0;
-  static const _anchoCampo = 400.0;
   static const _altoLogo = 260.0;
+
+  /// Lo que separa la tarjeta de las orillas, y su contenido del borde de la
+  /// tarjeta. En una ventana angosta se recortan todavía más: ahí cada píxel
+  /// hace falta para los campos.
+  static const _margenAmplio = 16.0;
+  static const _margenAngosto = 8.0;
+  static const _rellenoAmplio = 12.0;
+  static const _rellenoAngosto = 8.0;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -36,25 +41,42 @@ class ConfiguracionEmpresaView extends ConsumerWidget {
       ),
     );
 
-    return Stack(
-      children: [
-        Scaffold(
-          body: Center(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(24),
-              child: ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: _anchoMaximo),
-                child: Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    // El ancho de los campos se recorta al espacio disponible:
-                    // con un ancho fijo, una ventana angosta los desbordaba.
-                    child: LayoutBuilder(
-                      builder: (context, constraints) {
-                        final ancho = min(_anchoCampo, constraints.maxWidth);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // En una ventana angosta el margen es papel desperdiciado: lo que no se
+        // gasta en orillas es ancho para los campos.
+        final esAngosta = constraints.maxWidth < ConstantsManager.smallScreen;
+        final margen = esAngosta ? _margenAngosto : _margenAmplio;
+        final relleno = esAngosta ? _rellenoAngosto : _rellenoAmplio;
 
-                        return Column(
-                          spacing: 15,
+        // El ancho de los campos se reparte el espacio que queda: con un
+        // ancho fijo, una ventana angosta los desbordaba.
+        final disponible = constraints.maxWidth - (margen + relleno) * 2;
+        final ancho = MedidasFormulario.anchoCampo(disponible);
+
+        // La tarjeta mide lo que lleva dentro. Antes se estiraba hasta un
+        // ancho fijo y, cuando ahí sólo cabía una columna de campos, el ancho
+        // de la otra se quedaba como hueco a los lados.
+        final anchoTarjeta =
+            MedidasFormulario.anchoContenido(disponible) + relleno * 2;
+
+        return Stack(
+          children: [
+            Scaffold(
+              body: Center(
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(margen),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: anchoTarjeta),
+                    child: Card(
+                      // Sin el margen de omisión de `Card`: la separación con
+                      // las orillas la decide el relleno de arriba, en un solo
+                      // lugar.
+                      margin: EdgeInsets.zero,
+                      child: Padding(
+                        padding: EdgeInsets.all(relleno),
+                        child: Column(
+                          spacing: MedidasFormulario.separacion,
                           crossAxisAlignment: CrossAxisAlignment.stretch,
                           children: [
                             const TitleContainer(
@@ -68,22 +90,22 @@ class ConfiguracionEmpresaView extends ConsumerWidget {
                             const _SeparadorDireccion(),
                             DatosDireccionForm(anchoCampo: ancho),
                           ],
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                 ),
               ),
+              floatingActionButton: editable
+                  ? _BotonesEdicion(esAlta: esAlta, compacto: esAngosta)
+                  : null,
             ),
-          ),
-          floatingActionButton: editable
-              ? _BotonesEdicion(esAlta: esAlta)
-              : null,
-        ),
-        // Mientras se lee o se guarda, la pantalla no acepta nada: un segundo
-        // toque en guardar escribiría dos veces.
-        if (cargando) const AbsorbPointer(child: BlockProgress()),
-      ],
+            // Mientras se lee o se guarda, la pantalla no acepta nada: un
+            // segundo toque en guardar escribiría dos veces.
+            if (cargando) const AbsorbPointer(child: BlockProgress()),
+          ],
+        );
+      },
     );
   }
 }
@@ -99,12 +121,12 @@ class _Encabezado extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Wrap(
-      spacing: 15,
-      runSpacing: 15,
+      spacing: MedidasFormulario.separacion,
+      runSpacing: MedidasFormulario.separacion,
       alignment: WrapAlignment.center,
       children: [
         Column(
-          spacing: 15,
+          spacing: MedidasFormulario.separacion,
           mainAxisSize: MainAxisSize.min,
           children: [
             LogoPicker(ancho: anchoCampo, alto: altoLogo),
@@ -145,9 +167,13 @@ class _BarraProtegida extends ConsumerWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               Icon(Icons.lock_rounded, color: scheme.onSecondaryContainer),
-              Text(
-                'Los datos están protegidos.',
-                style: TextStyle(color: scheme.onSecondaryContainer),
+              // Flexible, o el texto reclama su ancho natural y desborda el
+              // renglón en una ventana angosta en lugar de partirse en dos.
+              Flexible(
+                child: Text(
+                  'Los datos están protegidos.',
+                  style: TextStyle(color: scheme.onSecondaryContainer),
+                ),
               ),
             ],
           ),
@@ -171,11 +197,18 @@ class _BarraProtegida extends ConsumerWidget {
 
 /// Guardar y, cuando hay algo guardado a lo que volver, cancelar.
 class _BotonesEdicion extends ConsumerWidget {
-  const _BotonesEdicion({required this.esAlta});
+  const _BotonesEdicion({required this.esAlta, required this.compacto});
 
   /// En un alta no se ofrece cancelar: no hay nada a lo que regresar y el
   /// botón sólo borraría lo que se acaba de capturar.
   final bool esAlta;
+
+  /// Si el botón de guardar va sin su texto.
+  ///
+  /// En una ventana angosta "Guardar datos" no cabe y el renglón de botones se
+  /// desborda; con el icono solo, lo que dice el botón se consulta en su globo
+  /// de ayuda.
+  final bool compacto;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -192,12 +225,20 @@ class _BotonesEdicion extends ConsumerWidget {
             onPressed: notifier.cancelarEdicion,
             child: const Icon(Icons.close_rounded),
           ),
-        FloatingActionButton.extended(
-          heroTag: null,
-          onPressed: () => _guardar(context, ref),
-          icon: const Icon(Icons.save_rounded),
-          label: const Text('Guardar datos'),
-        ),
+        if (compacto)
+          FloatingActionButton(
+            heroTag: null,
+            tooltip: 'Guardar datos',
+            onPressed: () => _guardar(context, ref),
+            child: const Icon(Icons.save_rounded),
+          )
+        else
+          FloatingActionButton.extended(
+            heroTag: null,
+            onPressed: () => _guardar(context, ref),
+            icon: const Icon(Icons.save_rounded),
+            label: const Text('Guardar datos'),
+          ),
       ],
     );
   }
@@ -234,11 +275,14 @@ class _SeparadorDireccion extends StatelessWidget {
       spacing: 10,
       children: [
         const Expanded(child: Divider()),
-        Text(
-          'Dirección de la empresa',
-          style: theme.textTheme.titleMedium?.copyWith(
-            fontWeight: FontWeight.bold,
-            color: theme.colorScheme.primary,
+        Flexible(
+          child: Text(
+            'Dirección de la empresa',
+            textAlign: TextAlign.center,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: theme.colorScheme.primary,
+            ),
           ),
         ),
         const Expanded(child: Divider()),

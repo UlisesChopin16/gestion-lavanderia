@@ -39,7 +39,7 @@ class MyApp extends ConsumerWidget {
     final tema = ThemeApp(seed: color);
 
     return MaterialApp(
-      title: 'Gestión Lavandería',
+      title: ConstantsManager.appName,
       debugShowCheckedModeBanner: false,
       theme: tema.light,
       darkTheme: tema.dark,

@@ -66,17 +66,8 @@ class ThemeApp {
           borderSide: BorderSide(color: scheme.outlineVariant),
         ),
       ),
-      navigationRailTheme: NavigationRailThemeData(
-        backgroundColor: esOscuro ? scheme.surface : Colors.white,
-        indicatorColor: scheme.primary.withValues(alpha: 0.2),
-        selectedIconTheme: IconThemeData(color: scheme.primary),
-        selectedLabelTextStyle: TextStyle(
-          color: scheme.primary,
-          fontWeight: FontWeight.w500,
-        ),
-        unselectedIconTheme: IconThemeData(color: scheme.onSurfaceVariant),
-        unselectedLabelTextStyle: TextStyle(color: scheme.onSurfaceVariant),
-      ),
+      // El menú lateral no es un `NavigationRail` sino botones propios, que
+      // toman sus colores del esquema: no hay tema que configurar aquí.
       navigationBarTheme: NavigationBarThemeData(
         backgroundColor: esOscuro ? scheme.surface : Colors.white,
         indicatorColor: scheme.primary.withValues(alpha: 0.2),

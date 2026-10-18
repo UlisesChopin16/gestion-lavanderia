@@ -6,17 +6,17 @@ import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 /// La pantalla principal: la navegación entre módulos y el módulo abierto.
 ///
-/// El módulo ocupa todo el espacio que deja la navegación, en los tres
-/// tamaños. Antes el riel iba dentro de un `SizedBox(width: 80)` mientras él
-/// pedía 100 de ancho mínimo y etiquetas debajo de cada icono, así que se
-/// quedaba estrecho y el contenido empezaba donde no debía.
+/// El módulo ocupa todo el espacio que deja la navegación. Antes el riel iba
+/// dentro de un `SizedBox(width: 80)` mientras él pedía 100 de ancho mínimo y
+/// etiquetas debajo de cada icono, así que se quedaba estrecho y el contenido
+/// empezaba donde no debía.
 ///
 /// La navegación cambia de forma con el ancho de la ventana —es una aplicación
 /// de escritorio, y se puede dejar en media pantalla—:
 ///
-/// - angosta: una barra abajo, que no le roba ancho al contenido;
-/// - normal: un riel a la izquierda con la etiqueta bajo el icono;
-/// - ancha: el mismo riel extendido, con la etiqueta al lado.
+/// - angosta: una barra superior con el cajón de módulos, que sólo ocupa
+///   espacio mientras está abierto;
+/// - a partir de ahí: el menú de módulos fijo a la izquierda.
 class HomeView extends ConsumerStatefulWidget {
   const HomeView({super.key});
 
@@ -40,32 +40,36 @@ class _HomeViewState extends ConsumerState<HomeView> {
     );
 
     final contenido = _Contenido(key: _contenido, pestana: pestana);
+    final botonTema = BotonTema(
+      themeMode: themeMode,
+      onPressed: notifier.cambiarTema,
+    );
 
     return LayoutBuilder(
       builder: (context, constraints) {
-        final ancho = constraints.maxWidth;
-
-        if (ancho < ConstantsManager.smallScreen) {
+        if (constraints.maxWidth < ConstantsManager.smallScreen) {
           return Scaffold(
-            body: contenido,
-            bottomNavigationBar: _BarraInferior(
+            appBar: AppBar(
+              // El nombre del módulo abierto: sin menú a la vista, es lo único
+              // que dice dónde está uno.
+              title: Text(pestana.title),
+              actions: [botonTema],
+            ),
+            drawer: DrawerModulos(
               pestana: pestana,
               onSeleccion: notifier.seleccionarPestana,
             ),
+            body: contenido,
           );
         }
 
         return Scaffold(
           body: Row(
             children: [
-              _Riel(
+              MenuModulos(
                 pestana: pestana,
                 onSeleccion: notifier.seleccionarPestana,
-                extendido: ancho >= ConstantsManager.largeScreen,
-                botonTema: BotonTema(
-                  themeMode: themeMode,
-                  onPressed: notifier.cambiarTema,
-                ),
+                botonTema: botonTema,
               ),
               const VerticalDivider(width: 1, thickness: 1),
               // El módulo se queda con todo el ancho restante.
@@ -121,73 +125,6 @@ class _ContenidoState extends State<_Contenido> {
             pestana.view
           else
             const SizedBox.shrink(),
-      ],
-    );
-  }
-}
-
-class _Riel extends StatelessWidget {
-  const _Riel({
-    required this.pestana,
-    required this.onSeleccion,
-    required this.extendido,
-    required this.botonTema,
-  });
-
-  final HomeTabsType pestana;
-  final ValueChanged<HomeTabsType> onSeleccion;
-  final bool extendido;
-  final Widget botonTema;
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationRail(
-      selectedIndex: pestana.index,
-      onDestinationSelected: (indice) =>
-          onSeleccion(HomeTabsType.values[indice]),
-      extended: extendido,
-      // Con el riel extendido la etiqueta va al lado del icono, así que no
-      // puede ir además debajo.
-      labelType: extendido ? null : NavigationRailLabelType.all,
-      elevation: 1,
-      // Pegado al borde inferior del riel y no debajo del último módulo, que
-      // es donde `trailing` cae por omisión.
-      trailingAtBottom: true,
-      trailing: Padding(
-        padding: const EdgeInsets.only(bottom: 16),
-        child: botonTema,
-      ),
-      destinations: [
-        for (final tab in HomeTabsType.values)
-          NavigationRailDestination(
-            icon: Icon(tab.unselectedIcon),
-            selectedIcon: Icon(tab.icon),
-            label: Text(tab.title, textAlign: TextAlign.center),
-          ),
-      ],
-    );
-  }
-}
-
-class _BarraInferior extends StatelessWidget {
-  const _BarraInferior({required this.pestana, required this.onSeleccion});
-
-  final HomeTabsType pestana;
-  final ValueChanged<HomeTabsType> onSeleccion;
-
-  @override
-  Widget build(BuildContext context) {
-    return NavigationBar(
-      selectedIndex: pestana.index,
-      onDestinationSelected: (indice) =>
-          onSeleccion(HomeTabsType.values[indice]),
-      destinations: [
-        for (final tab in HomeTabsType.values)
-          NavigationDestination(
-            icon: Icon(tab.unselectedIcon),
-            selectedIcon: Icon(tab.icon),
-            label: tab.title,
-          ),
       ],
     );
   }

@@ -108,6 +108,56 @@ void main() {
     expect(escrito(tester, 'Código postal'), '6000');
   });
 
+  testWidgets('en una ventana angosta nada se desborda', (tester) async {
+    await tester.binding.setSurfaceSize(const Size(240, 800));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    // Con configuración guardada se dibuja también la barra de protegido, que
+    // es donde el texto desbordaba el renglón por reclamar su ancho natural.
+    await guardarConfiguracion();
+    await abrirPantalla(tester);
+
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('los campos quedan centrados en la tarjeta', (tester) async {
+    // A este ancho sólo cabe un campo por renglón: es cuando se notaba que la
+    // dirección arrancaba pegada a la izquierda.
+    await tester.binding.setSurfaceSize(const Size(500, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await abrirPantalla(tester);
+
+    const centroDeLaPantalla = 250.0;
+
+    expect(tester.getCenter(campo('Calle')).dx, centroDeLaPantalla);
+    expect(tester.getCenter(campo('Ciudad')).dx, centroDeLaPantalla);
+  });
+
+  testWidgets('la tarjeta no deja huecos a los lados de los campos', (
+    tester,
+  ) async {
+    // Con los campos de ancho fijo, a este ancho ya no cabían dos por renglón
+    // y la tarjeta seguía midiendo lo que miden dos: los campos bajaban de uno
+    // en uno con el hueco del otro repartido a los lados.
+    await tester.binding.setSurfaceSize(const Size(800, 900));
+    addTearDown(() => tester.binding.setSurfaceSize(null));
+
+    await abrirPantalla(tester);
+
+    final tarjeta = tester.getRect(find.byType(Card));
+    final calle = tester.getRect(campo('Calle'));
+    final numeroExterior = tester.getRect(campo('Número exterior'));
+
+    // Los dos primeros campos de la dirección comparten renglón...
+    expect(calle.top, numeroExterior.top);
+
+    // ...y entre ellos y el borde de la tarjeta no queda más que el relleno.
+    const relleno = 12.0;
+    expect(calle.left - tarjeta.left, lessThanOrEqualTo(relleno));
+    expect(tarjeta.right - numeroExterior.right, lessThanOrEqualTo(relleno));
+  });
+
   testWidgets('una configuración guardada arranca protegida', (tester) async {
     await guardarConfiguracion();
     await abrirPantalla(tester);

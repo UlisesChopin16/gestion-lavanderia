@@ -3,6 +3,9 @@ import 'package:intl/intl.dart';
 
 /// Medidas y formatos que la interfaz repite.
 abstract final class ConstantsManager {
+  /// El nombre de la aplicación, como aparece en la ventana y en el menú.
+  static const String appName = 'Gestión Lavandería';
+
   /// Anchos a partir de los que la interfaz cambia de disposición.
   static const double smallScreen = 600.0;
   static const double mediumScreen = 900.0;

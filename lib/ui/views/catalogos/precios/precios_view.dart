@@ -55,10 +55,8 @@ class PreciosView extends ConsumerWidget {
           children: [
             VCol(
               cols: 12,
-              md: 5,
-              lg: 4,
-              xl: 3,
-              minWidth: SearchFilter.anchoMinimo,
+              md: 4,
+              sm: 6,
               child: SearchFilter(
                 label: 'Buscar concepto',
                 value: filtros.nombre,
@@ -67,10 +65,8 @@ class PreciosView extends ConsumerWidget {
             ),
             VCol(
               cols: 12,
+              md: 4,
               sm: 6,
-              md: VCol.grow,
-              minWidth: DropdownMenuBase.anchoMinimo,
-              maxWidth: DropdownMenuBase.anchoMaximo,
               child: EstatusFilter(
                 estatus: filtros.estatus,
                 onChanged: notifier.filtrarEstatus,
@@ -78,10 +74,8 @@ class PreciosView extends ConsumerWidget {
             ),
             VCol(
               cols: 12,
+              md: 4,
               sm: 6,
-              md: VCol.grow,
-              minWidth: DropdownMenuBase.anchoMinimo,
-              maxWidth: DropdownMenuBase.anchoMaximo,
               child: FiltroCategoria(
                 categorias: estado.categorias,
                 seleccionada: filtros.categoriaId,
@@ -91,10 +85,8 @@ class PreciosView extends ConsumerWidget {
             ),
             VCol(
               cols: 12,
+              md: 4,
               sm: 6,
-              md: VCol.grow,
-              minWidth: DropdownMenuBase.anchoMinimo,
-              maxWidth: DropdownMenuBase.anchoMaximo,
               child: SelectorTamano(
                 tamano: filtros.clotheSize,
                 permiteQuitar: true,
@@ -104,10 +96,8 @@ class PreciosView extends ConsumerWidget {
             ),
             VCol(
               cols: 12,
+              md: 4,
               sm: 6,
-              md: VCol.grow,
-              minWidth: DropdownMenuBase.anchoMinimo,
-              maxWidth: DropdownMenuBase.anchoMaximo,
               child: SortDropdown<ColumnPreciosName>(
                 columns: ColumnPreciosName.values,
                 selected: filtros.ordenamiento,
@@ -120,7 +110,8 @@ class PreciosView extends ConsumerWidget {
             ),
             VCol(
               cols: 12,
-              sm: VCol.auto,
+              md: 4,
+              sm: 6,
               child: ButtonClearFilters(onPressed: notifier.limpiarFiltros),
             ),
           ],

@@ -57,12 +57,12 @@ class CatalogoConceptos extends StatelessWidget {
           align: VAlign.center,
           children: [
             VCol(
-              cols: 6,
+              cols: 12,
               sm: 6,
               child: SearchFilter(label: 'Buscar concepto', value: busqueda, onChanged: onBuscar),
             ),
             VCol(
-              cols: 6,
+              cols: 12,
               sm: 6,
               child: FiltroCategoria(
                 categorias: categorias,

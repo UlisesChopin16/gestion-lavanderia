@@ -73,6 +73,18 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         child: MaterialApp(
+          // Con la densidad de escritorio, que es donde corre la aplicación.
+          // No es un detalle de adorno: Material le resta ocho píxeles de alto
+          // a sus controles en escritorio, y no todos la aplican igual —un
+          // `TextField` sí, un `DropdownMenu` no—, así que una fila que sale
+          // cuadrada con los valores de omisión puede salir descuadrada en la
+          // ventana de verdad. Se declara aquí en lugar de cambiar la
+          // plataforma de las pruebas porque el framework no deja tocar esa
+          // variable global sin reponerla dentro de cada prueba.
+          theme: ThemeData(
+            visualDensity: VisualDensity.compact,
+            materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+          ),
           home: Scaffold(
             body: Builder(
               builder: (context) => TextButton(
@@ -225,6 +237,50 @@ void main() {
           ?.text,
       isEmpty,
     );
+  });
+
+  testWidgets('los cuatro controles del cobro miden y empiezan igual', (
+    tester,
+  ) async {
+    await sembrarCatalogo();
+
+    await abrirDialogo(tester);
+
+    // El marco que se ve de un campo lo pinta su `InputDecorator`; el de un
+    // botón, su propia caja. Son los cuatro trozos que el ojo compara.
+    final cajas = <String, Rect>{
+      'método de pago': tester.getRect(
+        find.descendant(
+          of: find.byType(CobroOrden),
+          matching: find.byType(DropdownMenu<MetodoPagoType>),
+        ),
+      ),
+      // Por su etiqueta: el desplegable también lleva un campo de texto
+      // dentro, y por tipo salen los dos.
+      'adelanto': tester.getRect(
+        find.ancestor(
+          of: find.text('Adelanto'),
+          matching: find.byType(TextField),
+        ),
+      ),
+      'nada': tester.getRect(find.widgetWithText(FilledButton, 'Nada')),
+      'todo': tester.getRect(find.widgetWithText(OutlinedButton, 'Todo')),
+    };
+
+    final referencia = cajas['método de pago']!;
+
+    for (final MapEntry(key: nombre, value: caja) in cajas.entries) {
+      expect(
+        caja.height,
+        referencia.height,
+        reason: 'el control "$nombre" no mide lo mismo que el desplegable',
+      );
+      expect(
+        caja.top,
+        referencia.top,
+        reason: 'el control "$nombre" no empieza donde el desplegable',
+      );
+    }
   });
 
   testWidgets('la orden entera se ve sin desplazar en una pantalla de '

@@ -186,8 +186,15 @@ class _CobroOrdenState extends State<CobroOrden> {
 
     // Los campos, en su versión densa. Se cambia el tema en lugar de cada
     // control porque el desplegable no recibe su decoración por parámetro: la
-    // lee de aquí. Lo único que cambia son los rellenos; los bordes y los
-    // colores siguen siendo los de la aplicación.
+    // lee de aquí. Lo único que cambia son los rellenos y la densidad; los
+    // bordes y los colores siguen siendo los de la aplicación.
+    //
+    // La densidad vuelve a la normal a propósito. En escritorio Material la
+    // pone en `-2`, que son ocho píxeles menos de alto, y no todos los
+    // controles la aplican: el campo de texto y los botones encogían a
+    // treinta y seis mientras el desplegable se quedaba en cuarenta y cuatro,
+    // y la fila salía descuadrada. Aquí el alto lo fija esta tarjeta, que para
+    // eso los pide todos iguales.
     //
     // El tema de los botones de icono es por la flecha del desplegable: es un
     // `IconButton`, y con los cuarenta y ocho píxeles que Material le reserva
@@ -195,6 +202,7 @@ class _CobroOrdenState extends State<CobroOrden> {
     // lado. Aquí dentro no hay más botones de icono que ésa.
     return Theme(
       data: theme.copyWith(
+        visualDensity: VisualDensity.standard,
         inputDecorationTheme: theme.inputDecorationTheme.copyWith(
           isDense: true,
           contentPadding: const EdgeInsets.symmetric(

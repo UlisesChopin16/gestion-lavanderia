@@ -17,7 +17,7 @@ class OrdenServicio extends Table with TimestampColumns {
   IntColumn get id => integer().autoIncrement()();
   IntColumn get clienteId => integer().references(Cliente, #id)();
 
-  /// Formato `AAAA-MM-NNNN`, generado por `OrdenServicioDao.insertOrden`.
+  /// Formato `AAMM-NNNNN`, generado por `OrdenServicioDao.insertOrden`.
   TextColumn get folio => text()();
   TextColumn get descripcion => text().nullable()();
 

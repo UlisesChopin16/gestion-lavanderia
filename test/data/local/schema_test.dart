@@ -109,11 +109,13 @@ void main() {
       ),
     );
 
+    // `AAMM-`: los dos últimos dígitos del año y el mes.
     final ahora = DateTime.now();
-    final prefijo = '${ahora.year}-${ahora.month.toString().padLeft(2, '0')}-';
+    final anio = (ahora.year % 100).toString().padLeft(2, '0');
+    final prefijo = '$anio${ahora.month.toString().padLeft(2, '0')}-';
 
-    expect(primera.folio, '${prefijo}0001');
-    expect(segunda.folio, '${prefijo}0002');
+    expect(primera.folio, '${prefijo}00001');
+    expect(segunda.folio, '${prefijo}00002');
   });
 
   test('rechaza un cliente con el mismo correo en otras mayúsculas', () async {

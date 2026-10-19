@@ -114,74 +114,75 @@ class CategoriasView extends ConsumerWidget {
 
         columns: [
           TableColumnDef.text(
-            title: 'ID',
-            value: (categoria) => '${categoria.id}',
-            sortBy: ColumnsCategoriaType.id,
-            numeric: true,
-            showOnSmall: false,
-          ),
-          TableColumnDef.text(
             title: 'Nombre',
             value: (categoria) => categoria.nombre,
             sortBy: ColumnsCategoriaType.nombre,
-            primary: true,
+            size: TableColumnSize.amplia,
           ),
           TableColumnDef.widget(
             title: 'Estatus',
             content: (context, categoria) =>
                 EstatusChip(estatus: categoria.estatus),
             sortBy: ColumnsCategoriaType.estatus,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Días de Entrega',
             value: (categoria) => '${categoria.diasEntrega}',
             sortBy: ColumnsCategoriaType.diasEntrega,
             numeric: true,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (categoria) => categoria.fechaCreacion.formatFullDate,
             sortBy: ColumnsCategoriaType.fechaCreacion,
-            showOnSmall: false,
           ),
           TableColumnDef.text(
             title: 'Fecha de Eliminación',
             value: (categoria) => categoria.fechaEliminacion.formatFullDate,
             sortBy: ColumnsCategoriaType.fechaEliminacion,
-            showOnSmall: false,
           ),
-        ],
-
-        // Las acciones que no aplican no se muestran deshabilitadas, se
-        // omiten: editar una categoría dada de baja no es algo que se pueda
-        // "habilitar", simplemente no se hace sin reactivarla antes.
-        actionsBuilder: (categoria) => [
-          TableAction(
-            label: 'Ver sus conceptos',
-            icon: Icons.visibility_rounded,
-            color: Colors.blue,
-            onPressed: () => _verConceptos(ref, categoria),
+          // Las acciones son una columna más, la última: de ancho fijo porque
+          // lo que llevan dentro no cambia de tamaño con los datos.
+          //
+          // Las que no aplican no se muestran deshabilitadas, se omiten:
+          // editar una categoría dada de baja no es algo que se pueda
+          // "habilitar", simplemente no se hace sin reactivarla antes.
+          TableColumnDef.widget(
+            title: 'Acciones',
+            size: const TableColumnSize.fija(TableActionsCell.ancho),
+            content: (context, categoria) => TableActionsCell(
+              actions: [
+                TableAction(
+                  label: 'Ver sus conceptos',
+                  icon: Icons.visibility_rounded,
+                  color: Colors.blue,
+                  onPressed: () => _verConceptos(ref, categoria),
+                ),
+                if (categoria.estatus == EstatusType.activo) ...[
+                  TableAction(
+                    label: 'Editar categoría',
+                    icon: Icons.edit_rounded,
+                    color: Colors.amber,
+                    onPressed: () => _editar(context, categoria),
+                  ),
+                  TableAction(
+                    label: 'Desactivar categoría',
+                    icon: Icons.delete_rounded,
+                    color: Colors.red,
+                    onPressed: () => _desactivar(context, ref, categoria),
+                  ),
+                ] else
+                  TableAction(
+                    label: 'Activar categoría',
+                    icon: Icons.restore_rounded,
+                    color: Colors.green,
+                    onPressed: () => _activar(context, ref, categoria),
+                  ),
+              ],
+            ),
           ),
-          if (categoria.estatus == EstatusType.activo) ...[
-            TableAction(
-              label: 'Editar categoría',
-              icon: Icons.edit_rounded,
-              color: Colors.amber,
-              onPressed: () => _editar(context, categoria),
-            ),
-            TableAction(
-              label: 'Desactivar categoría',
-              icon: Icons.delete_rounded,
-              color: Colors.red,
-              onPressed: () => _desactivar(context, ref, categoria),
-            ),
-          ] else
-            TableAction(
-              label: 'Activar categoría',
-              icon: Icons.restore_rounded,
-              color: Colors.green,
-              onPressed: () => _activar(context, ref, categoria),
-            ),
         ],
       ),
     );

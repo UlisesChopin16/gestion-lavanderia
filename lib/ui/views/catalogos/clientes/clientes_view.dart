@@ -42,10 +42,7 @@ class ClientesView extends ConsumerWidget {
           runSpacing: 12,
           children: [
             const PestanasCatalogo(),
-            ButtonAdd(
-              label: 'Agregar cliente',
-              onPressed: () => _agregar(context),
-            ),
+            ButtonAdd(label: 'Agregar cliente', onPressed: () => _agregar(context)),
           ],
         ),
 
@@ -75,8 +72,7 @@ class ClientesView extends ConsumerWidget {
                 columns: ColumnClientesName.values,
                 selected: filtros.ordenamiento,
                 ascending: filtros.ascendente,
-                onColumnChanged: (columna) =>
-                    notifier.ordenar(columna, filtros.ascendente),
+                onColumnChanged: (columna) => notifier.ordenar(columna, filtros.ascendente),
                 onAscendingChanged: (ascendente) =>
                     notifier.ordenar(filtros.ordenamiento, ascendente),
               ),
@@ -98,17 +94,10 @@ class ClientesView extends ConsumerWidget {
 
         columns: [
           TableColumnDef.text(
-            title: 'ID',
-            value: (cliente) => '${cliente.id}',
-            sortBy: ColumnClientesName.id,
-            numeric: true,
-            showOnSmall: false,
-          ),
-          TableColumnDef.text(
             title: 'Nombre(s)',
             value: (cliente) => cliente.nombres,
             sortBy: ColumnClientesName.nombre,
-            primary: true,
+            size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Apellido(s)',
@@ -119,30 +108,38 @@ class ClientesView extends ConsumerWidget {
             title: 'Teléfono',
             value: (cliente) => cliente.telefono,
             sortBy: ColumnClientesName.telefono,
+            size: const TableColumnSize.fija(TableActionsCell.ancho),
           ),
           // El correo es opcional: cuando no lo hay se marca como ausente en
           // lugar de dejar la celda en blanco, que se lee como un error.
           TableColumnDef.text(
             title: 'Correo',
-            value: (cliente) => cliente.correo.isEmpty
-                ? ConstantsManager.emptyValue
-                : cliente.correo,
+            value: (cliente) =>
+                cliente.correo.isEmpty ? ConstantsManager.emptyValue : cliente.correo,
             sortBy: ColumnClientesName.correo,
+            size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (cliente) => cliente.fechaCreacion.formatFullDate,
             sortBy: ColumnClientesName.fechaCreacion,
-            showOnSmall: false,
+            size: const TableColumnSize.fija(100),
           ),
-        ],
-
-        actionsBuilder: (cliente) => [
-          TableAction(
-            label: 'Editar cliente',
-            icon: Icons.edit_rounded,
-            color: Colors.blue,
-            onPressed: () => _editar(context, cliente),
+          // Las acciones son una columna más, la última: de ancho fijo porque
+          // lo que llevan dentro no cambia de tamaño con los datos.
+          TableColumnDef.widget(
+            title: 'Acciones',
+            size: const TableColumnSize.fija(TableActionsCell.ancho),
+            content: (context, cliente) => TableActionsCell(
+              actions: [
+                TableAction(
+                  label: 'Editar cliente',
+                  icon: Icons.edit_rounded,
+                  color: Colors.blue,
+                  onPressed: () => _editar(context, cliente),
+                ),
+              ],
+            ),
           ),
         ],
       ),

@@ -373,8 +373,9 @@ void main() {
     await abrirModulo(tester, tamano: const Size(420, 800));
 
     expect(tester.takeException(), isNull);
-    // A este ancho la tabla se cambia por las tarjetas de la vista compacta.
-    expect(find.byType(DataTable), findsNothing);
+    // La tabla es la misma a cualquier ancho: a éste no cabe, así que se
+    // recorre a lo ancho en lugar de cambiarse por otra vista.
+    expect(find.byType(DataTable), findsOneWidget);
     expect(find.text('Cliente 1'), findsOneWidget);
   });
 }

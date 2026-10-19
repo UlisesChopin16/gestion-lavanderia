@@ -10,8 +10,9 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// salvo el nombre del enum. Lo único que necesitan de la columna es su
 /// [SortableColumn.title], que es justo lo que el contrato garantiza.
 ///
-/// Cumple el mismo papel que pulsar un encabezado de la tabla, y existe porque
-/// en la vista compacta no hay encabezados que pulsar.
+/// Cumple el mismo papel que pulsar un encabezado de la tabla, y existe para
+/// las columnas que quedan fuera de la parte visible cuando la tabla se
+/// recorre a lo ancho: ahí no hay encabezado que pulsar sin buscarlo antes.
 class SortDropdown<C extends SortableColumn> extends StatelessWidget {
   const SortDropdown({
     super.key,

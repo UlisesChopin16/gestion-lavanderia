@@ -1,11 +1,9 @@
+import 'dart:math' as math;
 import 'dart:ui' show PointerDeviceKind;
 
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/theme/color_row_theme.dart';
-import 'package:gestion_lavanderia/ui/shared/widgets/table/table_action.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_column.dart';
-import 'package:gestion_lavanderia/ui/shared/widgets/table/table_small_list.dart';
-import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 /// Qué hacer cuando se pide ordenar por [column].
 ///
@@ -14,7 +12,13 @@ import 'package:gestion_lavanderia/utils/constants_manager.dart';
 typedef SortChanged<C> = void Function(C column, bool ascending);
 
 /// El contenido de un listado: su encabezado, los filtros, la paginación y la
-/// lista como tabla o como tarjetas según el ancho disponible.
+/// tabla.
+///
+/// La tabla es la misma a cualquier ancho. Antes, por debajo de cierto corte,
+/// se cambiaba por una lista de tarjetas que escondía columnas: eran dos
+/// listados que había que mantener a la par y que no enseñaban lo mismo. En
+/// una ventana angosta la tabla se recorre a lo ancho, que es lo que ya hace
+/// cuando sus columnas no caben.
 ///
 /// De arriba abajo:
 ///
@@ -36,9 +40,9 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 /// con `label as Text` para volverlos a armar—, así que una celda ya no puede
 /// romper la tabla en tiempo de ejecución.
 ///
-/// La columna de acciones la agrega esta clase cuando hay [actionsBuilder]; la
-/// lista de celdas sale sólo de [columns] y por eso siempre coincide con el
-/// número de encabezados.
+/// Todas las celdas salen de [columns], acciones incluidas, así que la fila
+/// siempre tiene tantas celdas como encabezados: no hay columnas que la tabla
+/// agregue por su cuenta y que haya que recordar al contar.
 ///
 /// ```dart
 /// DataTableCard<PrecioData, ColumnPreciosName>(
@@ -90,7 +94,6 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///       title: 'Concepto',
 ///       value: (precio) => precio.nombreConcepto,
 ///       sortBy: ColumnPreciosName.nombre,
-///       primary: true,
 ///     ),
 ///     TableColumnDef.text(
 ///       title: 'Importe',
@@ -98,13 +101,19 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///       sortBy: ColumnPreciosName.importe,
 ///       numeric: true,
 ///     ),
-///   ],
-///   actionsBuilder: (precio) => [
-///     TableAction(
-///       label: 'Editar concepto',
-///       icon: Icons.edit,
-///       color: Colors.blue,
-///       onPressed: () => _onEditar(precio),
+///     TableColumnDef.widget(
+///       title: 'Acciones',
+///       size: const TableColumnSize.fija(TableActionsCell.ancho),
+///       content: (context, precio) => TableActionsCell(
+///         actions: [
+///           TableAction(
+///             label: 'Editar concepto',
+///             icon: Icons.edit,
+///             color: Colors.blue,
+///             onPressed: () => _onEditar(precio),
+///           ),
+///         ],
+///       ),
 ///     ),
 ///   ],
 /// )
@@ -117,13 +126,8 @@ class DataTableCard<T, C> extends StatefulWidget {
     this.sortedBy,
     this.ascending = true,
     this.onSort,
-    this.actionsBuilder,
     this.rowKey,
     this.onRowTap,
-    this.leadingBuilder,
-    this.smallItemBuilder,
-    this.forceSmall,
-    this.smallBreakpoint = ConstantsManager.mediumScreen,
     this.seccionEncabezado,
     this.seccionFiltros,
     this.isLoading = false,
@@ -141,26 +145,10 @@ class DataTableCard<T, C> extends StatefulWidget {
   /// En `null` ningún encabezado responde al toque.
   final SortChanged<C>? onSort;
 
-  /// Las acciones de cada fila. En `null` no hay columna de acciones: así se
-  /// oculta cuando la interfaz está bloqueada, sin quitar celdas después.
-  final RowActions<T>? actionsBuilder;
-
   /// Identidad de la fila. Con ella Flutter reconoce las filas entre dos
   /// consultas y no reconstruye las que no cambiaron.
   final Object Function(T row)? rowKey;
   final ValueChanged<T>? onRowTap;
-
-  /// Icono o avatar al inicio de la tarjeta, en la vista compacta.
-  final RowLeadingBuilder<T>? leadingBuilder;
-
-  /// Tarjeta completa de la vista compacta, cuando la de omisión no alcanza.
-  final SmallItemBuilder<T>? smallItemBuilder;
-
-  /// Fuerza la vista compacta (`true`) o la tabla (`false`). En `null` se
-  /// decide por el ancho que la tabla recibe, y no por el de la pantalla:
-  /// dentro de un panel angosto la tabla no cabe aunque la ventana sea ancha.
-  final bool? forceSmall;
-  final double smallBreakpoint;
 
   /// Con qué se acota el listado: los filtros, el buscador y el botón de
   /// limpiarlos, ya armados por la pantalla.
@@ -219,6 +207,28 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   /// El redondeo de los recuadros: el del encabezado y el de la tabla.
   static const double _radio = 16;
 
+  /// Lo que separa el contenido de las orillas de la tabla.
+  static const double _margenTabla = 16;
+
+  /// El aire entre una columna y la siguiente.
+  static const double _espacioColumnas = 16;
+
+  /// Lo que la tabla necesita para no apretar ninguna columna.
+  ///
+  /// Es la suma de los mínimos de sus columnas —el aire de cada celda va
+  /// dentro—, y es el ancho con el que la tabla se dibuja cuando la ventana da
+  /// menos: a partir de ahí se desplaza en lugar de seguir encogiendo, que es
+  /// lo que dejaba los datos ilegibles.
+  double get _anchoMinimoTabla {
+    var ancho = 0.0;
+
+    for (final column in widget.columns) {
+      ancho += column.anchoMinimo;
+    }
+
+    return ancho;
+  }
+
   @override
   void dispose() {
     // El controlador sobrevive al widget si no se cierra aquí.
@@ -244,8 +254,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
     return index < 0 ? null : index;
   }
 
-  bool get _hasActions => widget.actionsBuilder != null;
-
   @override
   Widget build(BuildContext context) {
     return Padding(
@@ -257,7 +265,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
           final width = constraints.maxWidth.isFinite
               ? constraints.maxWidth
               : MediaQuery.sizeOf(context).width;
-          final isSmall = widget.forceSmall ?? width < widget.smallBreakpoint;
 
           return Column(
             spacing: _espacio,
@@ -294,7 +301,7 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOutCubic,
                 alignment: Alignment.topCenter,
-                child: _body(context, isSmall: isSmall, maxWidth: width),
+                child: _body(context, maxWidth: width),
               ),
             ],
           );
@@ -306,11 +313,7 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   /// La lista, el aviso de vacío o el indicador de carga: nunca dos a la vez,
   /// que es lo que pasaba antes, cuando una lista vacía mostraba la tabla con
   /// sólo encabezados y el mensaje debajo.
-  Widget _body(
-    BuildContext context, {
-    required bool isSmall,
-    required double maxWidth,
-  }) {
+  Widget _body(BuildContext context, {required double maxWidth}) {
     if (widget.isLoading) {
       return _Marco(
         radio: _radio,
@@ -325,20 +328,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
       return _Marco(
         radio: _radio,
         child: _Vacio(mensaje: widget.emptyMessage),
-      );
-    }
-
-    // Las tarjetas de la vista compacta ya tienen borde propio; enmarcarlas
-    // otra vez sería una caja dentro de otra.
-    if (isSmall) {
-      return TableSmallList<T, C>(
-        columns: widget.columns,
-        rows: widget.rows,
-        actionsBuilder: widget.actionsBuilder,
-        leadingBuilder: widget.leadingBuilder,
-        itemBuilder: widget.smallItemBuilder,
-        onRowTap: widget.onRowTap,
-        rowKey: widget.rowKey,
       );
     }
 
@@ -362,9 +351,12 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
       // fila de la siguiente, y la línea encima del rayado ensuciaba la tabla.
       headingRowHeight: 56,
       dataRowMinHeight: 52,
-      dataRowMaxHeight: 60,
-      horizontalMargin: 20,
-      columnSpacing: 28,
+      // Sin tope de alto: una celda cuyo texto no cabe a lo ancho baja de
+      // línea, y la fila crece con ella. Con un máximo fijo, el texto que
+      // sobraba quedaba cortado por la mitad.
+      dataRowMaxHeight: double.infinity,
+      horizontalMargin: _margenTabla,
+      columnSpacing: _espacioColumnas,
       dividerThickness: 0,
       showBottomBorder: false,
       headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
@@ -397,10 +389,17 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
         child: SingleChildScrollView(
           controller: _horizontal,
           scrollDirection: Axis.horizontal,
-          // La tabla ocupa todo el ancho disponible y sólo se desborda —y se
-          // desplaza— cuando sus columnas no caben.
-          child: ConstrainedBox(
-            constraints: BoxConstraints(minWidth: maxWidth),
+          // El ancho se decide aquí y no se deja al contenido: con el de la
+          // tarjeta, las columnas se reparten lo que hay y la tabla no se
+          // desplaza; cuando la ventana no llega al mínimo, la tabla se queda
+          // en ese mínimo y lo que sobra se recorre.
+          //
+          // Antes esto era un `minWidth` dentro de un desplazable, de modo que
+          // la tabla se medía con ancho infinito: cada columna pedía lo que
+          // midiera su texto más largo y casi siempre había que desplazarse,
+          // aunque sobrara sitio en la pantalla.
+          child: SizedBox(
+            width: math.max(maxWidth, _anchoMinimoTabla),
             child: table,
           ),
         ),
@@ -417,30 +416,31 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
           headingRowAlignment: MainAxisAlignment.center,
           numeric: column.numeric,
           tooltip: column.tooltip,
-          columnWidth: column.width,
+          columnWidth: column.columnWidth,
           onSort: !column.isSortable || onSort == null
               ? null
               : (_, ascending) => onSort(column.sortBy as C, ascending),
+          // Flexible: un encabezado que no puede encogerse desborda su columna
+          // en cuanto la tipografía es más ancha de lo previsto.
+          //
+          // `softWrap` va explícito porque `DataTable` lo apaga en los
+          // encabezados: sin esto, "Fecha de Eliminación" se queda en un
+          // renglón y se corta. Dos líneas es lo que cabe en el alto del
+          // encabezado.
           label: Flexible(
             child: Text(
               column.title,
               textAlign: TextAlign.center,
+              softWrap: true,
               maxLines: 2,
-              overflow: TextOverflow.ellipsis,
             ),
           ),
-        ),
-      if (_hasActions)
-        const DataColumn(
-          headingRowAlignment: MainAxisAlignment.center,
-          label: Text('Acciones'),
         ),
     ];
   }
 
   List<DataRow> _buildRows(BuildContext context) {
     final stripes = ColorRowTheme.of(context);
-    final actionsBuilder = widget.actionsBuilder;
     final onRowTap = widget.onRowTap;
     final rowKey = widget.rowKey;
 
@@ -461,15 +461,20 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
           cells: [
             for (final column in widget.columns)
               DataCell(
-                Align(
-                  alignment: column.numeric
-                      ? Alignment.centerRight
-                      : Alignment.center,
-                  child: column.buildCell(context, row),
+                Padding(
+                  // El aire de arriba y abajo lo pone la celda: sin él, un
+                  // texto que baja de línea queda pegado al borde de la fila.
+                  // En una celda de un renglón no se nota, porque la fila
+                  // tiene un alto mínimo mayor.
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Align(
+                    alignment: column.numeric
+                        ? Alignment.centerRight
+                        : Alignment.center,
+                    child: column.buildCell(context, row),
+                  ),
                 ),
               ),
-            if (actionsBuilder != null)
-              DataCell(TableActionsCell(actions: actionsBuilder(row))),
           ],
         ),
     ];

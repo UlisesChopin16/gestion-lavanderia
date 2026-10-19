@@ -32,6 +32,18 @@ class TableAction {
 /// Con pocas acciones se muestran en línea; con [compact] o con más de
 /// [maxInline] se agrupan en un menú, porque tres botones por fila dejan la
 /// tabla sin ancho para los datos.
+///
+/// Va dentro de una columna como cualquier otro contenido:
+///
+/// ```dart
+/// TableColumnDef.widget(
+///   title: 'Acciones',
+///   size: const TableColumnSize.fija(TableActionsCell.ancho),
+///   content: (context, precio) => TableActionsCell(
+///     actions: [TableAction(label: 'Editar', icon: Icons.edit, onPressed: …)],
+///   ),
+/// )
+/// ```
 class TableActionsCell extends StatelessWidget {
   const TableActionsCell({
     super.key,
@@ -43,6 +55,13 @@ class TableActionsCell extends StatelessWidget {
   final List<TableAction> actions;
   final bool compact;
   final int maxInline;
+
+  /// Lo que mide su columna.
+  ///
+  /// Es fija porque lo que lleva dentro no cambia de tamaño con los datos:
+  /// dos botones de icono, o el menú cuando son más de [maxInline]. El aire de
+  /// la celda va incluido.
+  static const double ancho = 116;
 
   @override
   Widget build(BuildContext context) {

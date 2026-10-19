@@ -27,17 +27,30 @@ abstract final class ConstantsManager {
   /// `main`, para que la aplicación y las pruebas usen la misma llamada.
   static void initFormats() => initializeDateFormatting(locale);
 
+  /// Los dos formateadores, armados una sola vez.
+  ///
+  /// Construir un `DateFormat` cuesta unas veinte veces más que usarlo —hay
+  /// que interpretar el patrón y buscar los nombres del idioma—, y una tabla
+  /// con dos columnas de fecha lo hacía por cada celda y en cada dibujado.
+  ///
+  /// Un estático de Dart nace en su primer uso, así que estos dos se arman al
+  /// formatear la primera fecha, que siempre es después de [initFormats]: si
+  /// se armaran al cargar la clase, fallarían por un idioma todavía sin
+  /// inicializar.
+  static final DateFormat _soloDia = DateFormat(maskDate, locale);
+  static final DateFormat _diaYHora = DateFormat(maskDateTime, locale);
+
   /// Sólo el día: `17/oct/2026`.
   static String formatDate(DateTime? dateTime) {
     if (dateTime == null) return emptyValue;
 
-    return DateFormat(maskDate, locale).format(dateTime);
+    return _soloDia.format(dateTime);
   }
 
   /// Día y hora: `17/oct/2026 14:30`.
   static String fullDateFormat(DateTime? dateTime) {
     if (dateTime == null) return emptyValue;
 
-    return DateFormat(maskDateTime, locale).format(dateTime);
+    return _diaYHora.format(dateTime);
   }
 }

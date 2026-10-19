@@ -12,13 +12,13 @@ import 'package:gestion_lavanderia/utils/constants_manager.dart';
 /// categoría, donde esa columna no se muestra.
 List<TableColumnDef<PrecioData, ColumnPreciosName>> columnas({
   bool conCategoria = true,
+  bool conAcciones = false,
 }) {
   return [
     TableColumnDef.text(
       title: 'Concepto',
       value: (precio) => precio.nombreConcepto,
       sortBy: ColumnPreciosName.nombre,
-      primary: true,
     ),
     if (conCategoria)
       TableColumnDef.text(
@@ -36,8 +36,21 @@ List<TableColumnDef<PrecioData, ColumnPreciosName>> columnas({
       title: 'Fecha de Creación',
       value: (precio) => precio.fechaCreacion.formatFullDate,
       sortBy: ColumnPreciosName.fechaCreacion,
-      showOnSmall: false,
     ),
+    if (conAcciones)
+      TableColumnDef.widget(
+        title: 'Acciones',
+        size: const TableColumnSize.fija(TableActionsCell.ancho),
+        content: (context, precio) => TableActionsCell(
+          actions: [
+            TableAction(
+              label: 'Editar concepto',
+              icon: Icons.edit,
+              onPressed: () {},
+            ),
+          ],
+        ),
+      ),
   ];
 }
 
@@ -84,7 +97,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
         ),
       );
 
@@ -96,38 +108,30 @@ void main() {
       expect(find.text('01/oct/2026 00:00'), findsOneWidget);
     });
 
-    testWidgets(
-      'agrega la columna de acciones sin que las celdas se desalineen',
-      (tester) async {
-        await mostrar(
-          tester,
-          DataTableCard<PrecioData, ColumnPreciosName>(
-            columns: columnas(),
-            rows: precios,
-            forceSmall: false,
-            actionsBuilder: (precio) => [
-              TableAction(
-                label: 'Editar concepto',
-                icon: Icons.edit,
-                onPressed: () {},
-              ),
-            ],
-          ),
-        );
+    testWidgets('las acciones son una columna más de la lista', (
+      tester,
+    ) async {
+      await mostrar(
+        tester,
+        DataTableCard<PrecioData, ColumnPreciosName>(
+          columns: columnas(conAcciones: true),
+          rows: precios,
+        ),
+      );
 
-        // `DataTable` comprueba con un assert que cada fila tenga tantas
-        // celdas como encabezados: si la tabla agregara la columna sin agregar
-        // la celda, este `pump` fallaría.
-        final table = tester.widget<DataTable>(find.byType(DataTable));
-        expect(table.columns.length, columnas().length + 1);
-        expect(find.text('Acciones'), findsOneWidget);
-        for (final row in table.rows) {
-          expect(row.cells.length, table.columns.length);
-        }
-      },
-    );
+      // `DataTable` comprueba con un assert que cada fila tenga tantas celdas
+      // como encabezados. Ahora no hay forma de descuadrarlo: la tabla no
+      // agrega ninguna columna por su cuenta.
+      final table = tester.widget<DataTable>(find.byType(DataTable));
+      expect(table.columns.length, columnas(conAcciones: true).length);
+      expect(find.text('Acciones'), findsOneWidget);
+      expect(find.byType(TableActionsCell), findsNWidgets(precios.length));
+      for (final row in table.rows) {
+        expect(row.cells.length, table.columns.length);
+      }
+    });
 
-    testWidgets('sin actionsBuilder no hay columna de acciones', (
+    testWidgets('sin columna de acciones no aparece su encabezado', (
       tester,
     ) async {
       await mostrar(
@@ -135,7 +139,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
         ),
       );
 
@@ -147,6 +150,39 @@ void main() {
       }
     });
 
+    testWidgets('el texto que no cabe baja de línea en vez de cortarse', (
+      tester,
+    ) async {
+      const largo = 'Edredón matrimonial de plumas con funda';
+
+      await mostrar(
+        tester,
+        DataTableCard<PrecioData, ColumnPreciosName>(
+          columns: columnas(conAcciones: true),
+          rows: [
+            PrecioData(
+              categoriaId: 1,
+              categoria: 'Ropa de cama',
+              nombreConcepto: largo,
+            ),
+          ],
+        ),
+      );
+
+      final celda = tester.widget<Text>(find.text(largo));
+      final alto = tester.getSize(find.text(largo)).height;
+
+      // Ni puntos suspensivos ni un solo renglón: el texto se reparte en
+      // varios y la fila crece con él.
+      expect(celda.overflow, isNot(TextOverflow.ellipsis));
+      expect(celda.maxLines, isNull);
+      expect(alto, greaterThan(30));
+      expect(
+        tester.getSize(find.byType(DataTable)).height,
+        greaterThan(56 + 52),
+      );
+    });
+
     testWidgets('una lista vacía muestra el aviso en lugar de la tabla', (
       tester,
     ) async {
@@ -155,7 +191,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: const [],
-          forceSmall: false,
         ),
       );
 
@@ -171,7 +206,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
           sortedBy: ColumnPreciosName.importe,
           ascending: false,
           onSort: (_, _) {},
@@ -194,7 +228,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(conCategoria: false),
           rows: precios,
-          forceSmall: false,
           sortedBy: ColumnPreciosName.categoria,
           onSort: (_, _) {},
         ),
@@ -215,7 +248,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
           sortedBy: ColumnPreciosName.nombre,
           ascending: true,
           onSort: (column, ascending) => cambios.add((column, ascending)),
@@ -241,7 +273,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
           seccionFiltros: EstatusFilter(
             estatus: EstatusType.activo,
             onChanged: (_) {},
@@ -265,7 +296,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
         ),
       );
 
@@ -280,7 +310,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
           seccionEncabezado: const Text('Precios de ropa'),
         ),
       );
@@ -304,7 +333,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
         ),
       );
 
@@ -312,36 +340,75 @@ void main() {
       expect(find.byType(Divider), findsNothing);
     });
 
-    testWidgets('en una ventana angosta muestra tarjetas y no la tabla', (
-      tester,
+    /// El ancho de la tabla y el del hueco donde vive.
+    ///
+    /// El marco que la encierra se queda con un píxel por lado, así que la
+    /// tabla llena el hueco cuando mide dos menos que él.
+    Future<(double tabla, double hueco)> medirTabla(
+      WidgetTester tester,
+      Size ventana,
     ) async {
-      // El ancho de la superficie de prueba (800) queda por debajo del corte.
+      tester.view.physicalSize = ventana;
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
       await mostrar(
         tester,
         DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
+          columns: columnas(conAcciones: true),
           rows: precios,
-          actionsBuilder: (precio) => [
-            TableAction(
-              label: 'Editar concepto',
-              icon: Icons.edit,
-              onPressed: () {},
-            ),
-          ],
         ),
       );
 
-      expect(find.byType(DataTable), findsNothing);
-      expect(
-        find.byType(TableSmallList<PrecioData, ColumnPreciosName>),
-        findsOneWidget,
+      return (
+        tester.getSize(find.byType(DataTable)).width,
+        tester.getSize(find.byKey(DataTableCard.llaveLista)).width,
       );
-      // El título de la tarjeta es la columna marcada como `primary`...
+    }
+
+    testWidgets('con sitio de sobra la tabla llena el ancho y no se desplaza', (
+      tester,
+    ) async {
+      final (tabla, hueco) = await medirTabla(tester, const Size(1400, 900));
+
+      // Antes cada columna pedía lo que midiera su texto más largo y la tabla
+      // nacía desplazable aunque sobrara pantalla.
+      expect(tabla, closeTo(hueco - 2, 0.5));
+    });
+
+    testWidgets('sin sitio la tabla se queda en su mínimo y se desplaza', (
+      tester,
+    ) async {
+      final (tabla, hueco) = await medirTabla(tester, const Size(620, 900));
+
+      // Por debajo del mínimo deja de apretar: se sale del hueco y lo que
+      // sobra se recorre.
+      expect(tabla, greaterThan(hueco));
+    });
+
+    testWidgets('en una ventana angosta sigue siendo la misma tabla', (
+      tester,
+    ) async {
+      tester.view.physicalSize = const Size(420, 800);
+      tester.view.devicePixelRatio = 1;
+      addTearDown(tester.view.reset);
+
+      // Antes, por debajo de cierto ancho, la lista se cambiaba por tarjetas y
+      // escondía las columnas marcadas: eran dos listados distintos que había
+      // que mantener a la par.
+      await mostrar(
+        tester,
+        DataTableCard<PrecioData, ColumnPreciosName>(
+          columns: columnas(conAcciones: true),
+          rows: precios,
+        ),
+      );
+
+      expect(find.byType(DataTable), findsOneWidget);
+      // Con todas sus columnas, incluidas las que antes se escondían.
       expect(find.text('Sábana'), findsOneWidget);
-      // ...los demás datos llevan el encabezado de su columna como etiqueta...
-      expect(find.textContaining('Importe: 35.50'), findsOneWidget);
-      // ...y la columna marcada con `showOnSmall: false` no aparece.
-      expect(find.textContaining('01/oct/2026'), findsNothing);
+      expect(find.text('35.50'), findsOneWidget);
+      expect(find.text('01/oct/2026 00:00'), findsOneWidget);
     });
 
     testWidgets('mientras carga no muestra la lista ni el aviso de vacío', (
@@ -353,7 +420,6 @@ void main() {
             body: DataTableCard<PrecioData, ColumnPreciosName>(
               columns: columnas(),
               rows: const [],
-              forceSmall: false,
               isLoading: true,
             ),
           ),
@@ -383,7 +449,6 @@ void main() {
         DataTableCard<PrecioData, ColumnPreciosName>(
           columns: columnas(),
           rows: precios,
-          forceSmall: false,
           seccionFiltros: VRow(
             gutter: 12,
             align: VAlign.center,

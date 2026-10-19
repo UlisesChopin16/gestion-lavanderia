@@ -1,4 +1,5 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
+import 'package:gestion_lavanderia/extensions/int_ext.dart';
 import 'package:gestion_lavanderia/types/clothe_size_type.dart';
 import 'package:gestion_lavanderia/types/estatus_type.dart';
 import 'package:gestion_lavanderia/types/unit_type.dart';
@@ -46,6 +47,13 @@ sealed class PrecioData with _$PrecioData {
   bool get esNuevo => id == 0;
 
   bool get estaActivo => estatus == EstatusType.activo;
+
+  /// Los días de entrega con su unidad: `1 día`, `3 días`.
+  ///
+  /// Es un getter y no un campo guardado: el dato es [diasEntrega], que es con
+  /// el que se calculan las fechas, y un campo aparte podría quedarse
+  /// desfasado del número que dice representar.
+  String get diasFormato => diasEntrega.enDias;
 
   /// Cómo se nombra el concepto en una lista: el tamaño sólo aparece cuando lo
   /// tiene.

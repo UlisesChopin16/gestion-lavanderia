@@ -11,9 +11,8 @@ import 'package:gestion_lavanderia/ui/views/catalogos/widgets/widgets.dart';
 /// El catálogo de conceptos de ropa con su precio.
 ///
 /// Es la lista más ancha del módulo —un concepto se describe con su categoría,
-/// su tamaño, su unidad y sus días de entrega—, así que las columnas de
-/// auditoría se esconden en la vista compacta y la tabla se desplaza a lo
-/// ancho cuando no caben.
+/// su tamaño, su unidad y sus días de entrega—, así que es la primera que se
+/// recorre a lo ancho cuando la ventana no da para sus columnas.
 class PreciosView extends ConsumerWidget {
   const PreciosView({super.key});
 
@@ -76,10 +75,7 @@ class PreciosView extends ConsumerWidget {
               cols: 12,
               md: 4,
               sm: 6,
-              child: EstatusFilter(
-                estatus: filtros.estatus,
-                onChanged: notifier.filtrarEstatus,
-              ),
+              child: EstatusFilter(estatus: filtros.estatus, onChanged: notifier.filtrarEstatus),
             ),
             VCol(
               cols: 12,
@@ -111,8 +107,7 @@ class PreciosView extends ConsumerWidget {
                 columns: ColumnPreciosName.values,
                 selected: filtros.ordenamiento,
                 ascending: filtros.ascendente,
-                onColumnChanged: (columna) =>
-                    notifier.ordenar(columna, filtros.ascendente),
+                onColumnChanged: (columna) => notifier.ordenar(columna, filtros.ascendente),
                 onAscendingChanged: (ascendente) =>
                     notifier.ordenar(filtros.ordenamiento, ascendente),
               ),
@@ -134,17 +129,10 @@ class PreciosView extends ConsumerWidget {
 
         columns: [
           TableColumnDef.text(
-            title: 'ID',
-            value: (precio) => '${precio.id}',
-            sortBy: ColumnPreciosName.id,
-            numeric: true,
-            showOnSmall: false,
-          ),
-          TableColumnDef.text(
             title: 'Concepto',
             value: (precio) => precio.nombreConcepto,
             sortBy: ColumnPreciosName.nombre,
-            primary: true,
+            size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Categoría',
@@ -155,64 +143,73 @@ class PreciosView extends ConsumerWidget {
             title: 'Tamaño',
             value: (precio) => precio.clotheSize.description,
             sortBy: ColumnPreciosName.sizeRopa,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Unidad',
             value: (precio) => precio.tipoUnidad.value,
             sortBy: ColumnPreciosName.tipoUnidad,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Días de Entrega',
-            value: (precio) => '${precio.diasEntrega}',
+            value: (precio) => precio.diasFormato,
             sortBy: ColumnPreciosName.diasEntrega,
-            numeric: true,
+            size: TableColumnSize.normal,
           ),
           TableColumnDef.text(
             title: '\$ Importe',
             value: (precio) => precio.importe.toStringAsFixed(2),
             sortBy: ColumnPreciosName.importe,
             numeric: true,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.widget(
             title: 'Estatus',
             content: (context, precio) => EstatusChip(estatus: precio.estatus),
             sortBy: ColumnPreciosName.estatus,
+            size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (precio) => precio.fechaCreacion.formatFullDate,
             sortBy: ColumnPreciosName.fechaCreacion,
-            showOnSmall: false,
           ),
           TableColumnDef.text(
             title: 'Fecha de Eliminación',
             value: (precio) => precio.fechaEliminacion.formatFullDate,
             sortBy: ColumnPreciosName.fechaEliminacion,
-            showOnSmall: false,
           ),
-        ],
-
-        actionsBuilder: (precio) => [
-          if (precio.estaActivo) ...[
-            TableAction(
-              label: 'Editar concepto',
-              icon: Icons.edit_rounded,
-              color: Colors.blue,
-              onPressed: () => _editar(context, precio),
+          // Las acciones son una columna más, la última: de ancho fijo porque
+          // lo que llevan dentro no cambia de tamaño con los datos.
+          TableColumnDef.widget(
+            title: 'Acciones',
+            size: const TableColumnSize.fija(TableActionsCell.ancho),
+            content: (context, precio) => TableActionsCell(
+              actions: [
+                if (precio.estaActivo) ...[
+                  TableAction(
+                    label: 'Editar concepto',
+                    icon: Icons.edit_rounded,
+                    color: Colors.blue,
+                    onPressed: () => _editar(context, precio),
+                  ),
+                  TableAction(
+                    label: 'Desactivar concepto',
+                    icon: Icons.delete_rounded,
+                    color: Colors.red,
+                    onPressed: () => _desactivar(context, ref, precio),
+                  ),
+                ] else
+                  TableAction(
+                    label: 'Activar concepto',
+                    icon: Icons.restore_rounded,
+                    color: Colors.green,
+                    onPressed: () => _activar(context, ref, precio),
+                  ),
+              ],
             ),
-            TableAction(
-              label: 'Desactivar concepto',
-              icon: Icons.delete_rounded,
-              color: Colors.red,
-              onPressed: () => _desactivar(context, ref, precio),
-            ),
-          ] else
-            TableAction(
-              label: 'Activar concepto',
-              icon: Icons.restore_rounded,
-              color: Colors.green,
-              onPressed: () => _activar(context, ref, precio),
-            ),
+          ),
         ],
       ),
     );
@@ -251,11 +248,7 @@ class PreciosView extends ConsumerWidget {
     await context.showSuccessDialog('El concepto se actualizó correctamente.');
   }
 
-  Future<void> _desactivar(
-    BuildContext context,
-    WidgetRef ref,
-    PrecioData precio,
-  ) async {
+  Future<void> _desactivar(BuildContext context, WidgetRef ref, PrecioData precio) async {
     final confirmado = await context.showWarningDialog(
       message:
           '¿Desactivar "${precio.descripcion}" de la categoría '
@@ -268,11 +261,7 @@ class PreciosView extends ConsumerWidget {
     await ref.read(preciosViewModelProvider.notifier).desactivar(precio.id);
   }
 
-  Future<void> _activar(
-    BuildContext context,
-    WidgetRef ref,
-    PrecioData precio,
-  ) async {
+  Future<void> _activar(BuildContext context, WidgetRef ref, PrecioData precio) async {
     final confirmado = await context.showWarningDialog(
       message:
           '¿Activar "${precio.descripcion}" de la categoría '

@@ -280,15 +280,20 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     state = state.copyWith(descripcion: descripcion);
   }
 
-  /// Escribe la orden. Devuelve `true` cuando quedó guardada.
-  Future<bool> guardar() async {
+  /// Escribe la orden. Devuelve el folio con el que quedó registrada, o
+  /// `null` si no se pudo guardar.
+  ///
+  /// Se devuelve el folio y no un `true` porque es lo que hace falta para
+  /// confirmar el alta por su nombre: el `AAMM-NNNNN` lo pone la base al
+  /// insertar, y es el número que el cliente se lleva en el ticket.
+  Future<String?> guardar() async {
     final cliente = state.cliente;
-    if (cliente == null || state.items.isEmpty) return false;
+    if (cliente == null || state.items.isEmpty) return null;
 
     state = state.copyWith(guardando: true, mensajeError: '');
 
     try {
-      await _ordenes.crearOrden(
+      final orden = await _ordenes.crearOrden(
         clienteId: cliente.id,
         items: state.items.toList(),
         descripcion: state.descripcion.trim().isEmpty
@@ -298,15 +303,15 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
         metodoPago: state.metodoPago,
       );
 
-      if (!ref.mounted) return true;
+      if (!ref.mounted) return orden.folio;
 
       state = state.copyWith(guardando: false);
 
-      return true;
+      return orden.folio;
     } catch (error, stackTrace) {
       _fallar(error, stackTrace, 'No se pudo crear la orden.');
 
-      return false;
+      return null;
     }
   }
 

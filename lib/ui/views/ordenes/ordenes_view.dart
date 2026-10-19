@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
@@ -227,19 +228,29 @@ class OrdenesView extends ConsumerWidget {
     );
   }
 
-  /// Abre el alta y relee el listado si se guardó algo.
+  /// Abre el alta, relee el listado si se guardó algo y confirma con qué
+  /// folio quedó la orden.
   ///
   /// La relectura se pide aquí y no dentro del diálogo porque el listado es de
-  /// esta pantalla: el diálogo sólo dice si guardó.
+  /// esta pantalla: el diálogo sólo devuelve el folio de lo que guardó.
+  ///
+  /// El aviso va después de releer para que la orden ya esté en la tabla
+  /// cuando se cierre: se confirma y se ve, en ese orden. Y lleva el folio
+  /// porque es el número con el que se busca la orden después —el del ticket
+  /// que se lleva el cliente—, no un dato de la base que dé igual.
   Future<void> _agregar(BuildContext context, WidgetRef ref) async {
-    final guardada = await showDialog<bool>(
+    final folio = await showDialog<String>(
       context: context,
       builder: (context) => const OrdenDialog(),
     );
 
-    if (guardada != true) return;
+    if (folio == null) return;
 
     await ref.read(ordenesViewModelProvider.notifier).cargar();
+
+    if (!context.mounted) return;
+
+    await context.showSuccessDialog('La orden $folio se creó correctamente.');
   }
 
   /// Lo que todavía no se ha portado de este módulo: el historial, el detalle

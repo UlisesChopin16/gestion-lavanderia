@@ -317,7 +317,8 @@ void main() {
       notificador().cambiarAbono(40);
       notificador().cambiarDescripcion('  Una mancha de café  ');
 
-      expect(await notificador().guardar(), isTrue);
+      // Devuelve el folio con el que quedó: `AAMM-NNNNN`.
+      expect(await notificador().guardar(), matches(r'^\d{4}-\d{5}$'));
 
       final ordenes = await instance<OrdenesLocalDatasource>().listado();
       final orden = ordenes.single;
@@ -348,7 +349,7 @@ void main() {
       notificador().agregar(concepto('Sábana'));
       notificador().abonarTodo();
 
-      expect(await notificador().guardar(), isTrue);
+      expect(await notificador().guardar(), isNotNull);
 
       final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
 

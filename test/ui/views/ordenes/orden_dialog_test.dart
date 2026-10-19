@@ -9,6 +9,7 @@ import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/clientes/dialogs/cliente_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 import '../../../support/inyeccion_de_prueba.dart';
@@ -22,8 +23,9 @@ void main() {
 
   late AppDatabase db;
 
-  /// Lo que el diálogo devolvió al cerrarse.
-  bool? resultado;
+  /// El folio que el diálogo devolvió al cerrarse, o `null` si se salió
+  /// sin guardar.
+  String? resultado;
 
   Future<void> sembrarCatalogo() async {
     final categoriaId = await db.categoriaServicioDao.insertCategoria(
@@ -61,8 +63,11 @@ void main() {
   }
 
   /// Abre el diálogo como lo abre el listado y espera a que lea el catálogo.
-  Future<void> abrirDialogo(WidgetTester tester) async {
-    await tester.binding.setSurfaceSize(const Size(1400, 900));
+  Future<void> abrirDialogo(
+    WidgetTester tester, {
+    Size tamano = const Size(1400, 900),
+  }) async {
+    await tester.binding.setSurfaceSize(tamano);
     addTearDown(() => tester.binding.setSurfaceSize(null));
 
     await tester.pumpWidget(
@@ -72,7 +77,7 @@ void main() {
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () async {
-                  resultado = await showDialog<bool>(
+                  resultado = await showDialog<String>(
                     context: context,
                     builder: (context) => const OrdenDialog(),
                   );
@@ -222,6 +227,74 @@ void main() {
     );
   });
 
+  testWidgets('la orden entera se ve sin desplazar en una pantalla de '
+      'portátil', (tester) async {
+    final categoriaId = await db.categoriaServicioDao.insertCategoria(
+      const CategoriaServicioCompanion(
+        nombre: Value('Lavandería'),
+        estatus: Value(EstatusType.activo),
+        diasEntrega: Value(1),
+      ),
+    );
+
+    const prendas = ['Carga', 'Playera', 'Pantalón', 'Camisa', 'Saco', 'Falda'];
+
+    for (final prenda in prendas) {
+      await db.preciosConceptosDao.insertPrecio(
+        PreciosConceptosCompanion(
+          categoriaId: Value(categoriaId),
+          clotheSize: const Value(ClotheSizeType.emptySize),
+          nombreConcepto: Value(prenda),
+          diasEntrega: const Value(1),
+          tipoUnidad: const Value(UnitType.pieza),
+          importe: const Value(100),
+          estatus: const Value(EstatusType.activo),
+        ),
+      );
+    }
+
+    // La ventana de un portátil, que es donde aprieta: con el cobro en la
+    // columna derecha no cabía ni la segunda prenda.
+    await abrirDialogo(tester, tamano: const Size(1144, 643));
+
+    // Se agregan por el modelo y no tocando el catálogo porque en esta
+    // ventana el catálogo tampoco cabe entero: lo que se mide aquí es la
+    // lista de la orden, no el desplazamiento del de al lado.
+    final contenedor = ProviderScope.containerOf(
+      tester.element(find.byType(OrdenDialog)),
+    );
+    final notificador = contenedor.read(
+      ordenDialogViewModelProvider.notifier,
+    );
+
+    for (final concepto in contenedor
+        .read(ordenDialogViewModelProvider)
+        .conceptos) {
+      notificador.agregar(concepto);
+    }
+    await tester.pumpAndSettle();
+
+    final lista = tester.getRect(find.byType(RenglonesOrden));
+
+    // Los importes de la orden: uno por renglón puesto, y los que caen dentro
+    // del hueco de la lista son los que se ven sin rodar la rueda.
+    final dentro = find
+        .descendant(
+          of: find.byType(RenglonesOrden),
+          matching: find.text('100.00'),
+        )
+        .evaluate()
+        .map((elemento) => tester.getRect(find.byWidget(elemento.widget)))
+        .where((renglon) => renglon.bottom <= lista.bottom + 1)
+        .length;
+
+    // Con la tipografía de prueba —donde cada letra ocupa un cuadro entero y
+    // la banda de abajo se parte en dos renglones— se ven cinco de las seis;
+    // con Poppins, que es la de la aplicación, caben las seis. Se exige
+    // cuatro para que la prueba mida el reparto y no el ancho de la fuente.
+    expect(dentro, greaterThanOrEqualTo(4));
+  });
+
   testWidgets('se arma la orden tocando el concepto y se crea', (tester) async {
     await sembrarCatalogo();
     await sembrarCliente();
@@ -248,8 +321,9 @@ void main() {
     await tester.tap(find.widgetWithText(FilledButton, 'Crear orden · 100.00'));
     await tester.pumpAndSettle();
 
-    // El diálogo se cierra diciendo que guardó, y la orden está en la base.
-    expect(resultado, isTrue);
+    // El diálogo se cierra con el folio de lo que guardó, y la orden está
+    // en la base.
+    expect(resultado, matches(r'^\d{4}-\d{5}$'));
     expect(find.byType(OrdenDialog), findsNothing);
 
     final ordenes = await instance<OrdenesLocalDatasource>().listado();

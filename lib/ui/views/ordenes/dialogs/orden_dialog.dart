@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/clientes/dialogs/cliente_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
@@ -15,8 +16,15 @@ import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/widgets/widgets.dart
 /// Se arma en tres pasos numerados, de izquierda a derecha: a quién es, qué
 /// ropa trae y cuánto se cobra. Los dos primeros van en la columna izquierda
 /// porque son los que llevan trabajo —buscar, elegir— y el resultado se va
-/// viendo en la derecha, que es a la vez el resumen y lo que se firma: la
-/// ropa elegida arriba y el cobro abajo.
+/// viendo en la derecha, que es a la vez el resumen y lo que se firma.
+///
+/// El reparto a lo alto es lo que manda aquí, porque es lo escaso: lo que
+/// crece con la orden —las tres listas, y sobre todo la ropa elegida— se
+/// queda con todo el hueco que sobre, y lo demás se aprieta a lo ancho, que
+/// es lo que no falta. El cobro ocupaba antes media columna derecha puesto
+/// en vertical, y con tres prendas en la orden ya no se veía la tercera; hoy
+/// son dos renglones apretados al pie de esa misma columna, que es donde se
+/// leen las cifras que explica.
 ///
 /// No usa `BaseDialog`: ese es el molde de los diálogos que preguntan algo
 /// —un aviso, una confirmación, un formulario corto— y se miden por su
@@ -24,29 +32,34 @@ import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/widgets/widgets.dart
 /// queda con la ventana hasta un tope, porque amontonar dos listas y un cobro
 /// en el ancho de un formulario es lo que hacía lenta la captura.
 ///
-/// Se cierra devolviendo `true` cuando la orden quedó guardada, que es lo que
-/// el listado espera para releerse.
+/// Se cierra devolviendo el folio de la orden cuando quedó guardada, y `null`
+/// cuando se salió sin guardar: el listado lo usa para releerse y para decir
+/// con qué número quedó registrada.
 class OrdenDialog extends ConsumerWidget {
   const OrdenDialog({super.key});
 
   /// Lo que el diálogo mide como mucho. Más ancho que esto no ayuda: las dos
   /// columnas se separan tanto que hay que mover la cabeza entre una y otra.
   static const double anchoMaximo = 1120;
-  static const double altoMaximo = 760;
+
+  /// A lo alto sí se aprovecha lo que haya: cada píxel es una prenda más a la
+  /// vista. El tope está por encima de lo que mide un portátil para que en un
+  /// monitor de escritorio la lista crezca, no para recortarla.
+  static const double altoMaximo = 900;
 
   /// Por debajo de este ancho las dos columnas se apilan: en una ventana
   /// angosta, media pantalla por columna no alcanza ni para el buscador.
   static const double _corteDosColumnas = 880;
 
   /// Lo que separa el contenido de las orillas del diálogo.
-  static const double _relleno = 20;
+  static const double _relleno = 16;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final estado = ref.watch(ordenDialogViewModelProvider);
 
     return Dialog(
-      insetPadding: const EdgeInsets.all(24),
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       clipBehavior: Clip.antiAlias,
       child: ConstrainedBox(
         constraints: const BoxConstraints(
@@ -83,7 +96,7 @@ class _Encabezado extends StatelessWidget {
 
     return Container(
       color: scheme.primary,
-      padding: const EdgeInsets.fromLTRB(20, 14, 12, 14),
+      padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
       child: Row(
         spacing: 12,
         children: [
@@ -97,7 +110,7 @@ class _Encabezado extends StatelessWidget {
             ),
           ),
           IconButton(
-            onPressed: () => Navigator.of(context).pop(false),
+            onPressed: () => Navigator.of(context).pop(),
             icon: Icon(Icons.close_rounded, color: scheme.onPrimary),
             tooltip: 'Cerrar sin guardar',
           ),
@@ -136,11 +149,15 @@ class _Cuerpo extends ConsumerWidget {
           );
         }
 
+        // A medias. Lo que se elige lleva más trabajo que lo que queda, pero
+        // sus dos listas son de renglones cortos —un nombre y un precio— y
+        // les sobraba ancho, mientras que a la derecha cada renglón lleva
+        // además la cantidad, la fecha y el importe, y la tarjeta del cobro
+        // reparte cuatro controles en una línea.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
-              flex: 5,
               child: Padding(
                 padding: const EdgeInsets.all(OrdenDialog._relleno),
                 child: _Eleccion(estado: estado),
@@ -148,7 +165,6 @@ class _Cuerpo extends ConsumerWidget {
             ),
             const VerticalDivider(width: 1),
             Expanded(
-              flex: 4,
               child: Padding(
                 padding: const EdgeInsets.all(OrdenDialog._relleno),
                 child: _Resumen(estado: estado),
@@ -230,6 +246,11 @@ class _Eleccion extends ConsumerWidget {
 }
 
 /// Lo que va quedando: la ropa elegida y lo que se cobra por ella.
+///
+/// La lista se queda con todo el alto que sobra en la columna, y sólo cede el
+/// renglón del título arriba y la tarjeta del cobro abajo: es la única parte
+/// del diálogo que crece con la orden, y verla entera es lo que evita cobrar
+/// de menos por una prenda que se quedó fuera de la vista.
 class _Resumen extends ConsumerWidget {
   const _Resumen({required this.estado, this.altoRenglones});
 
@@ -237,6 +258,19 @@ class _Resumen extends ConsumerWidget {
   final double? altoRenglones;
 
   final OrdenDialogState estado;
+
+  /// Cuántos conceptos lleva y para cuándo queda, en una línea.
+  String get _cuenta {
+    final cuantos = estado.items.length;
+    if (cuantos == 0) return 'Sin prendas';
+
+    final conceptos = cuantos == 1 ? '1 concepto' : '$cuantos conceptos';
+    final entrega = estado.entregaEstimada;
+
+    if (entrega == null) return conceptos;
+
+    return '$conceptos · lista el ${entrega.formatDate}';
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -259,11 +293,16 @@ class _Resumen extends ConsumerWidget {
         PasoTitulo(
           numero: '3',
           titulo: 'La orden',
-          acompanante: Text(
-            estado.items.isEmpty
-                ? 'Sin prendas'
-                : '${estado.items.length} conceptos',
-            style: theme.textTheme.bodySmall,
+          // Suelto y no fijo: en una ventana angosta el título y la cuenta se
+          // reparten el renglón en lugar de salirse de él.
+          acompanante: Flexible(
+            child: Text(
+              _cuenta,
+              textAlign: TextAlign.end,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall,
+            ),
           ),
         ),
         if (alto == null)
@@ -274,7 +313,6 @@ class _Resumen extends ConsumerWidget {
           total: estado.total,
           abono: estado.abono,
           metodoPago: estado.metodoPago,
-          entregaEstimada: estado.entregaEstimada,
           onAbono: notifier.cambiarAbono,
           onMetodoPago: notifier.elegirMetodoPago,
         ),
@@ -283,11 +321,20 @@ class _Resumen extends ConsumerWidget {
   }
 }
 
-/// La nota de la orden y los dos botones con los que se sale.
+/// La banda de abajo: con qué se paga, cuánto se adelanta, la nota de la
+/// orden y los dos botones con los que se sale.
+///
+/// Va de lado a lado del diálogo porque todo lo que lleva son controles de una
+/// línea, y puestos en fila caben en el alto de uno solo. En la columna de la
+/// derecha, uno debajo de otro, medían casi trescientos píxeles que le hacían
+/// falta a la lista de prendas.
 class _Pie extends ConsumerWidget {
   const _Pie({required this.estado});
 
   final OrdenDialogState estado;
+
+  /// Lo que la nota necesita para que se lea lo que se escribe en ella.
+  static const double _anchoNota = 180;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -300,13 +347,17 @@ class _Pie extends ConsumerWidget {
         color: scheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
+      // Sólo quedan dos cosas, así que la nota se lleva todo el ancho que no
+      // piden los botones. El cobro estuvo aquí un tiempo: se subió a la
+      // tarjeta de la columna derecha, junto a las cifras que explica.
       child: VRow(
         gutter: 12,
         align: VAlign.center,
         children: [
           VCol(
             cols: 12,
-            md: VCol.grow,
+            sm: VCol.grow,
+            minWidth: _anchoNota,
             child: FormTextField(
               label: 'Nota de la orden (opcional)',
               hint: 'Una mancha, una prenda delicada, dónde se entrega…',
@@ -317,13 +368,13 @@ class _Pie extends ConsumerWidget {
           ),
           VCol(
             cols: 12,
-            md: VCol.auto,
+            sm: VCol.auto,
             child: Row(
               mainAxisSize: MainAxisSize.min,
               spacing: 12,
               children: [
                 TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
+                  onPressed: () => Navigator.of(context).pop(),
                   child: const Text('Cancelar'),
                 ),
                 FilledButton.icon(
@@ -353,13 +404,13 @@ class _Pie extends ConsumerWidget {
   }
 
   Future<void> _guardar(BuildContext context, WidgetRef ref) async {
-    final guardada = await ref
+    final folio = await ref
         .read(ordenDialogViewModelProvider.notifier)
         .guardar();
 
-    if (!guardada || !context.mounted) return;
+    if (folio == null || !context.mounted) return;
 
-    Navigator.of(context).pop(true);
+    Navigator.of(context).pop(folio);
   }
 }
 

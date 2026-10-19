@@ -9,7 +9,13 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// La fecha sale calculada de los días que pide el concepto, y se puede
 /// correr renglón por renglón: una prenda que el cliente necesita antes no
 /// obliga a cambiar el catálogo.
-class RenglonesOrden extends StatelessWidget {
+///
+/// Cada renglón ocupa una sola línea a propósito: la lista vive en un diálogo
+/// que no crece con ella, así que lo que mide un renglón decide cuántas
+/// prendas se ven sin desplazar. Con dos líneas por renglón —el nombre arriba
+/// y los controles abajo— no cabían ni tres, y una orden de mostrador trae
+/// media docena. Los controles se reparten a lo ancho, que es lo que sobra.
+class RenglonesOrden extends StatefulWidget {
   const RenglonesOrden({
     super.key,
     required this.items,
@@ -28,18 +34,41 @@ class RenglonesOrden extends StatelessWidget {
   final ValueChanged<int> onQuitar;
 
   @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) return const _Vacia();
+  State<RenglonesOrden> createState() => _RenglonesOrdenState();
+}
 
-    return ListView.separated(
-      padding: EdgeInsets.zero,
-      itemCount: items.length,
-      separatorBuilder: (context, _) => const Divider(height: 1),
-      itemBuilder: (context, indice) => _Renglon(
-        item: items[indice],
-        onCantidad: (cantidad) => onCantidad(indice, cantidad),
-        onEntrega: (fecha) => onEntrega(indice, fecha),
-        onQuitar: () => onQuitar(indice),
+class _RenglonesOrdenState extends State<RenglonesOrden> {
+  /// Propio y no el heredado: en escritorio nadie reparte el
+  /// `PrimaryScrollController`, y la barra sólo se deja ver siempre si sabe a
+  /// qué lista mira.
+  final _scroll = ScrollController();
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (widget.items.isEmpty) return const _Vacia();
+
+    // La barra se queda a la vista aunque no se esté desplazando: es lo que
+    // avisa de que la orden sigue más abajo de lo que se alcanza a ver.
+    return Scrollbar(
+      controller: _scroll,
+      thumbVisibility: true,
+      child: ListView.separated(
+        controller: _scroll,
+        padding: const EdgeInsets.only(right: 8),
+        itemCount: widget.items.length,
+        separatorBuilder: (context, _) => const Divider(height: 1),
+        itemBuilder: (context, indice) => _Renglon(
+          item: widget.items[indice],
+          onCantidad: (cantidad) => widget.onCantidad(indice, cantidad),
+          onEntrega: (fecha) => widget.onEntrega(indice, fecha),
+          onQuitar: () => widget.onQuitar(indice),
+        ),
       ),
     );
   }
@@ -58,61 +87,107 @@ class _Renglon extends StatelessWidget {
   final ValueChanged<DateTime> onEntrega;
   final VoidCallback onQuitar;
 
+  /// Lo que el renglón necesita para caber en una línea: el nombre más los
+  /// tres controles. Por debajo de eso el nombre se quedaría sin sitio, así
+  /// que los controles se van a una segunda línea.
+  static const double _anchoDeUnaLinea = 380;
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final precio = item.precio;
 
+    final nombre = Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          precio.descripcion,
+          style: theme.textTheme.titleSmall,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        Text(
+          precio.categoria,
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: theme.colorScheme.onSurfaceVariant,
+          ),
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ],
+    );
+
+    final cantidad = _Cantidad(
+      cantidad: item.cantidad,
+      unidad: precio.tipoUnidad.value,
+      onCambiar: onCantidad,
+    );
+
+    final importe = Text(
+      precio.importePor(item.cantidad).toStringAsFixed(2),
+      style: theme.textTheme.titleSmall,
+    );
+
+    final entrega = _Entrega(fecha: item.fechaEntrega, onCambiar: onEntrega);
+
+    final quitar = _BotonChico(
+      icono: Icons.close_rounded,
+      tooltip: 'Quitar de la orden',
+      onPressed: onQuitar,
+    );
+
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        spacing: 6,
-        children: [
-          Row(
-            spacing: 8,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < _anchoDeUnaLinea) {
+            // Dos líneas, como en una ventana angosta: el nombre y el importe
+            // arriba, los controles abajo. Cuesta el doble de alto, pero en
+            // este ancho la otra forma deja el nombre en nada.
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 4,
+              children: [
+                Row(
+                  spacing: 8,
+                  children: [Expanded(child: nombre), importe, quitar],
+                ),
+                Row(
+                  spacing: 8,
                   children: [
-                    Text(precio.descripcion, style: theme.textTheme.titleSmall),
-                    Text(
-                      precio.categoria,
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: theme.colorScheme.onSurfaceVariant,
+                    cantidad,
+                    Expanded(
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: entrega,
                       ),
                     ),
                   ],
                 ),
-              ),
-              Text(
-                precio.importePor(item.cantidad).toStringAsFixed(2),
-                style: theme.textTheme.titleSmall,
-              ),
-              IconButton(
-                onPressed: onQuitar,
-                icon: const Icon(Icons.close_rounded),
-                iconSize: 18,
-                visualDensity: VisualDensity.compact,
-                tooltip: 'Quitar de la orden',
-              ),
-            ],
-          ),
-          Row(
+              ],
+            );
+          }
+
+          // El nombre es lo único que se encoge: de un concepto cortado se
+          // reconoce el principio, y de un importe o una fecha cortados no se
+          // reconoce nada.
+          return Row(
             spacing: 8,
             children: [
-              _Cantidad(
-                cantidad: item.cantidad,
-                unidad: precio.tipoUnidad.value,
-                onCambiar: onCantidad,
+              Expanded(child: nombre),
+              cantidad,
+              // El importe y la entrega, uno debajo del otro: son las dos
+              // cifras del renglón y se leen en columna al recorrer la orden.
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [importe, entrega],
               ),
-              Expanded(
-                child: _Entrega(fecha: item.fechaEntrega, onCambiar: onEntrega),
-              ),
+              quitar,
             ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -167,23 +242,23 @@ class _CantidadState extends State<_Cantidad> {
   Widget build(BuildContext context) {
     return Row(
       mainAxisSize: MainAxisSize.min,
+      spacing: 2,
       children: [
-        IconButton(
-          onPressed: () => widget.onCambiar(widget.cantidad - 1),
-          icon: const Icon(Icons.remove_circle_outline_rounded),
-          iconSize: 20,
-          visualDensity: VisualDensity.compact,
+        _BotonChico(
+          icono: Icons.remove_circle_outline_rounded,
           tooltip: 'Una menos',
+          onPressed: () => widget.onCambiar(widget.cantidad - 1),
         ),
         SizedBox(
-          width: 56,
+          width: 48,
           child: TextField(
             controller: _controller,
             textAlign: TextAlign.center,
             keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            style: Theme.of(context).textTheme.bodyMedium,
             decoration: const InputDecoration(
               isDense: true,
-              contentPadding: EdgeInsets.symmetric(vertical: 8),
+              contentPadding: EdgeInsets.symmetric(vertical: 6),
             ),
             onChanged: (texto) {
               final cantidad = double.tryParse(texto);
@@ -194,12 +269,10 @@ class _CantidadState extends State<_Cantidad> {
             },
           ),
         ),
-        IconButton(
-          onPressed: () => widget.onCambiar(widget.cantidad + 1),
-          icon: const Icon(Icons.add_circle_outline_rounded),
-          iconSize: 20,
-          visualDensity: VisualDensity.compact,
+        _BotonChico(
+          icono: Icons.add_circle_outline_rounded,
           tooltip: 'Una más',
+          onPressed: () => widget.onCambiar(widget.cantidad + 1),
         ),
         Text(widget.unidad, style: Theme.of(context).textTheme.bodySmall),
       ],
@@ -216,12 +289,21 @@ class _Entrega extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Align(
-      alignment: Alignment.centerRight,
+    final theme = Theme.of(context);
+
+    return Tooltip(
+      message: 'Cambiar la fecha de entrega',
       child: TextButton.icon(
         onPressed: () => _elegir(context),
-        icon: const Icon(Icons.event_rounded, size: 18),
-        label: Text('Entrega ${fecha.formatDate}'),
+        icon: const Icon(Icons.event_rounded, size: 14),
+        label: Text(fecha.formatDate),
+        style: TextButton.styleFrom(
+          textStyle: theme.textTheme.bodySmall,
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          minimumSize: Size.zero,
+          visualDensity: VisualDensity.compact,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
       ),
     );
   }
@@ -239,6 +321,38 @@ class _Entrega extends StatelessWidget {
     );
 
     if (elegida != null) onCambiar(elegida);
+  }
+}
+
+/// Un botón de icono del tamaño del renglón.
+///
+/// El de Material reserva cuarenta y ocho píxeles para el dedo aunque el icono
+/// mida dieciocho; aquí hay tres por renglón y esa reserva es la que decidía
+/// el alto de la lista entera. En el mostrador se usa con ratón.
+class _BotonChico extends StatelessWidget {
+  const _BotonChico({
+    required this.icono,
+    required this.tooltip,
+    required this.onPressed,
+  });
+
+  final IconData icono;
+  final String tooltip;
+  final VoidCallback onPressed;
+
+  static const double _lado = 30;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      onPressed: onPressed,
+      icon: Icon(icono),
+      iconSize: 18,
+      tooltip: tooltip,
+      padding: EdgeInsets.zero,
+      visualDensity: VisualDensity.compact,
+      constraints: const BoxConstraints.tightFor(width: _lado, height: _lado),
+    );
   }
 }
 

@@ -6,7 +6,10 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
+import 'package:gestion_lavanderia/datasource/local/datasources.dart';
+import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
@@ -209,6 +212,71 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(OrdenDialog), findsOneWidget);
+  });
+
+  testWidgets('crear la orden avisa con qué folio quedó y la trae al listado', (
+    tester,
+  ) async {
+    final categoriaId = await db.categoriaServicioDao.insertCategoria(
+      const CategoriaServicioCompanion(
+        nombre: Value('Lavandería'),
+        estatus: Value(EstatusType.activo),
+        diasEntrega: Value(1),
+      ),
+    );
+
+    await db.preciosConceptosDao.insertPrecio(
+      PreciosConceptosCompanion(
+        categoriaId: Value(categoriaId),
+        clotheSize: const Value(ClotheSizeType.emptySize),
+        nombreConcepto: const Value('Playera'),
+        diasEntrega: const Value(1),
+        tipoUnidad: const Value(UnitType.pieza),
+        importe: const Value(100),
+        estatus: const Value(EstatusType.activo),
+      ),
+    );
+
+    final clienteId = await crearCliente(nombres: 'Lucía');
+
+    await abrirModulo(tester);
+
+    await tester.tap(find.widgetWithText(ButtonAdd, 'Nueva orden'));
+    await tester.pumpAndSettle();
+
+    // El alta se llena por el modelo: lo que se comprueba aquí es lo que hace
+    // el listado cuando el diálogo se cierra habiendo guardado, no la captura,
+    // que tiene sus propias pruebas.
+    final contenedor = ProviderScope.containerOf(
+      tester.element(find.byType(OrdenDialog)),
+    );
+    final alta = contenedor.read(ordenDialogViewModelProvider.notifier);
+
+    await alta.cargar();
+    await tester.pumpAndSettle();
+
+    alta.agregar(contenedor.read(ordenDialogViewModelProvider).conceptos.first);
+    alta.elegirCliente((await instance<ClientesLocalDatasource>().porId(
+      clienteId,
+    ))!);
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.widgetWithText(FilledButton, 'Crear orden · 100.00'));
+
+    // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se repite
+    // sola y nunca se queda quieta.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
+
+    final folio = (await instance<OrdenesLocalDatasource>().listado())
+        .single
+        .folio;
+
+    expect(find.text('La orden $folio se creó correctamente.'), findsOneWidget);
+
+    // Y detrás del aviso, la orden ya está en la tabla.
+    expect(find.text(folio), findsWidgets);
   });
 
   group('lo que todavía está por portar', () {

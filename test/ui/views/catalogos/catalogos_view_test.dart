@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/models/data/precios/precio_data.dart';
+import 'package:gestion_lavanderia/ui/shared/widgets/listado_card.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/catalogos_view.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/categorias/view_model/categorias_view_model.dart';
@@ -137,7 +138,7 @@ void main() {
     final modulo = tester.getRect(find.byType(CatalogosView));
     final tarjeta = tester.getRect(
       find.descendant(
-        of: find.byType(ListadoCatalogo),
+        of: find.byType(ListadoCard),
         matching: find.byType(Card),
       ),
     );

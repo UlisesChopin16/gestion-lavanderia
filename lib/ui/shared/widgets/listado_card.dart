@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 
-/// La tarjeta de un listado del módulo de catálogos.
+/// La tarjeta que encierra un listado de la aplicación.
 ///
-/// Ocupa todo el espacio que le deja la barra de pestañas, a lo ancho y a lo
+/// Ocupa todo el espacio que le deja lo que tenga encima, a lo ancho y a lo
 /// alto: un listado no se sabe de antemano cuánto mide, y una tarjeta centrada
 /// de ancho fijo —como estaba antes— dejaba media pantalla vacía a los lados
 /// mientras la tabla se apretaba en el centro.
@@ -10,12 +10,11 @@ import 'package:flutter/material.dart';
 /// El desplazamiento va por dentro: así los filtros y el pie de paginación
 /// pertenecen a la tarjeta y no se quedan flotando sobre el fondo de la
 /// pantalla cuando la lista es larga.
-class ListadoCatalogo extends StatelessWidget {
-  const ListadoCatalogo({
-    super.key,
-    required this.child,
-    this.mensajeError = '',
-  });
+///
+/// Nació en el módulo de catálogos y vive aquí desde que órdenes necesitó la
+/// misma tarjeta: lo que hace no tiene nada de un catálogo.
+class ListadoCard extends StatelessWidget {
+  const ListadoCard({super.key, required this.child, this.mensajeError = ''});
 
   final Widget child;
 

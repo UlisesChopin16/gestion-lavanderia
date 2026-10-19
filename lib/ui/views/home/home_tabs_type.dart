@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:gestion_lavanderia/ui/shared/views/pantalla_pendiente.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/catalogos_view.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/configuracion_empresa_view.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Los módulos de la aplicación, en el orden en que aparecen en la navegación.
@@ -17,7 +17,7 @@ enum HomeTabsType {
     title: 'Órdenes',
     icon: IconsManager.selectedOrdenServicioIcon,
     unselectedIcon: IconsManager.unselectedOrdenServicioIcon,
-    view: PantallaPendiente(modulo: 'Órdenes de servicio'),
+    view: OrdenesView(),
   ),
   catalogos(
     title: 'Catálogos',

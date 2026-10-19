@@ -12,6 +12,7 @@ export 'estatus_chip.dart';
 export 'estatus_filter.dart';
 export 'form_text_field.dart';
 export 'layout/layout.dart';
+export 'listado_card.dart';
 export 'search_filter.dart';
 export 'sort_button.dart';
 export 'sort_dropdown.dart';

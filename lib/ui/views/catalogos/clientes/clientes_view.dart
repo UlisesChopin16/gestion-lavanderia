@@ -21,7 +21,7 @@ class ClientesView extends ConsumerWidget {
     final notifier = ref.read(clientesViewModelProvider.notifier);
     final filtros = estado.filtros;
 
-    return ListadoCatalogo(
+    return ListadoCard(
       mensajeError: estado.mensajeError,
       child: DataTableCard<ClienteEntry>(
         rows: estado.pagina,

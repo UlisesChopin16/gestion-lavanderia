@@ -22,7 +22,7 @@ class PreciosView extends ConsumerWidget {
     final notifier = ref.read(preciosViewModelProvider.notifier);
     final filtros = estado.filtros;
 
-    return ListadoCatalogo(
+    return ListadoCard(
       mensajeError: estado.mensajeError,
       child: DataTableCard<PrecioData>(
         rows: estado.pagina,

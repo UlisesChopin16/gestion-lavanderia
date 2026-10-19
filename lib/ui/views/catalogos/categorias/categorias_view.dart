@@ -23,7 +23,7 @@ class CategoriasView extends ConsumerWidget {
     final notifier = ref.read(categoriasViewModelProvider.notifier);
     final filtros = estado.filtros;
 
-    return ListadoCatalogo(
+    return ListadoCard(
       mensajeError: estado.mensajeError,
       child: DataTableCard<CategoriaServicioEntry>(
         rows: estado.pagina,

@@ -2,7 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
-import 'package:gestion_lavanderia/ui/shared/views/pantalla_pendiente.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/configuracion_empresa_view.dart';
 import 'package:gestion_lavanderia/ui/views/home/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
@@ -46,7 +46,7 @@ void main() {
       expect(find.text('Órdenes'), findsWidgets);
       expect(find.text('Catálogos'), findsWidgets);
       expect(find.text('Empresa'), findsWidgets);
-      expect(find.byType(PantallaPendiente), findsOneWidget);
+      expect(find.byType(OrdenesView), findsOneWidget);
     });
 
     testWidgets('en una ventana angosta el menú pasa a un cajón', (
@@ -112,7 +112,7 @@ void main() {
       expect(empresa.left, greaterThan(ordenes.right));
       expect(
         ordenes.bottom,
-        lessThanOrEqualTo(tester.getRect(find.byType(PantallaPendiente)).top),
+        lessThanOrEqualTo(tester.getRect(find.byType(OrdenesView)).top),
       );
     });
 
@@ -149,7 +149,7 @@ void main() {
 
       // Con la navegación arriba ya no hay menú que le coma ancho: era lo que
       // se buscaba al subirla.
-      expect(tester.getSize(find.byType(PantallaPendiente)).width, 1000);
+      expect(tester.getSize(find.byType(OrdenesView)).width, 1000);
     });
 
     testWidgets('ocupa todo el alto que deja la barra', (tester) async {
@@ -158,7 +158,7 @@ void main() {
       await abrirAplicacion(tester);
 
       expect(
-        tester.getSize(find.byType(PantallaPendiente)).height,
+        tester.getSize(find.byType(OrdenesView)).height,
         800 - BarraModulos.alto,
       );
     });
@@ -170,7 +170,7 @@ void main() {
 
       await abrirAplicacion(tester);
 
-      expect(tester.getSize(find.byType(PantallaPendiente)).width, 500);
+      expect(tester.getSize(find.byType(OrdenesView)).width, 500);
     });
   });
 

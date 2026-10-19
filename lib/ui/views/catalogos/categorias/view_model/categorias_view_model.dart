@@ -1,7 +1,5 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/extensions/string_ext.dart';
@@ -13,8 +11,7 @@ import 'package:gestion_lavanderia/ui/views/catalogos/precios/view_model/precios
     show preciosViewModelProvider;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-export 'package:gestion_lavanderia/data/local/app_database.dart'
-    show CategoriaServicioEntry;
+export 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 export 'package:gestion_lavanderia/models/data/categorias/filtros_categoria.dart';
 export 'package:gestion_lavanderia/models/data/shared/filas.dart';
 export 'package:gestion_lavanderia/models/data/shared/paginacion.dart';
@@ -28,8 +25,7 @@ sealed class CategoriasState with _$CategoriasState {
 
   const factory CategoriasState({
     /// El listado completo que devolvió la base con los filtros vigentes.
-    @Default(Filas<CategoriaServicioEntry>())
-    Filas<CategoriaServicioEntry> categorias,
+    @Default(Filas<CategoriaData>()) Filas<CategoriaData> categorias,
     @Default(FiltrosCategoria()) FiltrosCategoria filtros,
     @Default(Paginacion()) Paginacion paginacion,
     @Default(true) bool cargando,
@@ -37,7 +33,7 @@ sealed class CategoriasState with _$CategoriasState {
   }) = _CategoriasState;
 
   /// Las categorías de la página que se está viendo.
-  List<CategoriaServicioEntry> get pagina => paginacion.recortar(categorias);
+  List<CategoriaData> get pagina => paginacion.recortar(categorias);
 }
 
 /// El listado de categorías de ropa y su alta, edición y baja.
@@ -106,32 +102,25 @@ class CategoriasViewModel extends _$CategoriasViewModel {
   /// propaga a los conceptos de la categoría dentro de la misma transacción,
   /// porque los días de un concepto son los de su categoría. Quien edita ya lo
   /// aceptó en el formulario.
-  Future<bool> guardar({
-    int? id,
-    required String nombre,
-    required int diasEntrega,
-  }) {
-    final limpio = nombre.normalizeSpaces();
+  /// Da de alta la categoría si es nueva, y la actualiza si ya existía.
+  ///
+  /// [propagarDias] decide si sus conceptos siguen a la categoría cuando le
+  /// cambian los días de entrega. Lo pregunta el formulario, que es donde se
+  /// ve el cambio; aquí sólo se pasa.
+  Future<bool> guardar(CategoriaData categoria, {bool propagarDias = true}) {
+    final limpia = categoria.copyWith(
+      nombre: categoria.nombre.normalizeSpaces(),
+    );
 
     return _escribir(
-      () => id == null
-          ? _categorias.crear(
-              CategoriaServicioCompanion(
-                nombre: Value(limpio),
-                estatus: const Value(EstatusType.activo),
-                diasEntrega: Value(diasEntrega),
-              ),
-            )
-          : _categorias.guardar(
-              id: id,
-              row: CategoriaServicioCompanion(
-                nombre: Value(limpio),
-                diasEntrega: Value(diasEntrega),
-              ),
-            ),
+      () => _categorias.guardar(limpia, propagarDias: propagarDias),
       'No se pudo guardar la categoría.',
     );
   }
+
+  /// Cuántos conceptos cuelgan de la categoría, para decirlo al preguntar si
+  /// un cambio de días los alcanza.
+  Future<int> conceptosDe(int id) => _categorias.conceptos(id);
 
   /// Da de baja la categoría y, con ella, sus conceptos vigentes.
   Future<bool> desactivar(int id) => _escribir(
@@ -140,8 +129,10 @@ class CategoriasViewModel extends _$CategoriasViewModel {
   );
 
   /// Reactiva la categoría y los conceptos que tenía dados de baja.
-  Future<bool> activar(int id) =>
-      _escribir(() => _categorias.activar(id), 'No se pudo activar la categoría.');
+  Future<bool> activar(int id) => _escribir(
+    () => _categorias.activar(id),
+    'No se pudo activar la categoría.',
+  );
 
   Future<void> _aplicar(FiltrosCategoria filtros) async {
     state = state.copyWith(filtros: filtros, cargando: true, mensajeError: '');

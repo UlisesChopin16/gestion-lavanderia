@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 import 'package:gestion_lavanderia/models/data/precios/filtros_precios.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
@@ -18,7 +18,7 @@ class FiltroCategoria extends StatelessWidget {
     this.width,
   });
 
-  final Iterable<CategoriaServicioEntry> categorias;
+  final Iterable<CategoriaData> categorias;
 
   /// La categoría elegida, o [sinCategoria] cuando están todas.
   final int seleccionada;
@@ -46,9 +46,7 @@ class FiltroCategoria extends StatelessWidget {
         for (final categoria in categorias)
           DropdownMenuEntry<int>(
             value: categoria.id,
-            label: categoria.estatus == EstatusType.activo
-                ? categoria.nombre
-                : '${categoria.nombre} (inactiva)',
+            label: categoria.descripcion,
           ),
       ],
       onChanged: (id) => onChanged(id ?? sinCategoria),

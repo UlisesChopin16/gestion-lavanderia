@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/dialogs/dialogs.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
+import 'package:gestion_lavanderia/ui/views/catalogos/categorias/dialogs/cambio_dias_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/categorias/view_model/categorias_view_model.dart';
 import 'package:gestion_lavanderia/validations/categoria_validation.dart';
 
@@ -16,7 +17,7 @@ class CategoriaDialog extends ConsumerStatefulWidget {
   const CategoriaDialog({super.key, this.categoria});
 
   /// La categoría que se edita, o `null` para un alta.
-  final CategoriaServicioEntry? categoria;
+  final CategoriaData? categoria;
 
   @override
   ConsumerState<CategoriaDialog> createState() => _CategoriaDialogState();
@@ -115,16 +116,20 @@ class _CategoriaDialogState extends ConsumerState<CategoriaDialog> {
       return;
     }
 
-    if (!await _confirmarCambioDeDias()) return;
+    final decision = await _decidirSobreLosDias();
 
-    if (!mounted) return;
+    if (decision == CambioDeDias.cancelar || !mounted) return;
 
     final notifier = ref.read(categoriasViewModelProvider.notifier);
 
+    // Partiendo de la categoría que se edita se conservan su id, su estatus
+    // y sus fechas; en un alta, de una en blanco, que nace activa.
     final guardado = await notifier.guardar(
-      id: widget.categoria?.id,
-      nombre: _nombre,
-      diasEntrega: _dias,
+      (widget.categoria ?? const CategoriaData()).copyWith(
+        nombre: _nombre,
+        diasEntrega: _dias,
+      ),
+      propagarDias: decision == CambioDeDias.propagar,
     );
 
     if (!mounted) return;
@@ -144,15 +149,38 @@ class _CategoriaDialogState extends ConsumerState<CategoriaDialog> {
   /// Los días de un concepto son los de su categoría, así que el cambio se
   /// propaga siempre; lo que se pregunta no es si propagarlo, sino si de
   /// verdad se quiere cambiar sabiendo a cuántos conceptos alcanza.
-  Future<bool> _confirmarCambioDeDias() async {
+  /// Hasta dónde llega el cambio de días de entrega.
+  ///
+  /// Sólo se pregunta cuando hay algo que decidir: en un alta no hay conceptos
+  /// todavía, si los días no cambiaron no hay nada que propagar, y una
+  /// categoría sin conceptos no arrastra a nadie. En esos tres casos se sigue
+  /// de largo con [CambioDeDias.propagar], que no cambia nada que no se haya
+  /// pedido.
+  Future<CambioDeDias> _decidirSobreLosDias() async {
     final categoria = widget.categoria;
 
-    if (categoria == null || categoria.diasEntrega == _dias) return true;
+    if (categoria == null || categoria.diasEntrega == _dias) {
+      return CambioDeDias.propagar;
+    }
 
-    return context.showWarningDialog(
-      message:
-          'Los conceptos de "${categoria.nombre}" pasarán también a $_dias '
-          'día(s) de entrega. ¿Continuar?',
+    final conceptos = await ref
+        .read(categoriasViewModelProvider.notifier)
+        .conceptosDe(categoria.id);
+
+    if (conceptos == 0 || !mounted) return CambioDeDias.propagar;
+
+    final decision = await showDialog<CambioDeDias>(
+      context: context,
+      builder: (context) => CambioDiasDialog(
+        categoria: categoria.nombre,
+        diasAnteriores: categoria.diasEntrega,
+        diasNuevos: _dias,
+        conceptos: conceptos,
+      ),
     );
+
+    // Cerrarlo con Escape o tocando fuera es no haber decidido, que aquí es
+    // lo mismo que cancelar: nada se escribe sin una respuesta.
+    return decision ?? CambioDeDias.cancelar;
   }
 }

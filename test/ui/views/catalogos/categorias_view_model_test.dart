@@ -24,7 +24,7 @@ void main() {
   PreciosState estadoPrecios() => container.read(preciosViewModelProvider);
 
   Future<bool> alta({String nombre = 'Ropa de cama', int dias = 2}) =>
-      notificador().guardar(nombre: nombre, diasEntrega: dias);
+      notificador().guardar(CategoriaData(nombre: nombre, diasEntrega: dias));
 
   /// Da de alta una categoría y devuelve su id.
   Future<int> crear({String nombre = 'Ropa de cama', int dias = 2}) async {
@@ -140,9 +140,9 @@ void main() {
 
     expect(
       await notificador().guardar(
-        id: id,
-        nombre: 'Ropa de cama',
-        diasEntrega: 5,
+        estado().categorias
+            .firstWhere((categoria) => categoria.id == id)
+            .copyWith(diasEntrega: 5),
       ),
       isTrue,
     );

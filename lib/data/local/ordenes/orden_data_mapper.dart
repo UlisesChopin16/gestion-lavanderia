@@ -1,6 +1,6 @@
 import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
-import 'package:gestion_lavanderia/data/local/clientes/cliente_extensions.dart';
+import 'package:gestion_lavanderia/data/local/clientes/cliente_data_mapper.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/history_con_items_entry.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/item_con_precio_entry.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_con_detalles_entry.dart';
@@ -18,7 +18,7 @@ extension OrdenConDetallesToData on OrdenConDetallesEntry {
     id: orden.id,
     folio: orden.folio,
     clienteId: orden.clienteId,
-    cliente: cliente.nombreCompleto,
+    cliente: cliente.toData().nombreCompleto,
     descripcion: orden.descripcion,
     estatus: orden.estatus,
     total: orden.total,
@@ -83,7 +83,7 @@ extension OrdenServicioToDetalle on OrdenServicioEntry {
       id: id,
       folio: folio,
       clienteId: clienteId,
-      cliente: cliente.nombreCompleto,
+      cliente: cliente.toData().nombreCompleto,
       clienteTelefono: cliente.telefono,
       clienteCorreo: cliente.correo,
       descripcion: descripcion,

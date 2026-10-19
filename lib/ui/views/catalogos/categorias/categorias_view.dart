@@ -25,7 +25,7 @@ class CategoriasView extends ConsumerWidget {
 
     return ListadoCard(
       mensajeError: estado.mensajeError,
-      child: DataTableCard<CategoriaServicioEntry>(
+      child: DataTableCard<CategoriaData>(
         rows: estado.pagina,
         isLoading: estado.cargando,
         emptyMessage: filtros.haveFilters
@@ -185,10 +185,7 @@ class CategoriasView extends ConsumerWidget {
   /// Antes esto era un diálogo con la pantalla de precios dentro; ahora lleva
   /// a la pestaña de al lado, que es la misma lista con todas sus acciones y
   /// no una copia encima.
-  Future<void> _verConceptos(
-    WidgetRef ref,
-    CategoriaServicioEntry categoria,
-  ) async {
+  Future<void> _verConceptos(WidgetRef ref, CategoriaData categoria) async {
     await ref
         .read(preciosViewModelProvider.notifier)
         .filtrarPorCategoria(
@@ -214,10 +211,7 @@ class CategoriasView extends ConsumerWidget {
     await context.showSuccessDialog('La categoría se creó correctamente.');
   }
 
-  Future<void> _editar(
-    BuildContext context,
-    CategoriaServicioEntry categoria,
-  ) async {
+  Future<void> _editar(BuildContext context, CategoriaData categoria) async {
     final guardado = await showDialog<bool>(
       context: context,
       builder: (context) => CategoriaDialog(categoria: categoria),
@@ -231,7 +225,7 @@ class CategoriasView extends ConsumerWidget {
   Future<void> _desactivar(
     BuildContext context,
     WidgetRef ref,
-    CategoriaServicioEntry categoria,
+    CategoriaData categoria,
   ) async {
     final confirmado = await context.showWarningDialog(
       message:
@@ -250,7 +244,7 @@ class CategoriasView extends ConsumerWidget {
   Future<void> _activar(
     BuildContext context,
     WidgetRef ref,
-    CategoriaServicioEntry categoria,
+    CategoriaData categoria,
   ) async {
     final confirmado = await context.showWarningDialog(
       message:

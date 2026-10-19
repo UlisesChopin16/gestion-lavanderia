@@ -203,6 +203,19 @@ class PreciosConceptosDao extends DatabaseAccessor<AppDatabase>
     );
   }
 
+  /// Cuántos conceptos cuelgan de una categoría, vigentes o dados de baja.
+  ///
+  /// Es el alcance de lo que arrastra un cambio en su categoría, y lo que la
+  /// pantalla necesita para preguntarlo con un número delante.
+  Future<int> contarPorCategoria(int categoriaId) async {
+    final cuenta = preciosConceptos.id.count();
+    final query = selectOnly(preciosConceptos)
+      ..addColumns([cuenta])
+      ..where(preciosConceptos.categoriaId.equals(categoriaId));
+
+    return (await query.getSingle()).read(cuenta) ?? 0;
+  }
+
   /// Propaga los días de entrega de la categoría a todos sus conceptos.
   ///
   /// Recibe los días y no la fila de la categoría, para que quien acaba de

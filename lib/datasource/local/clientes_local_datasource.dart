@@ -1,16 +1,15 @@
-import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/clientes/cliente_dao.dart';
+import 'package:gestion_lavanderia/data/local/clientes/cliente_data_mapper.dart';
 import 'package:gestion_lavanderia/datasource/local/filtros_store.dart';
+import 'package:gestion_lavanderia/models/data/clientes/cliente_data.dart';
 import 'package:gestion_lavanderia/models/data/clientes/filtros_clientes.dart';
 
-export 'package:gestion_lavanderia/data/local/clientes/cliente_extensions.dart';
+export 'package:gestion_lavanderia/models/data/clientes/cliente_data.dart';
 
 /// Los clientes, con los filtros que quedaron guardados en el equipo.
 ///
-/// Devuelve `ClienteEntry`, la fila generada: un cliente no tiene más forma que
-/// su fila, así que no lleva modelo propio. Lo derivado —el nombre completo—
-/// viaja en una extensión sobre la fila, que se re-exporta aquí para que la
-/// pantalla no tenga que importarla aparte.
+/// Lo que sale y entra es [ClienteData]: las filas de drift no salen de esta
+/// capa, de modo que ninguna pantalla depende de cómo esté hecha la tabla.
 ///
 /// Ninguna de sus escrituras toca más de una tabla, así que ninguna necesita
 /// transacción. Las operaciones atómicas están en las categorías y las órdenes,
@@ -23,21 +22,34 @@ class ClientesLocalDatasource {
 
   FiltrosClientes get filtros => _store.clientes;
 
-  Future<List<ClienteEntry>> listado() => _dao.listado(_store.clientes);
+  Future<List<ClienteData>> listado() async =>
+      (await _dao.listado(_store.clientes)).toData();
 
-  Future<List<ClienteEntry>> aplicarFiltros(FiltrosClientes filtros) async {
+  Future<List<ClienteData>> aplicarFiltros(FiltrosClientes filtros) async {
     await _store.guardarClientes(filtros);
-    return _dao.listado(filtros);
+
+    return (await _dao.listado(filtros)).toData();
   }
 
-  Future<ClienteEntry?> porId(int id) => _dao.getById(id);
+  Future<ClienteData?> porId(int id) async =>
+      (await _dao.getById(id))?.toData();
 
   /// Para el buscador que elige el cliente de una orden.
-  Future<List<ClienteEntry>> buscar(String info) =>
-      _dao.getClientesByInfo(info);
+  Future<List<ClienteData>> buscar(String info) async =>
+      (await _dao.getClientesByInfo(info)).toData();
 
-  Future<int> crear(ClienteCompanion row) => _dao.insertCliente(row);
+  /// Guarda el cliente y devuelve su id: lo da de alta si es nuevo y lo
+  /// actualiza si ya existía.
+  ///
+  /// La pantalla manda un [ClienteData] y aquí se traduce a la escritura con
+  /// `toCompanion()`, que deja fuera las fechas de auditoría: las pone el DAO.
+  Future<int> guardar(ClienteData cliente) async {
+    final row = cliente.toCompanion();
 
-  Future<void> guardar({required int id, required ClienteCompanion row}) =>
-      _dao.updateCliente(id: id, row: row);
+    if (cliente.esNuevo) return _dao.insertCliente(row);
+
+    await _dao.updateCliente(id: cliente.id, row: row);
+
+    return cliente.id;
+  }
 }

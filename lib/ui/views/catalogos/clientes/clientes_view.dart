@@ -23,7 +23,7 @@ class ClientesView extends ConsumerWidget {
 
     return ListadoCard(
       mensajeError: estado.mensajeError,
-      child: DataTableCard<ClienteEntry>(
+      child: DataTableCard<ClienteData>(
         rows: estado.pagina,
         isLoading: estado.cargando,
         emptyMessage: filtros.haveFilters
@@ -149,7 +149,7 @@ class ClientesView extends ConsumerWidget {
     await context.showSuccessDialog('El cliente se registró correctamente.');
   }
 
-  Future<void> _editar(BuildContext context, ClienteEntry cliente) async {
+  Future<void> _editar(BuildContext context, ClienteData cliente) async {
     final guardado = await showDialog<bool>(
       context: context,
       builder: (context) => ClienteDialog(cliente: cliente),

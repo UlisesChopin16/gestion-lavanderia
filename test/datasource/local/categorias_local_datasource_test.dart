@@ -1,4 +1,3 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
@@ -58,8 +57,8 @@ void main() {
     );
   }
 
-  List<String> nombresDe(List<CategoriaServicioEntry> filas) {
-    return filas.map((fila) => fila.nombre).toList();
+  List<String> nombresDe(List<CategoriaData> categorias) {
+    return categorias.map((categoria) => categoria.nombre).toList();
   }
 
   test('por omisión lista sólo las categorías activas', () async {
@@ -146,10 +145,9 @@ void main() {
     final categoriaId = await crear('Ropa de cama');
     final precioId = await crearConcepto(categoriaId);
 
-    await datasource.guardar(
-      id: categoriaId,
-      row: const CategoriaServicioCompanion(diasEntrega: Value(5)),
-    );
+    final categoria = (await datasource.porId(categoriaId))!;
+
+    await datasource.guardar(categoria.copyWith(diasEntrega: 5));
 
     final precio = (await db.preciosConceptosDao.getById(precioId))!.precio;
 
@@ -157,25 +155,43 @@ void main() {
     expect(precio.diasEntrega, 5);
   });
 
-  test('guardar sólo el nombre no toca los días de los conceptos', () async {
+  test('guardar sin propagar deja los días de los conceptos', () async {
     final categoriaId = await crear('Ropa de cama', diasEntrega: 3);
     final precioId = await crearConcepto(categoriaId);
+    final original = (await datasource.porId(categoriaId))!;
 
     await datasource.guardar(
-      id: categoriaId,
-      row: const CategoriaServicioCompanion(nombre: Value('Blancos')),
+      original.copyWith(diasEntrega: 5),
+      propagarDias: false,
     );
+
+    final precio = (await db.preciosConceptosDao.getById(precioId))!.precio;
+
+    expect((await datasource.porId(categoriaId))!.diasEntrega, 5);
+    expect(
+      precio.diasEntrega,
+      1,
+      reason: 'el concepto conserva los suyos: no se pidió propagar',
+    );
+  });
+
+  test('guardar sin cambiar los días no toca los conceptos', () async {
+    final categoriaId = await crear('Ropa de cama', diasEntrega: 3);
+    final precioId = await crearConcepto(categoriaId);
+    final original = (await datasource.porId(categoriaId))!;
+
+    await datasource.guardar(original.copyWith(nombre: 'Blancos'));
 
     final categoria = (await datasource.porId(categoriaId))!;
     final precio = (await db.preciosConceptosDao.getById(precioId))!.precio;
 
     expect(categoria.nombre, 'Blancos');
+    expect(categoria.diasEntrega, 3);
     expect(
-      categoria.diasEntrega,
-      3,
-      reason: 'la columna no venía en la escritura',
+      precio.diasEntrega,
+      1,
+      reason: 'los días de la categoría no cambiaron, así que no se propagan',
     );
-    expect(precio.diasEntrega, 1, reason: 'el concepto conserva los suyos');
   });
 
   test(
@@ -185,13 +201,11 @@ void main() {
       final precioId = await crearConcepto(categoriaId);
       await crear('Planchado');
 
+      final original = (await datasource.porId(categoriaId))!;
+
       await expectLater(
         datasource.guardar(
-          id: categoriaId,
-          row: const CategoriaServicioCompanion(
-            nombre: Value('Planchado'),
-            diasEntrega: Value(9),
-          ),
+          original.copyWith(nombre: 'Planchado', diasEntrega: 9),
         ),
         throwsA(isA<Exception>()),
       );

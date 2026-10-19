@@ -1,7 +1,5 @@
-import 'package:drift/drift.dart' show Value;
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/extensions/string_ext.dart';
@@ -11,8 +9,7 @@ import 'package:gestion_lavanderia/models/data/shared/filas.dart';
 import 'package:gestion_lavanderia/models/data/shared/paginacion.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-export 'package:gestion_lavanderia/data/local/app_database.dart'
-    show ClienteEntry;
+export 'package:gestion_lavanderia/models/data/clientes/cliente_data.dart';
 export 'package:gestion_lavanderia/models/data/clientes/filtros_clientes.dart';
 export 'package:gestion_lavanderia/models/data/shared/filas.dart';
 export 'package:gestion_lavanderia/models/data/shared/paginacion.dart';
@@ -26,7 +23,7 @@ sealed class ClientesState with _$ClientesState {
 
   const factory ClientesState({
     /// El listado completo que devolvió la base con los filtros vigentes.
-    @Default(Filas<ClienteEntry>()) Filas<ClienteEntry> clientes,
+    @Default(Filas<ClienteData>()) Filas<ClienteData> clientes,
     @Default(FiltrosClientes()) FiltrosClientes filtros,
     @Default(Paginacion()) Paginacion paginacion,
     @Default(true) bool cargando,
@@ -37,7 +34,7 @@ sealed class ClientesState with _$ClientesState {
 
   /// Los clientes de la página que se está viendo, que es lo que recibe la
   /// tabla.
-  List<ClienteEntry> get pagina => paginacion.recortar(clientes);
+  List<ClienteData> get pagina => paginacion.recortar(clientes);
 }
 
 /// El listado de clientes y su alta y edición.
@@ -101,29 +98,21 @@ class ClientesViewModel extends _$ClientesViewModel {
     );
   }
 
-  /// Da de alta un cliente, o guarda los cambios de [id] si viene.
+  /// Da de alta el cliente si es nuevo, y lo actualiza si ya existía.
   ///
   /// Devuelve si se pudo. Al fallar —un teléfono que ya es de otro cliente,
   /// por ejemplo— el motivo queda en [ClientesState.mensajeError] y el
   /// formulario se queda abierto para corregirlo.
-  Future<bool> guardar({
-    int? id,
-    required String nombres,
-    required String apellidos,
-    required String telefono,
-    required String correo,
-  }) {
-    final row = ClienteCompanion(
-      nombres: Value(nombres.normalizeSpaces()),
-      apellidos: Value(apellidos.normalizeSpaces()),
-      telefono: Value(telefono.trim()),
-      correo: Value(correo.trim()),
+  Future<bool> guardar(ClienteData cliente) {
+    final limpio = cliente.copyWith(
+      nombres: cliente.nombres.normalizeSpaces(),
+      apellidos: cliente.apellidos.normalizeSpaces(),
+      telefono: cliente.telefono.trim(),
+      correo: cliente.correo.trim(),
     );
 
     return _escribir(
-      () => id == null
-          ? _clientes.crear(row)
-          : _clientes.guardar(id: id, row: row),
+      () => _clientes.guardar(limpio),
       'No se pudo guardar el cliente.',
     );
   }

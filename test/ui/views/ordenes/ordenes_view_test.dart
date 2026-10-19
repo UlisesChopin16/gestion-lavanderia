@@ -6,6 +6,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
@@ -199,19 +200,18 @@ void main() {
     expect(find.text(deAna), findsNothing);
   });
 
+  testWidgets('el botón de alta abre el formulario de la orden', (
+    tester,
+  ) async {
+    await abrirModulo(tester);
+
+    await tester.tap(find.widgetWithText(ButtonAdd, 'Nueva orden'));
+    await tester.pumpAndSettle();
+
+    expect(find.byType(OrdenDialog), findsOneWidget);
+  });
+
   group('lo que todavía está por portar', () {
-    testWidgets('el alta avisa en lugar de abrir el formulario', (
-      tester,
-    ) async {
-      await abrirModulo(tester);
-
-      await tester.tap(find.widgetWithText(ButtonAdd, 'Nueva orden'));
-      await tester.pumpAndSettle();
-
-      expect(find.byType(DialogoPendiente), findsOneWidget);
-      expect(find.text('Nueva orden de servicio'), findsOneWidget);
-    });
-
     testWidgets('las acciones de la orden avisan y dicen cuál es', (
       tester,
     ) async {

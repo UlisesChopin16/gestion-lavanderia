@@ -28,10 +28,12 @@ void main() {
     String correo = '',
   }) {
     return notificador().guardar(
-      nombres: nombres,
-      apellidos: apellidos,
-      telefono: telefono,
-      correo: correo,
+      ClienteData(
+        nombres: nombres,
+        apellidos: apellidos,
+        telefono: telefono,
+        correo: correo,
+      ),
     );
   }
 
@@ -69,13 +71,7 @@ void main() {
       final ana = estado().pagina.single;
 
       expect(
-        await notificador().guardar(
-          id: ana.id,
-          nombres: 'Ana María',
-          apellidos: ana.apellidos,
-          telefono: ana.telefono,
-          correo: ana.correo,
-        ),
+        await notificador().guardar(ana.copyWith(nombres: 'Ana María')),
         isTrue,
       );
 

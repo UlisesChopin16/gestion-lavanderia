@@ -1,6 +1,5 @@
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/extensions/string_ext.dart';
@@ -10,8 +9,7 @@ import 'package:gestion_lavanderia/models/data/shared/filas.dart';
 import 'package:gestion_lavanderia/models/data/shared/paginacion.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-export 'package:gestion_lavanderia/data/local/app_database.dart'
-    show CategoriaServicioEntry;
+export 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 export 'package:gestion_lavanderia/models/data/precios/filtros_precios.dart';
 export 'package:gestion_lavanderia/models/data/precios/precio_data.dart';
 export 'package:gestion_lavanderia/models/data/shared/filas.dart';
@@ -31,8 +29,7 @@ sealed class PreciosState with _$PreciosState {
     /// Las categorías, para el filtro y para el formulario. Van todas y no
     /// sólo las activas porque la lista se puede acotar a una categoría dada
     /// de baja, para ver qué conceptos se fueron con ella.
-    @Default(Filas<CategoriaServicioEntry>())
-    Filas<CategoriaServicioEntry> categorias,
+    @Default(Filas<CategoriaData>()) Filas<CategoriaData> categorias,
     @Default(FiltrosPrecios()) FiltrosPrecios filtros,
     @Default(Paginacion()) Paginacion paginacion,
     @Default(true) bool cargando,
@@ -45,9 +42,8 @@ sealed class PreciosState with _$PreciosState {
   /// Las categorías a las que se puede asignar un concepto. La base rechaza
   /// un concepto en una categoría dada de baja, así que el formulario sólo
   /// ofrece las vigentes.
-  List<CategoriaServicioEntry> get categoriasActivas => categorias
-      .where((categoria) => categoria.estatus == EstatusType.activo)
-      .toList();
+  List<CategoriaData> get categoriasActivas =>
+      categorias.where((categoria) => categoria.estaActiva).toList();
 
   /// Si se puede dar de alta un concepto. Sin categorías vigentes no hay
   /// dónde ponerlo, y el formulario pediría elegir una de una lista vacía.

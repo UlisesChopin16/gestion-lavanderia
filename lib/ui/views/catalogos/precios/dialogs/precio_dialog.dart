@@ -147,7 +147,7 @@ class _PrecioDialogState extends ConsumerState<PrecioDialog> {
   /// Al elegir categoría, un concepto nuevo hereda sus días de entrega, que es
   /// lo que casi siempre corresponde. En una edición no se tocan: el concepto
   /// pudo haberlos cambiado a propósito.
-  void _elegirCategoria(CategoriaServicioEntry categoria) {
+  void _elegirCategoria(CategoriaData categoria) {
     final conCategoria = _precio.copyWith(
       categoriaId: categoria.id,
       categoria: categoria.nombre,
@@ -221,9 +221,9 @@ class _SelectorCategoria extends StatelessWidget {
     this.error,
   });
 
-  final List<CategoriaServicioEntry> categorias;
+  final List<CategoriaData> categorias;
   final int seleccionada;
-  final ValueChanged<CategoriaServicioEntry> onChanged;
+  final ValueChanged<CategoriaData> onChanged;
   final String? error;
 
   @override
@@ -235,14 +235,14 @@ class _SelectorCategoria extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       spacing: 4,
       children: [
-        DropdownMenuBase<CategoriaServicioEntry>(
+        DropdownMenuBase<CategoriaData>(
           label: 'Categoría',
           width: _PrecioDialogState._anchoCampo,
           leadingIcon: const Icon(IconsManager.selectedCategoriasIcon),
           value: _seleccionada,
           items: [
             for (final categoria in categorias)
-              DropdownMenuEntry<CategoriaServicioEntry>(
+              DropdownMenuEntry<CategoriaData>(
                 value: categoria,
                 label: categoria.nombre,
               ),
@@ -269,7 +269,7 @@ class _SelectorCategoria extends StatelessWidget {
 
   /// La categoría elegida dentro de la lista, para que el desplegable la
   /// reconozca: el concepto guarda su id, no la fila.
-  CategoriaServicioEntry? get _seleccionada {
+  CategoriaData? get _seleccionada {
     for (final categoria in categorias) {
       if (categoria.id == seleccionada) return categoria;
     }

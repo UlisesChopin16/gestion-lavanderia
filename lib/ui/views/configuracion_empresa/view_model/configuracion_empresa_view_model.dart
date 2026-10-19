@@ -2,11 +2,9 @@ import 'dart:ui' show Color;
 
 import 'package:flutter/foundation.dart' show debugPrint;
 import 'package:freezed_annotation/freezed_annotation.dart';
-import 'package:gestion_lavanderia/data/local/configuracion_empresa/empresa_data_mapper.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
-import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 import 'package:gestion_lavanderia/services/logo_storage.dart';
 import 'package:gestion_lavanderia/validations/empresa_validation.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
@@ -82,14 +80,9 @@ class ConfiguracionEmpresaViewModel extends _$ConfiguracionEmpresaViewModel {
     state = state.copyWith(cargando: true, mensajeError: '');
 
     try {
-      final configuracion = await _empresas.configuracion();
-      final direccion = configuracion == null
-          ? null
-          : await _empresas.direccion();
+      final empresa = await _empresas.empresa();
 
       if (!ref.mounted) return;
-
-      final empresa = configuracion?.toData(direccion);
 
       state = state.copyWith(
         cargando: false,
@@ -173,10 +166,7 @@ class ConfiguracionEmpresaViewModel extends _$ConfiguracionEmpresaViewModel {
     try {
       final empresa = state.empresa;
 
-      await _empresas.guardar(
-        empresa: empresa.toCompanion(),
-        direccion: empresa.toDireccionCompanion(),
-      );
+      await _empresas.guardar(empresa);
 
       if (!ref.mounted) return ResultadoGuardado.guardado;
 

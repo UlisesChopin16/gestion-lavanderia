@@ -2,6 +2,10 @@ import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/configuracion_empresa/configuracion_empresa_dao.dart';
 import 'package:gestion_lavanderia/data/local/configuracion_empresa/direccion_dao.dart';
+import 'package:gestion_lavanderia/data/local/configuracion_empresa/empresa_data_mapper.dart';
+import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
+
+export 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 
 /// Los datos de la lavandería: su configuración y su dirección.
 ///
@@ -20,35 +24,43 @@ class EmpresaLocalDatasource {
   /// La aplicación maneja una sola empresa, la del registro más bajo.
   static const _empresaId = 1;
 
-  Future<ConfiguracionEmpresaEntry?> configuracion() =>
-      _empresa.getById(_empresaId);
+  /// La empresa con su dirección, o `null` si todavía no se ha capturado.
+  ///
+  /// Son dos tablas y un solo modelo: la pantalla no tiene por qué pedirlas
+  /// por separado ni saber cómo se juntan. La dirección puede faltar —una
+  /// empresa guardada a medias, que la transacción de [guardar] ya evita— y
+  /// entonces llega vacía, lista para capturarse.
+  Future<EmpresaData?> empresa() async {
+    final configuracion = await _empresa.getById(_empresaId);
 
-  Future<DireccionEntry?> direccion() =>
-      _direcciones.getByEmpresaId(_empresaId);
+    if (configuracion == null) return null;
+
+    return configuracion.toData(await _direcciones.getByEmpresaId(_empresaId));
+  }
 
   /// Guarda la empresa y su dirección, dando de alta lo que todavía no exista.
   ///
   /// Sirve para el alta y para la edición: decide por lo que hay en la base en
   /// vez de pedirle a la pantalla que lo sepa, porque la pantalla de
   /// configuración es la misma la primera vez y todas las siguientes.
-  Future<void> guardar({
-    required ConfiguracionEmpresaCompanion empresa,
-    required DireccionCompanion direccion,
-  }) {
+  Future<void> guardar(EmpresaData empresa) {
     return _db.transaction(() async {
+      final fila = empresa.toCompanion();
       final actual = await _empresa.getById(_empresaId);
 
       final empresaId = actual == null
-          ? await _empresa.insertConfig(empresa)
+          ? await _empresa.insertConfig(fila)
           : actual.id;
 
       if (actual != null) {
-        await _empresa.updateConfig(id: empresaId, row: empresa);
+        await _empresa.updateConfig(id: empresaId, row: fila);
       }
 
       // La dirección siempre cuelga de la empresa que se acaba de escribir, sin
       // importar lo que la pantalla haya puesto en `empresaId`.
-      final row = direccion.copyWith(empresaId: Value(empresaId));
+      final row = empresa.toDireccionCompanion().copyWith(
+        empresaId: Value(empresaId),
+      );
       final actualDireccion = await _direcciones.getByEmpresaId(empresaId);
 
       if (actualDireccion == null) {

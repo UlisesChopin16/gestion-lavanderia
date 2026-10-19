@@ -1,8 +1,12 @@
 import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/data/local/categorias/categoria_data_mapper.dart';
 import 'package:gestion_lavanderia/data/local/categorias/categoria_servicio_dao.dart';
 import 'package:gestion_lavanderia/data/local/precios/precios_conceptos_dao.dart';
 import 'package:gestion_lavanderia/datasource/local/filtros_store.dart';
+import 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 import 'package:gestion_lavanderia/models/data/categorias/filtros_categoria.dart';
+
+export 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 
 /// Las categorías y lo que arrastran consigo.
 ///
@@ -10,11 +14,8 @@ import 'package:gestion_lavanderia/models/data/categorias/filtros_categoria.dart
 /// quién los guarda se decide aquí. Aquí viven además las operaciones que tocan
 /// más de una tabla, porque un DAO no puede coordinar a otro.
 ///
-/// Las lecturas devuelven `CategoriaServicioEntry`, la fila generada: una
-/// categoría no tiene más forma que su fila y la columna `estatus` ya sale como
-/// `EstatusType`, así que la interfaz la puede consumir tal cual. Los modelos
-/// propios —`PrecioData`, `OrdenDetalleData`— están donde la forma del dominio
-/// sí difiere de la tabla.
+/// Lo que sale y entra es [CategoriaData]: las filas de drift no salen de esta
+/// capa, de modo que ninguna pantalla depende de cómo esté hecha la tabla.
 class CategoriasLocalDatasource {
   const CategoriasLocalDatasource(
     this._db,
@@ -31,50 +32,67 @@ class CategoriasLocalDatasource {
   /// Los filtros vigentes, para pintar los controles con lo último que se usó.
   FiltrosCategoria get filtros => _store.categorias;
 
-  Future<List<CategoriaServicioEntry>> listado() =>
-      _dao.listado(_store.categorias);
+  Future<List<CategoriaData>> listado() async =>
+      (await _dao.listado(_store.categorias)).toData();
 
   /// Las categorías activas, para los selectores que piden una.
-  Future<List<CategoriaServicioEntry>> activas() => _dao.getAll();
+  Future<List<CategoriaData>> activas() async => (await _dao.getAll()).toData();
 
   /// Todas, activas o no, para los filtros: un listado se puede acotar a una
   /// categoría que ya se dio de baja.
-  Future<List<CategoriaServicioEntry>> todas() => _dao.getTodas();
+  Future<List<CategoriaData>> todas() async => (await _dao.getTodas()).toData();
 
-  Future<CategoriaServicioEntry?> porId(int id) => _dao.getById(id);
+  Future<CategoriaData?> porId(int id) async =>
+      (await _dao.getById(id))?.toData();
+
+  /// Cuántos conceptos cuelgan de la categoría, para avisar del alcance de un
+  /// cambio antes de hacerlo.
+  Future<int> conceptos(int id) => _precios.contarPorCategoria(id);
 
   /// Guarda los filtros y devuelve el listado ya filtrado: sin stream que
   /// reaccione solo, cambiar un filtro y recargar la lista es una sola llamada.
-  Future<List<CategoriaServicioEntry>> aplicarFiltros(
-    FiltrosCategoria filtros,
-  ) async {
+  Future<List<CategoriaData>> aplicarFiltros(FiltrosCategoria filtros) async {
     await _store.guardarCategorias(filtros);
-    return _dao.listado(filtros);
+
+    return (await _dao.listado(filtros)).toData();
   }
 
-  Future<int> crear(CategoriaServicioCompanion row) =>
-      _dao.insertCategoria(row);
-
-  /// Guarda la categoría y propaga sus días de entrega a sus conceptos.
+  /// Guarda la categoría y devuelve su id: la da de alta si es nueva y la
+  /// actualiza si ya existía. Al cambiarle los días de entrega se los propaga
+  /// a sus conceptos.
   ///
   /// Las dos escrituras van en una transacción porque los días de entrega de un
   /// concepto son los de su categoría: si la segunda falla, la categoría
-  /// prometería una fecha que sus conceptos no respetan. La propagación sólo
-  /// ocurre cuando el companion trae esa columna, para que editar el nombre no
-  /// reescriba todos los conceptos.
-  Future<void> guardar({
-    required int id,
-    required CategoriaServicioCompanion row,
-  }) {
+  /// prometería una fecha que sus conceptos no respetan.
+  ///
+  /// La propagación sólo ocurre cuando ese número cambió de verdad, y para
+  /// saberlo se lee antes la categoría como está guardada: editar el nombre no
+  /// tiene por qué reescribir todos sus conceptos.
+  ///
+  /// Con [propagarDias] en `false` la categoría cambia sola y sus conceptos
+  /// conservan los días que tengan: hay conceptos que se apartan de su
+  /// categoría a propósito, y renumerar la categoría no debería borrar esa
+  /// decisión. Quien llama es la pantalla, que es la que lo preguntó.
+  Future<int> guardar(CategoriaData categoria, {bool propagarDias = true}) {
     return _db.transaction(() async {
-      await _dao.updateCategoria(id: id, row: row);
+      final row = categoria.toCompanion();
 
-      if (!row.diasEntrega.present) return;
+      if (categoria.esNueva) return _dao.insertCategoria(row);
 
-      await _precios.changeDiasPreciosByCategoria(
-        categoriaId: id,
-        diasEntrega: row.diasEntrega.value,
-      );
+      final actual = await _dao.getById(categoria.id);
+
+      await _dao.updateCategoria(id: categoria.id, row: row);
+
+      if (propagarDias &&
+          actual != null &&
+          actual.diasEntrega != categoria.diasEntrega) {
+        await _precios.changeDiasPreciosByCategoria(
+          categoriaId: categoria.id,
+          diasEntrega: categoria.diasEntrega,
+        );
+      }
+
+      return categoria.id;
     });
   }
 

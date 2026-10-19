@@ -1,4 +1,5 @@
-import 'package:flutter/material.dart' show ThemeMode;
+import 'package:flutter/material.dart'
+    show Brightness, ThemeMode, WidgetsBinding;
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/ui/views/home/home_tabs_type.dart';
@@ -51,16 +52,34 @@ class HomeViewModel extends _$HomeViewModel {
     state = state.copyWith(pestana: pestana);
   }
 
-  /// Avanza al siguiente modo: según el sistema, claro, oscuro y de vuelta.
+  /// Alterna entre claro y oscuro.
+  ///
+  /// Son los dos modos que se eligen; «según el sistema» queda sólo como el
+  /// de arranque, mientras nadie ha dicho cuál quiere. Antes el botón iba
+  /// dando la vuelta a los tres, y para pasar de claro a oscuro había que
+  /// tocarlo dos veces.
   ///
   /// Se guarda el nombre de la constante y no su `toString`, para que
   /// renombrar algo en Flutter no invalide lo que ya está en el equipo.
   Future<void> cambiarTema() async {
-    final modos = ThemeMode.values;
-    final siguiente = modos[(state.themeMode.index + 1) % modos.length];
+    final siguiente = _seVeOscuro ? ThemeMode.light : ThemeMode.dark;
 
     state = state.copyWith(themeMode: siguiente);
 
     await _preferencias.setString(_llaveTema, siguiente.name);
   }
+
+  /// Si lo que hay en pantalla es oscuro.
+  ///
+  /// Con «según el sistema» hay que preguntárselo al equipo: el estado dice
+  /// que manda el sistema, no cuál de los dos puso. Sin eso, el primer toque
+  /// en un equipo que ya está oscuro lo dejaría oscuro y parecería que el
+  /// botón no hace nada.
+  bool get _seVeOscuro => switch (state.themeMode) {
+    ThemeMode.dark => true,
+    ThemeMode.light => false,
+    ThemeMode.system =>
+      WidgetsBinding.instance.platformDispatcher.platformBrightness ==
+          Brightness.dark,
+  };
 }

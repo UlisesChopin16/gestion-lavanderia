@@ -5,12 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/theme/color_row_theme.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/table/table_column.dart';
 
-/// Qué hacer cuando se pide ordenar por [column].
-///
-/// `ascending` ya viene resuelto: al tocar la columna que ya ordena llega
-/// invertido, y al tocar otra llega ascendente.
-typedef SortChanged<C> = void Function(C column, bool ascending);
-
 /// El contenido de un listado: su encabezado, los filtros, la paginación y la
 /// tabla.
 ///
@@ -44,12 +38,16 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 /// siempre tiene tantas celdas como encabezados: no hay columnas que la tabla
 /// agregue por su cuenta y que haya que recordar al contar.
 ///
+/// Ordenar no es cosa de la tabla: lo elige el desplegable de los filtros
+/// (`SortDropdown`). El encabezado también ordenaba, y eran dos mandos para lo
+/// mismo: el del filtro ordena por cualquier columna, también por las que
+/// quedan fuera de la parte visible cuando la tabla se recorre a lo ancho,
+/// mientras que el encabezado sólo alcanza a las que se ven y le quitaba ancho
+/// al nombre de cada columna para reservarle sitio a su flecha.
+///
 /// ```dart
-/// DataTableCard<PrecioData, ColumnPreciosName>(
+/// DataTableCard<PrecioData>(
 ///   rows: precios,
-///   sortedBy: filtros.ordenamiento,
-///   ascending: filtros.ascendente,
-///   onSort: notifier.ordenar,
 ///   seccionEncabezado: Wrap(
 ///     alignment: WrapAlignment.spaceBetween,
 ///     children: [
@@ -93,12 +91,10 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///     TableColumnDef.text(
 ///       title: 'Concepto',
 ///       value: (precio) => precio.nombreConcepto,
-///       sortBy: ColumnPreciosName.nombre,
 ///     ),
 ///     TableColumnDef.text(
 ///       title: 'Importe',
 ///       value: (precio) => precio.importe.toStringAsFixed(2),
-///       sortBy: ColumnPreciosName.importe,
 ///       numeric: true,
 ///     ),
 ///     TableColumnDef.widget(
@@ -118,14 +114,11 @@ typedef SortChanged<C> = void Function(C column, bool ascending);
 ///   ],
 /// )
 /// ```
-class DataTableCard<T, C> extends StatefulWidget {
+class DataTableCard<T> extends StatefulWidget {
   const DataTableCard({
     super.key,
     required this.columns,
     required this.rows,
-    this.sortedBy,
-    this.ascending = true,
-    this.onSort,
     this.rowKey,
     this.onRowTap,
     this.seccionEncabezado,
@@ -135,15 +128,8 @@ class DataTableCard<T, C> extends StatefulWidget {
     this.pagination,
   }) : assert(columns.length > 0, 'La tabla necesita al menos una columna');
 
-  final List<TableColumnDef<T, C>> columns;
+  final List<TableColumnDef<T>> columns;
   final List<T> rows;
-
-  /// Columna por la que la lista viene ordenada, para marcar su encabezado.
-  final C? sortedBy;
-  final bool ascending;
-
-  /// En `null` ningún encabezado responde al toque.
-  final SortChanged<C>? onSort;
 
   /// Identidad de la fila. Con ella Flutter reconoce las filas entre dos
   /// consultas y no reconstruye las que no cambiaron.
@@ -188,10 +174,10 @@ class DataTableCard<T, C> extends StatefulWidget {
   static const llaveLista = Key('data-table-card-lista');
 
   @override
-  State<DataTableCard<T, C>> createState() => _DataTableCardState<T, C>();
+  State<DataTableCard<T>> createState() => _DataTableCardState<T>();
 }
 
-class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
+class _DataTableCardState<T> extends State<DataTableCard<T>> {
   final ScrollController _horizontal = ScrollController();
 
   /// El aire entre los tres bloques: 1.5 rem.
@@ -212,6 +198,9 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
 
   /// El aire entre una columna y la siguiente.
   static const double _espacioColumnas = 16;
+
+  /// El alto del renglón de encabezados: dos renglones de texto y su aire.
+  static const double _altoEncabezado = 56;
 
   /// Lo que la tabla necesita para no apretar ninguna columna.
   ///
@@ -234,24 +223,6 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
     // El controlador sobrevive al widget si no se cierra aquí.
     _horizontal.dispose();
     super.dispose();
-  }
-
-  /// Posición del encabezado que ordena la lista.
-  ///
-  /// Se busca por identidad de columna y no por `enum.index`: el enum y las
-  /// columnas visibles no siempre coinciden —precios esconde la columna de
-  /// categoría cuando ya se filtró por una— y `DataTable` exige un índice
-  /// dentro del rango. Si la columna ordenada no está visible no se marca
-  /// ninguna, en lugar de pasar un índice inválido.
-  int? get _sortColumnIndex {
-    final sortedBy = widget.sortedBy;
-    if (sortedBy == null) return null;
-
-    final index = widget.columns.indexWhere(
-      (column) => column.sortBy == sortedBy,
-    );
-
-    return index < 0 ? null : index;
   }
 
   @override
@@ -344,12 +315,10 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
     final scheme = theme.colorScheme;
 
     final table = DataTable(
-      sortColumnIndex: _sortColumnIndex,
-      sortAscending: widget.ascending,
       showCheckboxColumn: false,
       // Un renglón alto y sin líneas que lo encajonen: el rayado ya separa una
       // fila de la siguiente, y la línea encima del rayado ensuciaba la tabla.
-      headingRowHeight: 56,
+      headingRowHeight: _altoEncabezado,
       dataRowMinHeight: 52,
       // Sin tope de alto: una celda cuyo texto no cabe a lo ancho baja de
       // línea, y la fila crece con ella. Con un máximo fijo, el texto que
@@ -359,9 +328,12 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
       columnSpacing: _espacioColumnas,
       dividerThickness: 0,
       showBottomBorder: false,
-      headingRowColor: WidgetStatePropertyAll(scheme.surfaceContainerHigh),
+      // El encabezado va del color de la acción principal, el mismo lleno del
+      // botón de agregar: una banda que dice dónde empieza la lista y separa
+      // los nombres de las columnas de los datos sin necesidad de una línea.
+      headingRowColor: WidgetStatePropertyAll(scheme.primary),
       headingTextStyle: theme.textTheme.labelLarge?.copyWith(
-        color: scheme.onSurfaceVariant,
+        color: scheme.onPrimary,
         fontWeight: FontWeight.w600,
         letterSpacing: 0.3,
       ),
@@ -408,26 +380,24 @@ class _DataTableCardState<T, C> extends State<DataTableCard<T, C>> {
   }
 
   List<DataColumn> _buildColumns() {
-    final onSort = widget.onSort;
-
     return [
       for (final column in widget.columns)
         DataColumn(
-          headingRowAlignment: MainAxisAlignment.center,
           numeric: column.numeric,
           tooltip: column.tooltip,
           columnWidth: column.columnWidth,
-          onSort: !column.isSortable || onSort == null
-              ? null
-              : (_, ascending) => onSort(column.sortBy as C, ascending),
-          // Flexible: un encabezado que no puede encogerse desborda su columna
-          // en cuanto la tipografía es más ancha de lo previsto.
+          // Expanded y no Flexible: el nombre se queda con la columna entera.
+          // `DataTable` le reservaba 36 píxeles a la flecha de ordenamiento
+          // —16 de flecha, 2 de aire y otros 18 del lado contrario para
+          // centrarlo entre los dos—, más de un tercio de la columna más
+          // angosta, y por eso "Tamaño" se partía en dos renglones teniendo
+          // sitio de sobra.
           //
           // `softWrap` va explícito porque `DataTable` lo apaga en los
           // encabezados: sin esto, "Fecha de Eliminación" se queda en un
           // renglón y se corta. Dos líneas es lo que cabe en el alto del
           // encabezado.
-          label: Flexible(
+          label: Expanded(
             child: Text(
               column.title,
               textAlign: TextAlign.center,

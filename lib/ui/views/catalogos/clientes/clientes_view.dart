@@ -23,7 +23,7 @@ class ClientesView extends ConsumerWidget {
 
     return ListadoCatalogo(
       mensajeError: estado.mensajeError,
-      child: DataTableCard<ClienteEntry, ColumnClientesName>(
+      child: DataTableCard<ClienteEntry>(
         rows: estado.pagina,
         isLoading: estado.cargando,
         emptyMessage: filtros.haveFilters
@@ -46,9 +46,6 @@ class ClientesView extends ConsumerWidget {
           ],
         ),
 
-        sortedBy: filtros.ordenamiento,
-        ascending: filtros.ascendente,
-        onSort: notifier.ordenar,
         // Clientes sólo se acota por el nombre y por el orden, así que el
         // buscador se queda con más renglón que en los demás listados.
         seccionFiltros: VRow(
@@ -96,18 +93,15 @@ class ClientesView extends ConsumerWidget {
           TableColumnDef.text(
             title: 'Nombre(s)',
             value: (cliente) => cliente.nombres,
-            sortBy: ColumnClientesName.nombre,
             size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Apellido(s)',
             value: (cliente) => cliente.apellidos,
-            sortBy: ColumnClientesName.apellido,
           ),
           TableColumnDef.text(
             title: 'Teléfono',
             value: (cliente) => cliente.telefono,
-            sortBy: ColumnClientesName.telefono,
             size: const TableColumnSize.fija(TableActionsCell.ancho),
           ),
           // El correo es opcional: cuando no lo hay se marca como ausente en
@@ -116,13 +110,11 @@ class ClientesView extends ConsumerWidget {
             title: 'Correo',
             value: (cliente) =>
                 cliente.correo.isEmpty ? ConstantsManager.emptyValue : cliente.correo,
-            sortBy: ColumnClientesName.correo,
             size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (cliente) => cliente.fechaCreacion.formatFullDate,
-            sortBy: ColumnClientesName.fechaCreacion,
             size: const TableColumnSize.fija(100),
           ),
           // Las acciones son una columna más, la última: de ancho fijo porque

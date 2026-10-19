@@ -72,16 +72,14 @@ class TableColumnSize {
 /// pasar un campo que no existe en la fila ya no es un error en tiempo de
 /// ejecución.
 ///
-/// [C] es el enum por el que la lista se ordena (`ColumnPreciosName`, por
-/// ejemplo). Una columna con [sortBy] es ordenable; sin él, el encabezado no
-/// responde al toque.
+/// No dice nada del ordenamiento: por qué columna va ordenada la lista lo
+/// elige el desplegable de los filtros, no el encabezado.
 @immutable
-class TableColumnDef<T, C> {
+class TableColumnDef<T> {
   /// Columna de texto, que es el caso común.
   const TableColumnDef.text({
     required this.title,
     required this.value,
-    this.sortBy,
     this.numeric = false,
     this.tooltip,
     this.size = TableColumnSize.normal,
@@ -91,7 +89,6 @@ class TableColumnDef<T, C> {
   const TableColumnDef.widget({
     required this.title,
     required this.content,
-    this.sortBy,
     this.tooltip,
     this.size = TableColumnSize.normal,
   }) : value = null,
@@ -105,10 +102,6 @@ class TableColumnDef<T, C> {
 
   /// El widget de la celda, cuando la columna no es de texto.
   final CellContent<T>? content;
-
-  /// Valor del enum de ordenamiento que corresponde a esta columna. En `null`
-  /// la columna no se puede ordenar.
-  final C? sortBy;
 
   /// Si la columna contiene números. Se alinean a la derecha para que las
   /// unidades, decenas y centenas queden una debajo de otra y se puedan
@@ -125,8 +118,6 @@ class TableColumnDef<T, C> {
 
   /// Lo que esta columna aporta al ancho mínimo de la tabla.
   double get anchoMinimo => size.minimo;
-
-  bool get isSortable => sortBy != null;
 
   /// El contenido de la celda para [row].
   Widget buildCell(BuildContext context, T row) {

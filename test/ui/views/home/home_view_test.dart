@@ -209,16 +209,25 @@ void main() {
   });
 
   group('el botón del tema', () {
-    testWidgets('avanza entre los tres modos y lo dice en el globo', (
+    testWidgets('alterna entre claro y oscuro y lo dice en el globo', (
       tester,
     ) async {
       await abrirAplicacion(tester);
 
       Finder botonConTema(String modo) => find.byTooltip('Tema: $modo');
 
+      // Arranca según el sistema, que en la prueba es claro, así que el
+      // primer toque lleva al oscuro...
       expect(botonConTema('Según el sistema'), findsOneWidget);
 
       await tester.tap(botonConTema('Según el sistema'));
+      await tester.pumpAndSettle();
+
+      expect(botonConTema('Oscuro'), findsOneWidget);
+
+      // ...y de ahí es ir y venir entre los dos: a «según el sistema» ya no
+      // se vuelve.
+      await tester.tap(botonConTema('Oscuro'));
       await tester.pumpAndSettle();
 
       expect(botonConTema('Claro'), findsOneWidget);
@@ -227,11 +236,22 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(botonConTema('Oscuro'), findsOneWidget);
+    });
 
-      await tester.tap(botonConTema('Oscuro'));
+    testWidgets('en un equipo oscuro el primer toque lleva al claro', (
+      tester,
+    ) async {
+      // Saliendo de «según el sistema» no vale tomar siempre el mismo: en un
+      // equipo que ya está oscuro, irse al oscuro no se vería.
+      tester.platformDispatcher.platformBrightnessTestValue = Brightness.dark;
+      addTearDown(tester.platformDispatcher.clearPlatformBrightnessTestValue);
+
+      await abrirAplicacion(tester);
+
+      await tester.tap(find.byTooltip('Tema: Según el sistema'));
       await tester.pumpAndSettle();
 
-      expect(botonConTema('Según el sistema'), findsOneWidget);
+      expect(find.byTooltip('Tema: Claro'), findsOneWidget);
     });
   });
 }

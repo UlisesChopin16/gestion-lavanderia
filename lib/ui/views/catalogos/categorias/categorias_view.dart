@@ -25,7 +25,7 @@ class CategoriasView extends ConsumerWidget {
 
     return ListadoCatalogo(
       mensajeError: estado.mensajeError,
-      child: DataTableCard<CategoriaServicioEntry, ColumnsCategoriaType>(
+      child: DataTableCard<CategoriaServicioEntry>(
         rows: estado.pagina,
         isLoading: estado.cargando,
         emptyMessage: filtros.haveFilters
@@ -51,9 +51,6 @@ class CategoriasView extends ConsumerWidget {
           ],
         ),
 
-        sortedBy: filtros.ordenamiento,
-        ascending: filtros.ascendente,
-        onSort: notifier.ordenar,
         // Los filtros y su reparto: el buscador se lleva una fracción fija del
         // renglón —es por donde se empieza a buscar una categoría—, los dos
         // desplegables se parten lo que sobra y el botón mide lo que su texto.
@@ -116,32 +113,27 @@ class CategoriasView extends ConsumerWidget {
           TableColumnDef.text(
             title: 'Nombre',
             value: (categoria) => categoria.nombre,
-            sortBy: ColumnsCategoriaType.nombre,
             size: TableColumnSize.amplia,
           ),
           TableColumnDef.widget(
             title: 'Estatus',
             content: (context, categoria) =>
                 EstatusChip(estatus: categoria.estatus),
-            sortBy: ColumnsCategoriaType.estatus,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Días de Entrega',
             value: (categoria) => '${categoria.diasEntrega}',
-            sortBy: ColumnsCategoriaType.diasEntrega,
             numeric: true,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (categoria) => categoria.fechaCreacion.formatFullDate,
-            sortBy: ColumnsCategoriaType.fechaCreacion,
           ),
           TableColumnDef.text(
             title: 'Fecha de Eliminación',
             value: (categoria) => categoria.fechaEliminacion.formatFullDate,
-            sortBy: ColumnsCategoriaType.fechaEliminacion,
           ),
           // Las acciones son una columna más, la última: de ancho fijo porque
           // lo que llevan dentro no cambia de tamaño con los datos.

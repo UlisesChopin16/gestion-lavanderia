@@ -7,35 +7,24 @@ import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
 /// Columnas de precios, como las armaría la pantalla.
-///
-/// [conCategoria] en `false` reproduce el caso de la lista abierta desde una
-/// categoría, donde esa columna no se muestra.
-List<TableColumnDef<PrecioData, ColumnPreciosName>> columnas({
-  bool conCategoria = true,
-  bool conAcciones = false,
-}) {
+List<TableColumnDef<PrecioData>> columnas({bool conAcciones = false}) {
   return [
     TableColumnDef.text(
       title: 'Concepto',
       value: (precio) => precio.nombreConcepto,
-      sortBy: ColumnPreciosName.nombre,
     ),
-    if (conCategoria)
-      TableColumnDef.text(
-        title: 'Categoría',
-        value: (precio) => precio.categoria,
-        sortBy: ColumnPreciosName.categoria,
-      ),
+    TableColumnDef.text(
+      title: 'Categoría',
+      value: (precio) => precio.categoria,
+    ),
     TableColumnDef.text(
       title: 'Importe',
       value: (precio) => precio.importe.toStringAsFixed(2),
-      sortBy: ColumnPreciosName.importe,
       numeric: true,
     ),
     TableColumnDef.text(
       title: 'Fecha de Creación',
       value: (precio) => precio.fechaCreacion.formatFullDate,
-      sortBy: ColumnPreciosName.fechaCreacion,
     ),
     if (conAcciones)
       TableColumnDef.widget(
@@ -73,15 +62,27 @@ final precios = [
   ),
 ];
 
+/// [ancho] en `null` deja a la tarjeta todo el de la ventana; con un valor se
+/// la acota, que es como se ven las columnas en su ancho mínimo.
 Future<void> mostrar(
   WidgetTester tester,
-  DataTableCard<PrecioData, ColumnPreciosName> card,
-) async {
+  DataTableCard<PrecioData> card, {
+  double? ancho,
+}) async {
+  Widget contenido = Card(child: card);
+
+  if (ancho != null) {
+    // El Align afloja el ancho que el desplazable impone: sin él la tarjeta
+    // ocuparía la ventana entera y el SizedBox no serviría de nada.
+    contenido = Align(
+      alignment: Alignment.topLeft,
+      child: SizedBox(width: ancho, child: contenido),
+    );
+  }
+
   await tester.pumpWidget(
     MaterialApp(
-      home: Scaffold(
-        body: SingleChildScrollView(child: Card(child: card)),
-      ),
+      home: Scaffold(body: SingleChildScrollView(child: contenido)),
     ),
   );
   await tester.pumpAndSettle();
@@ -94,10 +95,7 @@ void main() {
     testWidgets('muestra encabezados y datos de cada fila', (tester) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: precios),
       );
 
       expect(find.text('Concepto'), findsOneWidget);
@@ -113,7 +111,7 @@ void main() {
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(conAcciones: true),
           rows: precios,
         ),
@@ -136,10 +134,7 @@ void main() {
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: precios),
       );
 
       final table = tester.widget<DataTable>(find.byType(DataTable));
@@ -157,7 +152,7 @@ void main() {
 
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(conAcciones: true),
           rows: [
             PrecioData(
@@ -188,81 +183,59 @@ void main() {
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: const [],
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: const []),
       );
 
       expect(find.text('No hay elementos disponibles'), findsOneWidget);
       expect(find.byType(DataTable), findsNothing);
     });
 
-    testWidgets('marca el encabezado por el que viene ordenada', (
+    testWidgets('el nombre de la columna dispone del ancho entero', (
       tester,
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
+        DataTableCard<PrecioData>(
+          columns: [
+            TableColumnDef.text(
+              title: 'Fecha de Creación',
+              value: (precio) => precio.fechaCreacion.formatFullDate,
+            ),
+          ],
           rows: precios,
-          sortedBy: ColumnPreciosName.importe,
-          ascending: false,
-          onSort: (_, _) {},
         ),
+        ancho: 160,
       );
 
-      final table = tester.widget<DataTable>(find.byType(DataTable));
-      expect(table.sortColumnIndex, 2);
-      expect(table.sortAscending, isFalse);
+      // Una sola columna, en su ancho mínimo: lo que mide la tabla menos el
+      // aire de las orillas (16 por lado) es del nombre, entero. Cuando el
+      // encabezado ordenaba, `DataTable` le quitaba 36 de ahí para reservarle
+      // sitio a su flecha, y el nombre se partía en dos renglones teniendo
+      // columna de sobra.
+      final tabla = tester.getSize(find.byType(DataTable));
+
+      expect(
+        tester.getSize(find.text('Fecha de Creación')).width,
+        tabla.width - 32,
+      );
     });
 
-    testWidgets('no marca ninguna cuando la columna ordenada no está visible', (
+    testWidgets('el encabezado va del color de la acción principal', (
       tester,
     ) async {
-      // La lista viene ordenada por categoría y la columna de categoría está
-      // escondida. Antes la pantalla calculaba el índice con `indexWhere` y
-      // pasaba -1, que `DataTable` rechaza con un assert.
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(conCategoria: false),
-          rows: precios,
-          sortedBy: ColumnPreciosName.categoria,
-          onSort: (_, _) {},
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: precios),
       );
 
-      expect(tester.takeException(), isNull);
-      final table = tester.widget<DataTable>(find.byType(DataTable));
-      expect(table.sortColumnIndex, isNull);
-    });
+      // El mismo lleno que el botón de agregar, para que la tabla empiece por
+      // una banda que se lee de un golpe.
+      final tabla = find.byType(DataTable);
+      final scheme = Theme.of(tester.element(tabla)).colorScheme;
+      final table = tester.widget<DataTable>(tabla);
 
-    testWidgets('al tocar un encabezado avisa con la columna y el sentido', (
-      tester,
-    ) async {
-      final cambios = <(ColumnPreciosName, bool)>[];
-
-      await mostrar(
-        tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-          sortedBy: ColumnPreciosName.nombre,
-          ascending: true,
-          onSort: (column, ascending) => cambios.add((column, ascending)),
-        ),
-      );
-
-      // Otra columna empieza ascendente...
-      await tester.tap(find.text('Importe'));
-      // ...y la que ya ordena invierte el sentido.
-      await tester.tap(find.text('Concepto'));
-
-      expect(cambios, [
-        (ColumnPreciosName.importe, true),
-        (ColumnPreciosName.nombre, false),
-      ]);
+      expect(table.headingRowColor?.resolve({}), scheme.primary);
+      expect(table.headingTextStyle?.color, scheme.onPrimary);
     });
 
     testWidgets('la sección de filtros va tal cual, arriba de la lista', (
@@ -270,7 +243,7 @@ void main() {
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(),
           rows: precios,
           seccionFiltros: EstatusFilter(
@@ -293,10 +266,7 @@ void main() {
     testWidgets('sin sección de filtros no se dibuja nada', (tester) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: precios),
       );
 
       expect(find.byKey(DataTableCard.llaveFiltros), findsNothing);
@@ -307,7 +277,7 @@ void main() {
     ) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(),
           rows: precios,
           seccionEncabezado: const Text('Precios de ropa'),
@@ -330,10 +300,7 @@ void main() {
     testWidgets('sin encabezado no hay línea que cerrar', (tester) async {
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
-          columns: columnas(),
-          rows: precios,
-        ),
+        DataTableCard<PrecioData>(columns: columnas(), rows: precios),
       );
 
       expect(find.byKey(DataTableCard.llaveEncabezado), findsNothing);
@@ -354,7 +321,7 @@ void main() {
 
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(conAcciones: true),
           rows: precios,
         ),
@@ -398,7 +365,7 @@ void main() {
       // que mantener a la par.
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(conAcciones: true),
           rows: precios,
         ),
@@ -417,7 +384,7 @@ void main() {
       await tester.pumpWidget(
         MaterialApp(
           home: Scaffold(
-            body: DataTableCard<PrecioData, ColumnPreciosName>(
+            body: DataTableCard<PrecioData>(
               columns: columnas(),
               rows: const [],
               isLoading: true,
@@ -446,7 +413,7 @@ void main() {
 
       await mostrar(
         tester,
-        DataTableCard<PrecioData, ColumnPreciosName>(
+        DataTableCard<PrecioData>(
           columns: columnas(),
           rows: precios,
           seccionFiltros: VRow(

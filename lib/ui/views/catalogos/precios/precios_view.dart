@@ -24,7 +24,7 @@ class PreciosView extends ConsumerWidget {
 
     return ListadoCatalogo(
       mensajeError: estado.mensajeError,
-      child: DataTableCard<PrecioData, ColumnPreciosName>(
+      child: DataTableCard<PrecioData>(
         rows: estado.pagina,
         isLoading: estado.cargando,
         emptyMessage: filtros.haveFilters
@@ -50,9 +50,6 @@ class PreciosView extends ConsumerWidget {
           ],
         ),
 
-        sortedBy: filtros.ordenamiento,
-        ascending: filtros.ascendente,
-        onSort: notifier.ordenar,
         // Es el listado con más filtros —estatus, categoría, tamaño y orden—,
         // así que el buscador se queda con un tercio del renglón como mucho y
         // los cuatro desplegables se reparten lo que sobra. Cuando ya no caben
@@ -131,54 +128,45 @@ class PreciosView extends ConsumerWidget {
           TableColumnDef.text(
             title: 'Concepto',
             value: (precio) => precio.nombreConcepto,
-            sortBy: ColumnPreciosName.nombre,
             size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(
             title: 'Categoría',
             value: (precio) => precio.categoria,
-            sortBy: ColumnPreciosName.categoria,
           ),
           TableColumnDef.text(
             title: 'Tamaño',
             value: (precio) => precio.clotheSize.description,
-            sortBy: ColumnPreciosName.sizeRopa,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Unidad',
             value: (precio) => precio.tipoUnidad.value,
-            sortBy: ColumnPreciosName.tipoUnidad,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Días de Entrega',
             value: (precio) => precio.diasFormato,
-            sortBy: ColumnPreciosName.diasEntrega,
             size: TableColumnSize.normal,
           ),
           TableColumnDef.text(
             title: '\$ Importe',
             value: (precio) => precio.importe.toStringAsFixed(2),
-            sortBy: ColumnPreciosName.importe,
             numeric: true,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.widget(
             title: 'Estatus',
             content: (context, precio) => EstatusChip(estatus: precio.estatus),
-            sortBy: ColumnPreciosName.estatus,
             size: TableColumnSize.compacta,
           ),
           TableColumnDef.text(
             title: 'Fecha de Creación',
             value: (precio) => precio.fechaCreacion.formatFullDate,
-            sortBy: ColumnPreciosName.fechaCreacion,
           ),
           TableColumnDef.text(
             title: 'Fecha de Eliminación',
             value: (precio) => precio.fechaEliminacion.formatFullDate,
-            sortBy: ColumnPreciosName.fechaEliminacion,
           ),
           // Las acciones son una columna más, la última: de ancho fijo porque
           // lo que llevan dentro no cambia de tamaño con los datos.

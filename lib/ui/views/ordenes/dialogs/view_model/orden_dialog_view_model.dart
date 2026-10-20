@@ -284,7 +284,7 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
   /// `null` si no se pudo guardar.
   ///
   /// Se devuelve el folio y no un `true` porque es lo que hace falta para
-  /// confirmar el alta por su nombre: el `AAMM-NNNNN` lo pone la base al
+  /// confirmar el alta por su nombre: el `AAMM-NNNN` lo pone la base al
   /// insertar, y es el número que el cliente se lleva en el ticket.
   Future<String?> guardar() async {
     final cliente = state.cliente;

@@ -65,7 +65,11 @@ class CobroOrden extends StatefulWidget {
 class _CobroOrdenState extends State<CobroOrden> {
   late final TextEditingController _controller = TextEditingController(text: _texto);
 
-  String get _texto => widget.abono.toStringAsFixed(2);
+  /// Lo que le toca al campo. Sin adelanto se queda vacío y deja ver su
+  /// pista: una orden nace sin nada pagado, y un `0.00` escrito parece un
+  /// importe capturado —hay que borrarlo antes de teclear el de verdad—
+  /// cuando en realidad es que todavía no hay ninguno.
+  String get _texto => widget.abono == 0 ? '' : widget.abono.toStringAsFixed(2);
 
   double get _resta => widget.total - widget.abono;
 
@@ -76,7 +80,11 @@ class _CobroOrdenState extends State<CobroOrden> {
     // y reescribir el campo a media captura movería el cursor al final. Lo
     // que sí se repone es un cambio que viene de fuera —un atajo, o el
     // recorte al quitar ropa—, porque entonces el número ya no es el escrito.
-    final escrito = double.tryParse(_controller.text);
+    //
+    // El campo vacío cuenta como cero, que es lo que vale: si no, borrarlo
+    // del todo dejaría un texto que no cuadra con el abono y el campo se
+    // repondría solo a media captura.
+    final escrito = double.tryParse(_controller.text) ?? 0;
     if (escrito != widget.abono) _controller.text = _texto;
   }
 
@@ -279,19 +287,18 @@ class _Adelanto extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // El icono de delante no es un adorno: la etiqueta de un campo con marco
-    // se dibuja en un hueco de la línea de arriba, y sin icono empieza a diez
-    // píxeles del borde y se lleva casi toda esa línea. El campo se queda
-    // abierto por arriba y se lee más bajo que el desplegable de al lado, que
-    // sí tiene icono. Con él, los dos marcos empiezan en el mismo sitio.
-    //
-    // Va acotado a mano porque Material le reserva a un icono de campo los
-    // cuarenta y ocho píxeles del dedo, y aquí eso es ancho que le falta al
-    // importe.
+    // La etiqueta se queda arriba aunque el campo esté vacío: es lo que deja
+    // sitio dentro para la pista. Con el comportamiento de omisión, «Adelanto»
+    // baja a ocupar el hueco del importe mientras no hay nada escrito y el
+    // `0.00` no llega a verse nunca.
     return TextField(
       controller: controller,
       keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(labelText: 'Adelanto'),
+      decoration: const InputDecoration(
+        labelText: 'Adelanto',
+        hintText: '0.00',
+        floatingLabelBehavior: FloatingLabelBehavior.always,
+      ),
       onChanged: (texto) => onAbono(double.tryParse(texto) ?? 0),
     );
   }

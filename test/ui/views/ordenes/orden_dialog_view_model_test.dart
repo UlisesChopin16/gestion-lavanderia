@@ -317,8 +317,8 @@ void main() {
       notificador().cambiarAbono(40);
       notificador().cambiarDescripcion('  Una mancha de café  ');
 
-      // Devuelve el folio con el que quedó: `AAMM-NNNNN`.
-      expect(await notificador().guardar(), matches(r'^\d{4}-\d{5}$'));
+      // Devuelve el folio con el que quedó: `AAMM-NNNN`.
+      expect(await notificador().guardar(), matches(r'^\d{4}-\d{4}$'));
 
       final ordenes = await instance<OrdenesLocalDatasource>().listado();
       final orden = ordenes.single;

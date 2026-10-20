@@ -74,18 +74,18 @@ class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
     return entry;
   }
 
-  /// Folio con formato `AAMM-NNNNN`, consecutivo dentro del mes.
+  /// Folio con formato `AAMM-NNNN`, consecutivo dentro del mes.
   ///
-  /// Los dos últimos dígitos del año, el mes y cinco de consecutivo:
-  /// `2610-00001` es la primera orden de octubre de 2026. Se dicta por
+  /// Los dos últimos dígitos del año, el mes y cuatro de consecutivo:
+  /// `2610-0001` es la primera orden de octubre de 2026. Se dicta por
   /// teléfono y se copia a mano en el ticket, así que es lo más corto que
   /// sigue diciendo de cuándo es la orden.
   ///
   /// El consecutivo se obtiene del folio más alto del mes y no de la fecha de
   /// creación: así el número siempre corresponde al prefijo que lo acompaña,
   /// incluso para una orden creada justo al cambiar de mes. Como el consecutivo
-  /// va rellenado a cinco dígitos, el máximo alfabético coincide con el
-  /// numérico (válido hasta 99 999 órdenes en un mismo mes).
+  /// va rellenado a cuatro dígitos, el máximo alfabético coincide con el
+  /// numérico (válido hasta 9 999 órdenes en un mismo mes).
   Future<String> _generarFolio(DateTime fecha) async {
     final anio = (fecha.year % 100).toString().padLeft(2, '0');
     final prefijo = '$anio${fecha.month.toString().padLeft(2, '0')}-';
@@ -99,6 +99,6 @@ class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
     final consecutivo =
         (int.tryParse(ultimoFolio?.split('-').last ?? '') ?? 0) + 1;
 
-    return '$prefijo${consecutivo.toString().padLeft(5, '0')}';
+    return '$prefijo${consecutivo.toString().padLeft(4, '0')}';
   }
 }

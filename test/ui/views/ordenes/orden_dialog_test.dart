@@ -239,6 +239,38 @@ void main() {
     );
   });
 
+  testWidgets('el adelanto nace vacío, con el importe como pista', (
+    tester,
+  ) async {
+    await sembrarCatalogo();
+    await sembrarCliente();
+
+    await abrirDialogo(tester);
+
+    TextField campo() => tester.widget<TextField>(
+      find.ancestor(of: find.text('Adelanto'), matching: find.byType(TextField)),
+    );
+
+    // Una orden nace sin nada pagado: el campo está vacío y lo que se ve es
+    // la pista, no un importe capturado que haya que borrar antes de teclear.
+    expect(campo().controller?.text, isEmpty);
+    expect(campo().decoration?.hintText, '0.00');
+
+    // El atajo de pagar todo sí escribe el importe.
+    await tester.tap(find.text('Sábana'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Todo'));
+    await tester.pumpAndSettle();
+
+    expect(campo().controller?.text, '50.00');
+
+    // Y el de no dejar nada lo vacía de nuevo.
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Nada'));
+    await tester.pumpAndSettle();
+
+    expect(campo().controller?.text, isEmpty);
+  });
+
   testWidgets('los cuatro controles del cobro miden y empiezan igual', (
     tester,
   ) async {
@@ -379,7 +411,7 @@ void main() {
 
     // El diálogo se cierra con el folio de lo que guardó, y la orden está
     // en la base.
-    expect(resultado, matches(r'^\d{4}-\d{5}$'));
+    expect(resultado, matches(r'^\d{4}-\d{4}$'));
     expect(find.byType(OrdenDialog), findsNothing);
 
     final ordenes = await instance<OrdenesLocalDatasource>().listado();

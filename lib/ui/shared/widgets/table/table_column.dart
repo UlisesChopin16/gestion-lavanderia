@@ -119,12 +119,30 @@ class TableColumnDef<T> {
   /// Lo que esta columna aporta al ancho mínimo de la tabla.
   double get anchoMinimo => size.minimo;
 
-  /// El contenido de la celda para [row].
-  Widget buildCell(BuildContext context, T row) {
-    final content = this.content;
-    if (content != null) return content(context, row);
+}
 
-    final value = this.value;
+/// Lo que una celda enseña de su fila: el widget que pidió la columna, o su
+/// texto.
+///
+/// Es un widget y no un método de [TableColumnDef] porque es lo que la tabla
+/// cuelga de cada celda: así cada una tiene su propio sitio en el árbol y se
+/// reconstruye sola, en lugar de volver a nacer entera con la tabla.
+class TableCellContent<T> extends StatelessWidget {
+  const TableCellContent({
+    super.key,
+    required this.columna,
+    required this.fila,
+  });
+
+  final TableColumnDef<T> columna;
+  final T fila;
+
+  @override
+  Widget build(BuildContext context) {
+    final content = columna.content;
+    if (content != null) return content(context, fila);
+
+    final value = columna.value;
     if (value == null) return const SizedBox.shrink();
 
     // Lo que no cabe a lo ancho baja de línea, no se corta: un correo o un
@@ -132,8 +150,8 @@ class TableColumnDef<T> {
     // leerlo entero. La fila crece con él —la tabla no le pone tope de alto—,
     // así que lo que se paga es alto, que es lo que sobra, y no el dato.
     return Text(
-      value(row),
-      textAlign: numeric ? TextAlign.end : TextAlign.center,
+      value(fila),
+      textAlign: columna.numeric ? TextAlign.end : TextAlign.center,
     );
   }
 }

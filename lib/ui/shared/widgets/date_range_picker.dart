@@ -61,19 +61,6 @@ class _DateRangePickerState extends State<DateRangePicker> {
     super.dispose();
   }
 
-  Widget get _prefix {
-    final showDelete = widget.showDelete ?? widget.selectedDates.isNotEmpty;
-
-    if (showDelete) {
-      return DeleteButton(
-        onPressed: widget.onDelete,
-        tooltip: 'Quitar las fechas',
-      );
-    }
-
-    return const Icon(IconsManager.calendarRange);
-  }
-
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -90,7 +77,11 @@ class _DateRangePickerState extends State<DateRangePicker> {
         constraints: widget.width == null
             ? null
             : BoxConstraints(maxHeight: 40, maxWidth: widget.width!),
-        prefixIcon: _prefix,
+        prefixIcon: _Prefijo(
+          mostrarQuitar:
+              widget.showDelete ?? widget.selectedDates.isNotEmpty,
+          onDelete: widget.onDelete,
+        ),
       ),
       onTap: _openCalendar,
     );
@@ -123,6 +114,24 @@ class _DateRangePickerState extends State<DateRangePicker> {
     }
 
     return (firstDate, lastDate);
+  }
+}
+
+/// Lo que va al principio del campo: el calendario, o el botón de quitar
+/// cuando hay fechas que quitar.
+class _Prefijo extends StatelessWidget {
+  const _Prefijo({required this.mostrarQuitar, required this.onDelete});
+
+  final bool mostrarQuitar;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    if (mostrarQuitar) {
+      return DeleteButton(onPressed: onDelete, tooltip: 'Quitar las fechas');
+    }
+
+    return const Icon(IconsManager.calendarRange);
   }
 }
 

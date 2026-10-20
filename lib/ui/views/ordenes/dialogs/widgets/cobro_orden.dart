@@ -63,9 +63,7 @@ class CobroOrden extends StatefulWidget {
 }
 
 class _CobroOrdenState extends State<CobroOrden> {
-  late final TextEditingController _controller = TextEditingController(
-    text: _texto,
-  );
+  late final TextEditingController _controller = TextEditingController(text: _texto);
 
   String get _texto => widget.abono.toStringAsFixed(2);
 
@@ -90,24 +88,44 @@ class _CobroOrdenState extends State<CobroOrden> {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
       decoration: BoxDecoration(
-        color: theme.colorScheme.surfaceContainerHigh,
+        color: Theme.of(context).colorScheme.surfaceContainerHigh,
         borderRadius: BorderRadius.circular(16),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
-        spacing: 10,
-        children: [_cifras(theme), _controles(theme)],
+        spacing: 4,
+        children: [
+          _Cifras(total: widget.total, resta: _resta),
+          const Divider(),
+          _Controles(
+            adelanto: _controller,
+            total: widget.total,
+            abono: widget.abono,
+            metodoPago: widget.metodoPago,
+            onAbono: widget.onAbono,
+            onMetodoPago: widget.onMetodoPago,
+          ),
+        ],
       ),
     );
   }
+}
 
-  /// Lo que suma la orden y lo que falta por pagar, uno al lado del otro.
-  Widget _cifras(ThemeData theme) {
+/// Lo que suma la orden y lo que falta por pagar, uno al lado del otro.
+class _Cifras extends StatelessWidget {
+  const _Cifras({required this.total, required this.resta});
+
+  final double total;
+
+  /// Lo que queda a deber. En cero o menos, la orden está pagada.
+  final double resta;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
     return Row(
@@ -115,74 +133,59 @@ class _CobroOrdenState extends State<CobroOrden> {
       children: [
         Expanded(
           flex: CobroOrden._izquierda,
-          child: _Cifra(
-            etiqueta: 'Total',
-            importe: widget.total,
-            estilo: theme.textTheme.titleLarge,
-          ),
+          child: _Cifra(etiqueta: 'Total', importe: total, estilo: theme.textTheme.titleLarge),
         ),
         SizedBox(
           height: 24,
-          child: VerticalDivider(
-            width: CobroOrden._separador,
-            color: scheme.outlineVariant,
-          ),
+          child: VerticalDivider(width: CobroOrden._separador, color: scheme.outlineVariant),
         ),
         Expanded(
           flex: CobroOrden._derecha,
           child: _Cifra(
             // La etiqueta dice el estado y el color lo repite: una orden que
             // queda a deber se reconoce sin leer la cifra.
-            etiqueta: _resta > 0 ? 'Queda a deber' : 'Pagada',
-            importe: _resta,
+            etiqueta: resta > 0 ? 'Queda a deber' : 'Pagada',
+            importe: resta,
             estilo: theme.textTheme.titleLarge?.copyWith(
-              color: _resta > 0 ? scheme.error : scheme.primary,
+              color: resta > 0 ? scheme.error : scheme.primary,
             ),
           ),
         ),
       ],
     );
   }
+}
 
-  /// Con qué paga y cuánto deja.
-  Widget _controles(ThemeData theme) {
-    final metodo = _MetodoPago(
-      metodoPago: widget.metodoPago,
-      onMetodoPago: widget.onMetodoPago,
-    );
+/// Con qué paga y cuánto deja.
+///
+/// Los tres controles van en un renglón cuando caben y en dos cuando no, y
+/// con la misma rejilla que las cifras de arriba: el método de pago debajo
+/// del total, y lo que se adelanta debajo de lo que queda a deber, que es la
+/// cifra que mueve.
+class _Controles extends StatelessWidget {
+  const _Controles({
+    required this.adelanto,
+    required this.total,
+    required this.abono,
+    required this.metodoPago,
+    required this.onAbono,
+    required this.onMetodoPago,
+  });
 
-    // El icono de delante no es un adorno: la etiqueta de un campo con marco
-    // se dibuja en un hueco de la línea de arriba, y sin icono empieza a diez
-    // píxeles del borde y se lleva casi toda esa línea. El campo se queda
-    // abierto por arriba y se lee más bajo que el desplegable de al lado, que
-    // sí tiene icono. Con él, los dos marcos empiezan en el mismo sitio.
-    //
-    // Va acotado a mano porque Material le reserva a un icono de campo los
-    // cuarenta y ocho píxeles del dedo, y aquí eso es ancho que le falta al
-    // importe.
-    final adelanto = TextField(
-      controller: _controller,
-      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-      decoration: const InputDecoration(
-        labelText: 'Adelanto',
-        prefixIcon: Icon(Icons.payments_rounded, size: 18),
-        prefixIconConstraints: BoxConstraints(minWidth: 34),
-      ),
-      onChanged: (texto) => widget.onAbono(double.tryParse(texto) ?? 0),
-    );
+  /// El campo del adelanto lo gobierna la tarjeta, que es quien sabe cuándo
+  /// el importe cambió por fuera —un atajo, o el recorte al quitar ropa— y
+  /// hay que reponer el texto.
+  final TextEditingController adelanto;
 
-    final atajos = [
-      _Atajo(
-        texto: 'Nada',
-        activo: widget.abono == 0,
-        onPressed: () => widget.onAbono(0),
-      ),
-      _Atajo(
-        texto: 'Todo',
-        activo: widget.abono == widget.total && widget.total > 0,
-        onPressed: () => widget.onAbono(widget.total),
-      ),
-    ];
+  final double total;
+  final double abono;
+  final MetodoPagoType metodoPago;
+  final ValueChanged<double> onAbono;
+  final ValueChanged<MetodoPagoType> onMetodoPago;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     // Los campos, en su versión densa. Se cambia el tema en lugar de cada
     // control porque el desplegable no recibe su decoración por parámetro: la
@@ -205,16 +208,11 @@ class _CobroOrdenState extends State<CobroOrden> {
         visualDensity: VisualDensity.standard,
         inputDecorationTheme: theme.inputDecorationTheme.copyWith(
           isDense: true,
-          contentPadding: const EdgeInsets.symmetric(
-            vertical: 10,
-            horizontal: 10,
-          ),
+          contentPadding: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
           // El alto, a mano: el icono que el desplegable lleva delante pide
           // los cuarenta y ocho de Material por su cuenta y dejaba un control
           // más alto que los otros dos.
-          constraints: const BoxConstraints.tightFor(
-            height: CobroOrden._altoControl,
-          ),
+          constraints: const BoxConstraints.tightFor(height: CobroOrden._altoControl),
         ),
         iconButtonTheme: IconButtonThemeData(
           style: IconButton.styleFrom(
@@ -226,6 +224,10 @@ class _CobroOrdenState extends State<CobroOrden> {
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
+          final metodo = _MetodoPago(metodoPago: metodoPago, onMetodoPago: onMetodoPago);
+          final importe = _Adelanto(controller: adelanto, onAbono: onAbono);
+          final atajos = _Atajos(total: total, abono: abono, onAbono: onAbono);
+
           if (constraints.maxWidth < CobroOrden._anchoDeUnRenglon) {
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -234,17 +236,17 @@ class _CobroOrdenState extends State<CobroOrden> {
                 metodo,
                 Row(
                   spacing: 8,
-                  children: [Expanded(child: adelanto), ...atajos],
+                  children: [
+                    Expanded(child: importe),
+                    atajos,
+                  ],
                 ),
               ],
             );
           }
 
-          // La misma rejilla que las cifras de arriba: el método de pago
-          // debajo del total, y lo que se adelanta debajo de lo que queda a
-          // deber, que es la cifra que mueve. Las dos filas empiezan y acaban
-          // en la misma columna, y el hueco del separador se respeta aunque
-          // aquí no se pinte.
+          // El hueco del separador se respeta aunque aquí no se pinte: es lo
+          // que hace que las dos filas empiecen y acaben en la misma columna.
           return Row(
             spacing: CobroOrden._aire,
             children: [
@@ -254,13 +256,64 @@ class _CobroOrdenState extends State<CobroOrden> {
                 flex: CobroOrden._derecha,
                 child: Row(
                   spacing: 8,
-                  children: [Expanded(child: adelanto), ...atajos],
+                  children: [
+                    Expanded(child: importe),
+                    atajos,
+                  ],
                 ),
               ),
             ],
           );
         },
       ),
+    );
+  }
+}
+
+/// Cuánto deja el cliente al dejar la ropa.
+class _Adelanto extends StatelessWidget {
+  const _Adelanto({required this.controller, required this.onAbono});
+
+  final TextEditingController controller;
+  final ValueChanged<double> onAbono;
+
+  @override
+  Widget build(BuildContext context) {
+    // El icono de delante no es un adorno: la etiqueta de un campo con marco
+    // se dibuja en un hueco de la línea de arriba, y sin icono empieza a diez
+    // píxeles del borde y se lleva casi toda esa línea. El campo se queda
+    // abierto por arriba y se lee más bajo que el desplegable de al lado, que
+    // sí tiene icono. Con él, los dos marcos empiezan en el mismo sitio.
+    //
+    // Va acotado a mano porque Material le reserva a un icono de campo los
+    // cuarenta y ocho píxeles del dedo, y aquí eso es ancho que le falta al
+    // importe.
+    return TextField(
+      controller: controller,
+      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+      decoration: const InputDecoration(labelText: 'Adelanto'),
+      onChanged: (texto) => onAbono(double.tryParse(texto) ?? 0),
+    );
+  }
+}
+
+/// Los dos atajos del adelanto, que siempre van juntos.
+class _Atajos extends StatelessWidget {
+  const _Atajos({required this.total, required this.abono, required this.onAbono});
+
+  final double total;
+  final double abono;
+  final ValueChanged<double> onAbono;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 8,
+      children: [
+        _Atajo(texto: 'Nada', activo: abono == 0, onPressed: () => onAbono(0)),
+        _Atajo(texto: 'Todo', activo: abono == total && total > 0, onPressed: () => onAbono(total)),
+      ],
     );
   }
 }
@@ -292,11 +345,7 @@ class _MetodoPago extends StatelessWidget {
 }
 
 class _Cifra extends StatelessWidget {
-  const _Cifra({
-    required this.etiqueta,
-    required this.importe,
-    required this.estilo,
-  });
+  const _Cifra({required this.etiqueta, required this.importe, required this.estilo});
 
   final String etiqueta;
   final double importe;
@@ -334,11 +383,7 @@ class _Cifra extends StatelessWidget {
 /// pegados y de anchos distintos por tres píxeles se leen como un descuadre,
 /// no como dos palabras de largo distinto.
 class _Atajo extends StatelessWidget {
-  const _Atajo({
-    required this.texto,
-    required this.activo,
-    required this.onPressed,
-  });
+  const _Atajo({required this.texto, required this.activo, required this.onPressed});
 
   final String texto;
   final bool activo;

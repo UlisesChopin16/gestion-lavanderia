@@ -58,14 +58,6 @@ class _DatePickerComponentState extends State<DatePickerComponent> {
     super.dispose();
   }
 
-  Widget get _prefix {
-    final onDelete = widget.onDelete;
-    if (onDelete != null && widget.currentDate != null) {
-      return DeleteButton(onPressed: onDelete, tooltip: 'Quitar la fecha');
-    }
-    return const Icon(IconsManager.calendar);
-  }
-
   @override
   Widget build(BuildContext context) {
     return TextField(
@@ -79,7 +71,10 @@ class _DatePickerComponentState extends State<DatePickerComponent> {
           maxHeight: 40,
           maxWidth: widget.width ?? 160,
         ),
-        prefixIcon: _prefix,
+        prefixIcon: _Prefijo(
+          fecha: widget.currentDate,
+          onDelete: widget.onDelete,
+        ),
       ),
       onTap: _openCalendar,
     );
@@ -127,6 +122,26 @@ class _DatePickerComponentState extends State<DatePickerComponent> {
 }
 
 /// El calendario. Se cierra devolviendo la fecha elegida, o nada si se cancela.
+/// Lo que va al principio del campo: el calendario, o el botón de quitar
+/// cuando hay una fecha que quitar.
+class _Prefijo extends StatelessWidget {
+  const _Prefijo({required this.fecha, required this.onDelete});
+
+  final DateTime? fecha;
+  final VoidCallback? onDelete;
+
+  @override
+  Widget build(BuildContext context) {
+    final onDelete = this.onDelete;
+
+    if (onDelete != null && fecha != null) {
+      return DeleteButton(onPressed: onDelete, tooltip: 'Quitar la fecha');
+    }
+
+    return const Icon(IconsManager.calendar);
+  }
+}
+
 class _CalendarDialog extends StatefulWidget {
   const _CalendarDialog({
     required this.initialDate,

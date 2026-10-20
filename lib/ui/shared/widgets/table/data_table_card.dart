@@ -190,34 +190,6 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
   /// Lo que separa el contenido del borde de la tarjeta.
   static const double _relleno = 20;
 
-  /// El redondeo de los recuadros: el del encabezado y el de la tabla.
-  static const double _radio = 16;
-
-  /// Lo que separa el contenido de las orillas de la tabla.
-  static const double _margenTabla = 16;
-
-  /// El aire entre una columna y la siguiente.
-  static const double _espacioColumnas = 16;
-
-  /// El alto del renglón de encabezados: dos renglones de texto y su aire.
-  static const double _altoEncabezado = 56;
-
-  /// Lo que la tabla necesita para no apretar ninguna columna.
-  ///
-  /// Es la suma de los mínimos de sus columnas —el aire de cada celda va
-  /// dentro—, y es el ancho con el que la tabla se dibuja cuando la ventana da
-  /// menos: a partir de ahí se desplaza en lugar de seguir encogiendo, que es
-  /// lo que dejaba los datos ilegibles.
-  double get _anchoMinimoTabla {
-    var ancho = 0.0;
-
-    for (final column in widget.columns) {
-      ancho += column.anchoMinimo;
-    }
-
-    return ancho;
-  }
-
   @override
   void dispose() {
     // El controlador sobrevive al widget si no se cierra aquí.
@@ -272,7 +244,16 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
                 duration: const Duration(milliseconds: 250),
                 curve: Curves.easeInOutCubic,
                 alignment: Alignment.topCenter,
-                child: _body(context, maxWidth: width),
+                child: _Cuerpo<T>(
+                  cargando: widget.isLoading,
+                  filas: widget.rows,
+                  columnas: widget.columns,
+                  mensajeVacio: widget.emptyMessage,
+                  ancho: width,
+                  horizontal: _horizontal,
+                  onRowTap: widget.onRowTap,
+                  rowKey: widget.rowKey,
+                ),
               ),
             ],
           );
@@ -281,36 +262,118 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
     );
   }
 
-  /// La lista, el aviso de vacío o el indicador de carga: nunca dos a la vez,
-  /// que es lo que pasaba antes, cuando una lista vacía mostraba la tabla con
-  /// sólo encabezados y el mensaje debajo.
-  Widget _body(BuildContext context, {required double maxWidth}) {
-    if (widget.isLoading) {
-      return _Marco(
+}
+
+/// La lista, el aviso de vacío o el indicador de carga: nunca dos a la vez,
+/// que es lo que pasaba antes, cuando una lista vacía mostraba la tabla con
+/// sólo encabezados y el mensaje debajo.
+class _Cuerpo<T> extends StatelessWidget {
+  const _Cuerpo({
+    required this.cargando,
+    required this.filas,
+    required this.columnas,
+    required this.mensajeVacio,
+    required this.ancho,
+    required this.horizontal,
+    required this.onRowTap,
+    required this.rowKey,
+  });
+
+  final bool cargando;
+  final List<T> filas;
+  final List<TableColumnDef<T>> columnas;
+  final String mensajeVacio;
+
+  /// El ancho que la tarjeta puede dar, ya medido.
+  final double ancho;
+
+  final ScrollController horizontal;
+  final void Function(T row)? onRowTap;
+  final Object Function(T row)? rowKey;
+
+  /// El redondeo del recuadro que encierra la lista.
+  static const double _radio = 16;
+
+  @override
+  Widget build(BuildContext context) {
+    if (cargando) {
+      return const _Marco(
         radio: _radio,
-        child: const Padding(
+        child: Padding(
           padding: EdgeInsets.symmetric(vertical: 48),
           child: Center(child: CircularProgressIndicator()),
         ),
       );
     }
 
-    if (widget.rows.isEmpty) {
-      return _Marco(
-        radio: _radio,
-        child: _Vacio(mensaje: widget.emptyMessage),
-      );
+    if (filas.isEmpty) {
+      return _Marco(radio: _radio, child: _Vacio(mensaje: mensajeVacio));
     }
 
     return _Marco(
       radio: _radio,
       // El ancho de dentro del marco: el borde se queda con un píxel por lado,
       // y sin descontarlo la tabla pediría dos de más y nacería desplazable.
-      child: _scrollableTable(context, maxWidth - 2),
+      child: _Tabla<T>(
+        columnas: columnas,
+        filas: filas,
+        ancho: ancho - 2,
+        horizontal: horizontal,
+        onRowTap: onRowTap,
+        rowKey: rowKey,
+      ),
     );
   }
+}
 
-  Widget _scrollableTable(BuildContext context, double maxWidth) {
+/// La tabla, que se recorre a lo ancho cuando sus columnas no caben.
+class _Tabla<T> extends StatelessWidget {
+  const _Tabla({
+    required this.columnas,
+    required this.filas,
+    required this.ancho,
+    required this.horizontal,
+    required this.onRowTap,
+    required this.rowKey,
+  });
+
+  final List<TableColumnDef<T>> columnas;
+  final List<T> filas;
+
+  /// El ancho de dentro del marco.
+  final double ancho;
+
+  final ScrollController horizontal;
+  final void Function(T row)? onRowTap;
+  final Object Function(T row)? rowKey;
+
+  /// Lo que separa el contenido de las orillas de la tabla.
+  static const double _margen = 16;
+
+  /// El aire entre una columna y la siguiente.
+  static const double _espacioColumnas = 16;
+
+  /// El alto del renglón de encabezados: dos renglones de texto y su aire.
+  static const double _altoEncabezado = 56;
+
+  /// Lo que la tabla necesita para no apretar ninguna columna.
+  ///
+  /// Es la suma de los mínimos de sus columnas —el aire de cada celda va
+  /// dentro—, y es el ancho con el que la tabla se dibuja cuando la ventana da
+  /// menos: a partir de ahí se desplaza en lugar de seguir encogiendo, que es
+  /// lo que dejaba los datos ilegibles.
+  double get _anchoMinimo {
+    var minimo = 0.0;
+
+    for (final columna in columnas) {
+      minimo += columna.anchoMinimo;
+    }
+
+    return minimo;
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
 
@@ -324,7 +387,7 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
       // línea, y la fila crece con ella. Con un máximo fijo, el texto que
       // sobraba quedaba cortado por la mitad.
       dataRowMaxHeight: double.infinity,
-      horizontalMargin: _margenTabla,
+      horizontalMargin: _margen,
       columnSpacing: _espacioColumnas,
       dividerThickness: 0,
       showBottomBorder: false,
@@ -338,12 +401,12 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
         letterSpacing: 0.3,
       ),
       dataTextStyle: theme.textTheme.bodyMedium,
-      columns: _buildColumns(),
-      rows: _buildRows(context),
+      columns: _encabezados(),
+      rows: _renglones(context),
     );
 
     return Scrollbar(
-      controller: _horizontal,
+      controller: horizontal,
       thumbVisibility: true,
       child: ScrollConfiguration(
         // Arrastrar con el ratón: en escritorio no hay gesto táctil y una
@@ -359,7 +422,7 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
           },
         ),
         child: SingleChildScrollView(
-          controller: _horizontal,
+          controller: horizontal,
           scrollDirection: Axis.horizontal,
           // El ancho se decide aquí y no se deja al contenido: con el de la
           // tarjeta, las columnas se reparten lo que hay y la tabla no se
@@ -371,7 +434,7 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
           // midiera su texto más largo y casi siempre había que desplazarse,
           // aunque sobrara sitio en la pantalla.
           child: SizedBox(
-            width: math.max(maxWidth, _anchoMinimoTabla),
+            width: math.max(ancho, _anchoMinimo),
             child: table,
           ),
         ),
@@ -379,13 +442,18 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
     );
   }
 
-  List<DataColumn> _buildColumns() {
+  /// Los encabezados.
+  ///
+  /// Sigue siendo un método y no un widget porque `DataColumn` no lo es: es la
+  /// configuración que `DataTable` pide, y lo único que sí es un widget —el
+  /// nombre de la columna— ya va dentro.
+  List<DataColumn> _encabezados() {
     return [
-      for (final column in widget.columns)
+      for (final columna in columnas)
         DataColumn(
-          numeric: column.numeric,
-          tooltip: column.tooltip,
-          columnWidth: column.columnWidth,
+          numeric: columna.numeric,
+          tooltip: columna.tooltip,
+          columnWidth: columna.columnWidth,
           // Expanded y no Flexible: el nombre se queda con la columna entera.
           // `DataTable` le reservaba 36 píxeles a la flecha de ordenamiento
           // —16 de flecha, 2 de aire y otros 18 del lado contrario para
@@ -399,7 +467,7 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
           // encabezado.
           label: Expanded(
             child: Text(
-              column.title,
+              columna.title,
               textAlign: TextAlign.center,
               softWrap: true,
               maxLines: 2,
@@ -409,27 +477,29 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
     ];
   }
 
-  List<DataRow> _buildRows(BuildContext context) {
+  /// Las filas, también configuración de `DataTable`. Lo que cada celda
+  /// enseña lo arma [TableCellContent], que sí es un widget.
+  List<DataRow> _renglones(BuildContext context) {
     final stripes = ColorRowTheme.of(context);
-    final onRowTap = widget.onRowTap;
-    final rowKey = widget.rowKey;
+    final onRowTap = this.onRowTap;
+    final rowKey = this.rowKey;
 
     return [
-      for (final (index, row) in widget.rows.indexed)
+      for (final (index, fila) in filas.indexed)
         DataRow(
-          key: rowKey == null ? null : ValueKey(rowKey(row)),
+          key: rowKey == null ? null : ValueKey(rowKey(fila)),
           color: WidgetStateProperty.resolveWith((states) {
             if (states.contains(WidgetState.hovered)) return stripes.hoverColor;
             return stripes.colorForRow(index);
           }),
-          onSelectChanged: onRowTap == null ? null : (_) => onRowTap(row),
+          onSelectChanged: onRowTap == null ? null : (_) => onRowTap(fila),
           mouseCursor: WidgetStatePropertyAll(
             onRowTap == null
                 ? SystemMouseCursors.basic
                 : SystemMouseCursors.click,
           ),
           cells: [
-            for (final column in widget.columns)
+            for (final columna in columnas)
               DataCell(
                 Padding(
                   // El aire de arriba y abajo lo pone la celda: sin él, un
@@ -438,10 +508,10 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
                   // tiene un alto mínimo mayor.
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Align(
-                    alignment: column.numeric
+                    alignment: columna.numeric
                         ? Alignment.centerRight
                         : Alignment.center,
-                    child: column.buildCell(context, row),
+                    child: TableCellContent<T>(columna: columna, fila: fila),
                   ),
                 ),
               ),

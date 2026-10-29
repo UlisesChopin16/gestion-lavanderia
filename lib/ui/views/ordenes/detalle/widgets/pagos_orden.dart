@@ -47,27 +47,20 @@ class _Movimiento extends StatelessWidget {
     final entregados = movimiento.entregados.length;
     final conceptos = entregados == 1 ? '1 concepto' : '$entregados conceptos';
     final metodo = movimiento.metodoPago;
+    final tipo = movimiento.tipo(esAlta: esAlta);
 
-    final (icono, descripcion) = switch (movimiento) {
-      MovimientoData(huboAbono: true, huboEntrega: true) => (
-        Icons.local_shipping_rounded,
+    final (icono, descripcion) = switch (tipo) {
+      TipoMovimientoType.pagoYEntrega => (
+        tipo.icon,
         'Pago con ${metodo.value} y entrega de $conceptos',
       ),
-      MovimientoData(huboAbono: true) when esAlta => (
+      TipoMovimientoType.adelanto => (
         metodo.icon,
         'Adelanto con ${metodo.value}',
       ),
-      MovimientoData(huboAbono: true) => (
-        metodo.icon,
-        'Pago con ${metodo.value}',
-      ),
-      MovimientoData(huboEntrega: true) => (
-        Icons.inventory_2_outlined,
-        'Entrega de $conceptos',
-      ),
-      // El primer movimiento de una orden que nació sin adelanto: no cobra
-      // ni entrega, pero es el que fecha el alta.
-      _ => (Icons.post_add_rounded, 'Alta de la orden'),
+      TipoMovimientoType.pago => (metodo.icon, 'Pago con ${metodo.value}'),
+      TipoMovimientoType.entrega => (tipo.icon, 'Entrega de $conceptos'),
+      TipoMovimientoType.alta => (tipo.icon, tipo.titulo),
     };
 
     return Padding(

@@ -12,6 +12,8 @@ import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/view_model/orden_detalle_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/historial/orden_historial_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/historial/view_model/orden_historial_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
@@ -311,10 +313,58 @@ void main() {
     );
   });
 
+  testWidgets('una orden cerrada ya no ofrece ver la orden', (tester) async {
+    final clienteId = await crearCliente(nombres: 'Lucía');
+    await crearOrden(clienteId: clienteId, estatus: EstatusOrdenType.cerrada);
+
+    await abrirModulo(tester);
+
+    // El mismo menú que las demás filas, con una acción menos.
+    await tester.tap(find.byType(PopupMenuButton<TableAction>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ver historial de la orden'), findsOneWidget);
+    expect(find.text('Ver ticket de la orden'), findsOneWidget);
+    expect(find.text('Ver la orden'), findsNothing);
+  });
+
+  testWidgets('una orden en curso sí ofrece ver la orden', (tester) async {
+    final clienteId = await crearCliente(nombres: 'Lucía');
+    await crearOrden(clienteId: clienteId, restante: 50);
+
+    await abrirModulo(tester);
+
+    await tester.tap(find.byType(PopupMenuButton<TableAction>));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ver la orden'), findsOneWidget);
+  });
+
+  testWidgets('ver el historial abre el de esa orden', (tester) async {
+    final clienteId = await crearCliente(nombres: 'Lucía');
+    final folio = await crearOrden(clienteId: clienteId);
+
+    await abrirModulo(tester);
+
+    await tester.tap(find.byType(PopupMenuButton<TableAction>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver historial de la orden'));
+    await tester.pump();
+
+    final dialogo = tester.widget<OrdenHistorialDialog>(
+      find.byType(OrdenHistorialDialog),
+    );
+    await ProviderScope.containerOf(
+      tester.element(find.byType(OrdenHistorialDialog)),
+    ).read(ordenHistorialViewModelProvider(dialogo.ordenId).notifier).cargar();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Historial · Orden $folio'), findsOneWidget);
+    expect(find.byType(DialogoPendiente), findsNothing);
+  });
+
   group('lo que todavía está por portar', () {
-    testWidgets('las acciones de la orden avisan y dicen cuál es', (
-      tester,
-    ) async {
+    testWidgets('el ticket avisa y dice de qué orden es', (tester) async {
       final clienteId = await crearCliente(nombres: 'Lucía');
       final folio = await crearOrden(clienteId: clienteId);
 
@@ -324,7 +374,7 @@ void main() {
       await tester.tap(find.byType(PopupMenuButton<TableAction>));
       await tester.pumpAndSettle();
 
-      await tester.tap(find.text('Ver historial de la orden'));
+      await tester.tap(find.text('Ver ticket de la orden'));
       await tester.pumpAndSettle();
 
       expect(find.byType(DialogoPendiente), findsOneWidget);

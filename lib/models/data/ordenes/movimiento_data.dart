@@ -1,9 +1,11 @@
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/item_orden_data.dart';
 import 'package:gestion_lavanderia/types/metodo_pago_type.dart';
+import 'package:gestion_lavanderia/types/tipo_movimiento_type.dart';
 
 export 'package:gestion_lavanderia/models/data/ordenes/item_orden_data.dart';
 export 'package:gestion_lavanderia/types/metodo_pago_type.dart';
+export 'package:gestion_lavanderia/types/tipo_movimiento_type.dart';
 
 part 'movimiento_data.freezed.dart';
 
@@ -48,6 +50,25 @@ sealed class MovimientoData with _$MovimientoData {
   bool get huboEntrega => entregados.isNotEmpty;
 
   bool get huboAbono => monto > 0;
+
+  /// Si con este cobro la orden quedó sin deber nada.
+  ///
+  /// Medio centavo de margen, el mismo con el que la base da una orden por
+  /// saldada: los importes son `double` y un cero puede quedar en 0.0000001.
+  bool get saldaLaOrden => huboAbono && restante <= 0.005;
+
+  /// Qué pasó en el movimiento, dicho como lo lee quien atiende.
+  ///
+  /// [esAlta] lo sabe el historial y no el movimiento: es el más antiguo de
+  /// la orden, y su cobro es el adelanto.
+  TipoMovimientoType tipo({required bool esAlta}) => switch (this) {
+    MovimientoData(huboAbono: true, huboEntrega: true) =>
+      TipoMovimientoType.pagoYEntrega,
+    MovimientoData(huboAbono: true) when esAlta => TipoMovimientoType.adelanto,
+    MovimientoData(huboAbono: true) => TipoMovimientoType.pago,
+    MovimientoData(huboEntrega: true) => TipoMovimientoType.entrega,
+    _ => TipoMovimientoType.alta,
+  };
 
   /// Lo que se le devolvió al cliente, cuando se sabe con cuánto pagó.
   double? get cambio {

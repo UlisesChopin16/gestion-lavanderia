@@ -6,6 +6,7 @@ import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/historial/orden_historial_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
@@ -190,23 +191,27 @@ class OrdenesView extends ConsumerWidget {
             title: 'Acciones',
             size: const TableColumnSize.fija(TableActionsCell.ancho),
             content: (context, orden) => TableActionsCell(
+              // Siempre en menú: una orden cerrada lleva una acción menos, y
+              // con dos la celda las pondría en línea. La columna quedaría
+              // con menús en unas filas y botones sueltos en otras.
+              compact: true,
               actions: [
                 TableAction(
                   label: 'Ver historial de la orden',
                   icon: Icons.history_rounded,
                   color: Colors.blue,
-                  onPressed: () => _pendiente(
-                    context,
-                    titulo: 'Historial de la orden',
-                    orden: orden,
+                  onPressed: () => _verHistorial(context, orden),
+                ),
+                // Una orden cerrada ya está pagada y entregada: en el detalle
+                // no queda nada que cobrar ni que entregar, y lo que pasó con
+                // ella se consulta en el historial.
+                if (orden.estatus != EstatusOrdenType.cerrada)
+                  TableAction(
+                    label: 'Ver la orden',
+                    icon: Icons.assignment_turned_in_rounded,
+                    color: orden.estatus.color,
+                    onPressed: () => _verOrden(context, ref, orden),
                   ),
-                ),
-                TableAction(
-                  label: 'Ver la orden',
-                  icon: Icons.assignment_turned_in_rounded,
-                  color: orden.estatus.color,
-                  onPressed: () => _verOrden(context, ref, orden),
-                ),
                 TableAction(
                   label: 'Ver ticket de la orden',
                   icon: IconsManager.selectedOrdenServicioIcon,
@@ -274,8 +279,17 @@ class OrdenesView extends ConsumerWidget {
     await context.showSuccessDialog(mensaje);
   }
 
-  /// Lo que todavía no se ha portado de este módulo: el historial de la orden
-  /// y su ticket. Cada uno sustituirá esta llamada por su diálogo.
+  /// Abre el historial de la orden. Sólo se mira, así que no hay nada que
+  /// releer al cerrarlo.
+  Future<void> _verHistorial(BuildContext context, OrdenListadoData orden) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => OrdenHistorialDialog(ordenId: orden.id),
+    );
+  }
+
+  /// Lo que todavía no se ha portado de este módulo: el ticket de la orden.
+  /// Sustituirá esta llamada por su diálogo.
   Future<void> _pendiente(
     BuildContext context, {
     required String titulo,

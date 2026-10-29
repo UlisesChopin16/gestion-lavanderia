@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/view_model/orden_detalle_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/widgets/widgets.dart';
-import 'package:gestion_lavanderia/ui/views/ordenes/widgets/estatus_orden_chip.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/widgets/encabezado_orden.dart';
 
 /// El detalle de una orden: lo que es, lo que debe y lo que falta entregar, y
 /// desde donde se cobra y se entrega.
@@ -54,9 +54,15 @@ class OrdenDetalleDialog extends ConsumerWidget {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            _Encabezado(folio: orden?.folio, estatus: orden?.estatus),
+            EncabezadoOrden(
+              titulo: orden == null
+                  ? 'Orden de servicio'
+                  : 'Orden ${orden.folio}',
+              icono: Icons.assignment_rounded,
+              estatus: orden?.estatus,
+            ),
             if (estado.mensajeError.isNotEmpty)
-              _Aviso(mensaje: estado.mensajeError),
+              AvisoErrorOrden(mensaje: estado.mensajeError),
             Expanded(
               child: switch (orden) {
                 _ when estado.cargando => const Center(
@@ -73,56 +79,6 @@ class OrdenDetalleDialog extends ConsumerWidget {
             _Pie(ordenId: ordenId, estado: estado),
           ],
         ),
-      ),
-    );
-  }
-}
-
-class _Encabezado extends StatelessWidget {
-  const _Encabezado({required this.folio, required this.estatus});
-
-  /// En `null` mientras la orden se lee.
-  final String? folio;
-  final EstatusOrdenType? estatus;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final scheme = theme.colorScheme;
-    final folio = this.folio;
-    final estatus = this.estatus;
-
-    return Container(
-      color: scheme.primary,
-      padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
-      child: Row(
-        spacing: 12,
-        children: [
-          Icon(Icons.assignment_rounded, color: scheme.onPrimary),
-          Expanded(
-            child: Text(
-              folio == null ? 'Orden de servicio' : 'Orden $folio',
-              style: theme.textTheme.titleLarge?.copyWith(
-                color: scheme.onPrimary,
-              ),
-            ),
-          ),
-          if (estatus != null)
-            // Sobre el fondo de la superficie y no sobre el primario: la
-            // etiqueta trae su color en el contorno, y sobre azul se perdía.
-            DecoratedBox(
-              decoration: BoxDecoration(
-                color: scheme.surface,
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: EstatusOrdenChip(estatus: estatus),
-            ),
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: Icon(Icons.close_rounded, color: scheme.onPrimary),
-            tooltip: 'Cerrar',
-          ),
-        ],
       ),
     );
   }
@@ -382,39 +338,7 @@ class _SinOrden extends StatelessWidget {
             size: 40,
             color: theme.colorScheme.outline,
           ),
-          Text(
-            'No se pudo abrir la orden.',
-            style: theme.textTheme.bodyMedium,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Lo último que falló, a la vista y no en un diálogo encima de otro.
-class _Aviso extends StatelessWidget {
-  const _Aviso({required this.mensaje});
-
-  final String mensaje;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      color: scheme.errorContainer,
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-      child: Row(
-        spacing: 10,
-        children: [
-          Icon(Icons.error_outline_rounded, color: scheme.onErrorContainer),
-          Expanded(
-            child: Text(
-              mensaje,
-              style: TextStyle(color: scheme.onErrorContainer),
-            ),
-          ),
+          Text('No se pudo abrir la orden.', style: theme.textTheme.bodyMedium),
         ],
       ),
     );

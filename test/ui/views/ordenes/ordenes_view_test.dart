@@ -1,10 +1,11 @@
+import 'dart:typed_data';
+
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
-import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
@@ -14,7 +15,10 @@ import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/historial/orden_historial_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/historial/view_model/orden_historial_view_model.dart';
+import 'package:gestion_lavanderia/services/ticket/salida_ticket.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/ticket/orden_ticket_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/ticket/view_model/orden_ticket_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
@@ -360,25 +364,41 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Historial · Orden $folio'), findsOneWidget);
-    expect(find.byType(DialogoPendiente), findsNothing);
   });
 
-  group('lo que todavía está por portar', () {
-    testWidgets('el ticket avisa y dice de qué orden es', (tester) async {
-      final clienteId = await crearCliente(nombres: 'Lucía');
-      final folio = await crearOrden(clienteId: clienteId);
+  testWidgets('ver el ticket abre el de esa orden', (tester) async {
+    // Sin PDFium en las pruebas: la vista previa es una lista vacía.
+    instance.registerLazySingleton<VistaPreviaPdf>(
+      () => const _VistaPreviaVacia(),
+    );
+    final clienteId = await crearCliente(nombres: 'Lucía');
+    final folio = await crearOrden(clienteId: clienteId);
 
-      await abrirModulo(tester);
+    await abrirModulo(tester);
 
-      // Son tres acciones, así que la tabla las agrupa en un menú.
-      await tester.tap(find.byType(PopupMenuButton<TableAction>));
-      await tester.pumpAndSettle();
+    await tester.tap(find.byType(PopupMenuButton<TableAction>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver ticket de la orden'));
+    await tester.pump();
 
-      await tester.tap(find.text('Ver ticket de la orden'));
-      await tester.pumpAndSettle();
+    final dialogo = tester.widget<OrdenTicketDialog>(
+      find.byType(OrdenTicketDialog),
+    );
+    await tester.runAsync(
+      () => ProviderScope.containerOf(
+        tester.element(find.byType(OrdenTicketDialog)),
+      ).read(ordenTicketViewModelProvider(dialogo.ordenId).notifier).cargar(),
+    );
+    await tester.pumpAndSettle();
 
-      expect(find.byType(DialogoPendiente), findsOneWidget);
-      expect(find.text('Orden $folio · Lucía Pérez'), findsOneWidget);
-    });
+    expect(find.text('Ticket · Orden $folio'), findsOneWidget);
   });
+}
+
+/// La vista previa sin PDFium, que en las pruebas no existe.
+class _VistaPreviaVacia extends VistaPreviaPdf {
+  const _VistaPreviaVacia();
+
+  @override
+  Future<List<Uint8List>> paginas(Uint8List pdf) async => const [];
 }

@@ -35,6 +35,10 @@ sealed class EmpresaData with _$EmpresaData {
     /// Contraseña del modo administrador.
     @Default('') String password,
     @Default(DireccionData()) DireccionData direccion,
+
+    /// La cuenta desde la que se envían los tickets. Vacía mientras no se
+    /// configure.
+    @Default(CorreoEnvioData()) CorreoEnvioData correoEnvio,
     DateTime? fechaCreacion,
     DateTime? fechaActualizacion,
   }) = _EmpresaData;
@@ -45,6 +49,53 @@ sealed class EmpresaData with _$EmpresaData {
   bool get esNueva => id == 0;
 
   bool get tieneLogo => logo != null && logo!.isNotEmpty;
+}
+
+/// La cuenta de correo desde la que la lavandería envía los tickets.
+///
+/// Es opcional: sin ella todo funciona y sólo el envío por correo pide que se
+/// configure. Por eso hay dos estados que importan, y no uno: [vacia] —nadie la
+/// ha tocado, y eso está bien— y [completa] —se puede enviar—. Lo que queda en
+/// medio es una captura a medias, que la validación no deja guardar.
+@freezed
+sealed class CorreoEnvioData with _$CorreoEnvioData {
+  const CorreoEnvioData._();
+
+  const factory CorreoEnvioData({
+    /// El servidor SMTP: `smtp.gmail.com`.
+    @Default('') String servidor,
+
+    /// `0` mientras no se ha escrito ninguno.
+    @Default(0) int puerto,
+
+    /// La dirección de la cuenta, que es también con la que se inicia sesión
+    /// en el servidor y la que el cliente ve como remitente.
+    @Default('') String usuario,
+
+    /// La contraseña de aplicación de la cuenta. No viaja a la base: la guarda
+    /// cifrada `SecretosCorreo`, y el datasource la junta aquí al leer.
+    @Default('') String password,
+  }) = _CorreoEnvioData;
+
+  /// El puerto en el que el servidor espera TLS desde el saludo. En cualquier
+  /// otro —el 587 de siempre— la conexión empieza en claro y se cifra con
+  /// STARTTLS.
+  static const int puertoSsl = 465;
+
+  bool get vacia =>
+      servidor.trim().isEmpty &&
+      puerto == 0 &&
+      usuario.trim().isEmpty &&
+      password.isEmpty;
+
+  bool get completa =>
+      servidor.trim().isNotEmpty &&
+      puerto > 0 &&
+      usuario.trim().isNotEmpty &&
+      password.isNotEmpty;
+
+  /// El puerto como lo escribe el usuario: vacío mientras no hay nada.
+  String get puertoTexto => puerto == 0 ? '' : '$puerto';
 }
 
 /// Dirección de la empresa.

@@ -18,4 +18,15 @@ class ConfiguracionEmpresa extends Table
 
   /// Contraseña para el acceso administrativo.
   TextColumn get password => text()();
+
+  /// La cuenta desde la que se envían los tickets por correo: servidor SMTP,
+  /// puerto y usuario. Vacíos mientras no se configure, que es lo normal: el
+  /// correo es opcional.
+  ///
+  /// La contraseña de esa cuenta no está aquí: se guarda cifrada fuera de la
+  /// base —`SecretosCorreo`—, porque `app.db` es un archivo que cualquiera
+  /// con acceso al equipo puede abrir.
+  TextColumn get smtpServidor => text().withDefault(const Constant(''))();
+  IntColumn get smtpPuerto => integer().withDefault(const Constant(0))();
+  TextColumn get smtpUsuario => text().withDefault(const Constant(''))();
 }

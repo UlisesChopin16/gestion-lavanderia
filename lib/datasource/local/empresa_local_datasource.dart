@@ -4,6 +4,7 @@ import 'package:gestion_lavanderia/data/local/configuracion_empresa/configuracio
 import 'package:gestion_lavanderia/data/local/configuracion_empresa/direccion_dao.dart';
 import 'package:gestion_lavanderia/data/local/configuracion_empresa/empresa_data_mapper.dart';
 import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
+import 'package:gestion_lavanderia/services/secretos_correo.dart';
 
 export 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 
@@ -14,12 +15,22 @@ export 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_dat
 /// que insertar primero la empresa para tener su id: si esa segunda inserción
 /// falla fuera de una transacción, queda una empresa sin dirección y el ticket
 /// se imprime incompleto.
+///
+/// La contraseña de la cuenta de correo es la excepción: no vive en la base
+/// sino en [SecretosCorreo], cifrada. Para la pantalla da igual, porque aquí se
+/// junta con lo demás al leer y se separa al guardar.
 class EmpresaLocalDatasource {
-  const EmpresaLocalDatasource(this._db, this._empresa, this._direcciones);
+  const EmpresaLocalDatasource(
+    this._db,
+    this._empresa,
+    this._direcciones,
+    this._secretos,
+  );
 
   final AppDatabase _db;
   final ConfiguracionEmpresaDao _empresa;
   final DireccionDao _direcciones;
+  final SecretosCorreo _secretos;
 
   /// La aplicación maneja una sola empresa, la del registro más bajo.
   static const _empresaId = 1;
@@ -35,7 +46,15 @@ class EmpresaLocalDatasource {
 
     if (configuracion == null) return null;
 
-    return configuracion.toData(await _direcciones.getByEmpresaId(_empresaId));
+    final empresa = configuracion.toData(
+      await _direcciones.getByEmpresaId(_empresaId),
+    );
+
+    return empresa.copyWith(
+      correoEnvio: empresa.correoEnvio.copyWith(
+        password: await _secretos.password(),
+      ),
+    );
   }
 
   /// Guarda la empresa y su dirección, dando de alta lo que todavía no exista.
@@ -43,8 +62,12 @@ class EmpresaLocalDatasource {
   /// Sirve para el alta y para la edición: decide por lo que hay en la base en
   /// vez de pedirle a la pantalla que lo sepa, porque la pantalla de
   /// configuración es la misma la primera vez y todas las siguientes.
-  Future<void> guardar(EmpresaData empresa) {
-    return _db.transaction(() async {
+  ///
+  /// La contraseña del correo se guarda al final, cuando la base ya aceptó lo
+  /// demás: si la transacción falla, no queda una contraseña nueva junto a
+  /// una cuenta vieja.
+  Future<void> guardar(EmpresaData empresa) async {
+    await _db.transaction(() async {
       final fila = empresa.toCompanion();
       final actual = await _empresa.getById(_empresaId);
 
@@ -70,5 +93,7 @@ class EmpresaLocalDatasource {
 
       await _direcciones.updateDireccion(id: actualDireccion.id, row: row);
     });
+
+    await _secretos.guardarPassword(empresa.correoEnvio.password);
   }
 }

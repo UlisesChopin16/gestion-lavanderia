@@ -113,9 +113,20 @@ void main() {
     return orden.id;
   }
 
-  /// Deja la base como la versión 3: sin la columna que guarda con cuánto pagó
-  /// el cliente en efectivo.
+  /// Deja la base como la versión 4: sin la cuenta de correo de la empresa.
+  Future<void> degradarAVersion4(AppDatabase db) async {
+    for (final columna in ['smtp_servidor', 'smtp_puerto', 'smtp_usuario']) {
+      await db.customStatement(
+        'ALTER TABLE configuracion_empresa DROP COLUMN $columna',
+      );
+    }
+    await db.customStatement('PRAGMA user_version = 4');
+  }
+
+  /// Deja la base como la versión 3: además de lo anterior, sin la columna que
+  /// guarda con cuánto pagó el cliente en efectivo.
   Future<void> degradarAVersion3(AppDatabase db) async {
+    await degradarAVersion4(db);
     await db.customStatement('ALTER TABLE orden_history DROP COLUMN recibido');
     await db.customStatement('PRAGMA user_version = 3');
   }
@@ -146,7 +157,45 @@ void main() {
     await db.customStatement('PRAGMA user_version = 1');
   }
 
-  test('migra de la versión 3 a la 4 sin tocar los pagos de antes', () async {
+  test(
+    'migra de la versión 4 a la 5 sin tocar los datos de la empresa',
+    () async {
+      var db = abrir();
+      await db.configuracionEmpresaDao.insertConfig(
+        ConfiguracionEmpresaCompanion.insert(
+          nombre: 'Lavandería El Sol',
+          telefono: '5551234567',
+          correo: 'sol@example.com',
+          paginaWeb: '',
+          color: 0xFF2196F3,
+          password: 'secreta',
+          fechaCreacion: DateTime.now(),
+        ),
+      );
+      await degradarAVersion4(db);
+      await db.close();
+
+      db = abrir();
+      addTearDown(db.close);
+
+      expect(await versionDe(db), 5);
+      expect(
+        await columnasDe(db, 'configuracion_empresa'),
+        containsAll(['smtp_servidor', 'smtp_puerto', 'smtp_usuario']),
+      );
+
+      // La empresa sigue igual, y la cuenta de correo nace vacía: sin
+      // configurar, que es lo que era.
+      final empresa = await db.configuracionEmpresaDao.getById(1);
+      expect(empresa?.nombre, 'Lavandería El Sol');
+      expect(empresa?.password, 'secreta');
+      expect(empresa?.smtpServidor, '');
+      expect(empresa?.smtpPuerto, 0);
+      expect(empresa?.smtpUsuario, '');
+    },
+  );
+
+  test('migra de la versión 3 a la 5 sin tocar los pagos de antes', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await db.ordenHistoryDao.insertHistory(
@@ -164,8 +213,12 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 4);
+    expect(await versionDe(db), 5);
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
+    expect(
+      await columnasDe(db, 'configuracion_empresa'),
+      contains('smtp_servidor'),
+    );
 
     final antes = await db.ordenHistoryDao.getHistoryByOrden(ordenId);
     expect(antes.single.monto, 50);
@@ -189,7 +242,7 @@ void main() {
     expect(despues.first.recibido, 100);
   });
 
-  test('migra de la versión 2 a la 4', () async {
+  test('migra de la versión 2 a la 5', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion2(db);
@@ -198,9 +251,13 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 4);
+    expect(await versionDe(db), 5);
     expect(await indicesDe(db), contains('idx_item_history'));
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
+    expect(
+      await columnasDe(db, 'configuracion_empresa'),
+      contains('smtp_servidor'),
+    );
 
     final items = await db.itemServicioOrdenDao.getItemsByOrden(ordenId);
     expect(items, hasLength(1));
@@ -212,7 +269,7 @@ void main() {
     expect(items.single.item.ordenHistoryId, isNull);
   });
 
-  test('migra de la versión 1 a la 4 y crea todos los índices', () async {
+  test('migra de la versión 1 a la 5 y crea todos los índices', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion1(db);
@@ -221,7 +278,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 4);
+    expect(await versionDe(db), 5);
     expect(
       await indicesDe(db),
       containsAll([
@@ -237,16 +294,20 @@ void main() {
       ]),
     );
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
+    expect(
+      await columnasDe(db, 'configuracion_empresa'),
+      contains('smtp_servidor'),
+    );
 
     final items = await db.itemServicioOrdenDao.getItemsByOrden(ordenId);
     expect(items.single.item.fechaEntregado, DateTime(2026, 10, 17, 9, 30));
   });
 
-  test('una base nueva nace en la versión 4 y no migra', () async {
+  test('una base nueva nace en la versión 5 y no migra', () async {
     final db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 4);
+    expect(await versionDe(db), 5);
     expect(await indicesDe(db), contains('idx_item_history'));
   });
 }

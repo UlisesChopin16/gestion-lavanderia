@@ -27,6 +27,12 @@ extension ConfiguracionEmpresaEntryToData on ConfiguracionEmpresaEntry {
     color: Color(color),
     password: password,
     direccion: direccion?.toData() ?? const DireccionData(),
+    // Sin la contraseña: no está en la fila. La junta el datasource.
+    correoEnvio: CorreoEnvioData(
+      servidor: smtpServidor,
+      puerto: smtpPuerto,
+      usuario: smtpUsuario,
+    ),
     fechaCreacion: fechaCreacion,
     fechaActualizacion: fechaActualizacion,
   );
@@ -61,6 +67,11 @@ extension EmpresaDataToCompanion on EmpresaData {
     logo: Value(logo),
     color: Value(color.toARGB32()),
     password: Value(password),
+    // La contraseña del correo no se escribe aquí: va cifrada fuera de la
+    // base.
+    smtpServidor: Value(correoEnvio.servidor.trim()),
+    smtpPuerto: Value(correoEnvio.puerto),
+    smtpUsuario: Value(correoEnvio.usuario.trim()),
   );
 
   /// La dirección, sin `empresaId`.

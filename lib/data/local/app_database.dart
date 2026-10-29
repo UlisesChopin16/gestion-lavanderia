@@ -39,7 +39,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 4;
+  int get schemaVersion => 5;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -47,6 +47,7 @@ class AppDatabase extends _$AppDatabase {
       if (from < 2) await _migrarAVersion2(m);
       if (from < 3) await _migrarAVersion3(m);
       if (from < 4) await _migrarAVersion4(m);
+      if (from < 5) await _migrarAVersion5(m);
     },
     beforeOpen: (details) async {
       // Las tablas declaran `references`, pero SQLite no las hace cumplir si
@@ -91,6 +92,16 @@ class AppDatabase extends _$AppDatabase {
   /// el monto sería inventar que todos pagaron justo.
   Future<void> _migrarAVersion4(Migrator m) async {
     await m.addColumn(ordenHistory, ordenHistory.recibido);
+  }
+
+  /// Versión 5: la cuenta de correo desde la que se envían los tickets.
+  ///
+  /// Las tres columnas nacen vacías —servidor y usuario en blanco, puerto en
+  /// cero—, que es como se lee "el correo no está configurado".
+  Future<void> _migrarAVersion5(Migrator m) async {
+    await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpServidor);
+    await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpPuerto);
+    await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpUsuario);
   }
 
   /// Los índices que el esquema tenía en la versión 2.

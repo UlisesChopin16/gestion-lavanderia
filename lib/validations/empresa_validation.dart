@@ -20,6 +20,10 @@ enum CampoEmpresa {
   codigoPostal,
   ciudad,
   estado,
+  smtpServidor,
+  smtpPuerto,
+  smtpUsuario,
+  smtpPassword,
 }
 
 /// Los campos mal capturados, con el motivo de cada uno.
@@ -71,6 +75,9 @@ class ErroresEmpresa {
 const int _codigoPostalMinimo = 1000;
 const int _codigoPostalMaximo = 99999;
 
+/// El puerto más alto que existe: el campo es de 16 bits.
+const int _puertoMaximo = 65535;
+
 /// Los dígitos de un teléfono. El campo ya no deja escribir más, pero una
 /// captura a medias llega hasta aquí.
 const int _digitosTelefono = 10;
@@ -79,10 +86,17 @@ const int _digitosTelefono = 10;
 ///
 /// `paginaWeb` y el número interior no aparecen porque son opcionales, y el
 /// correo sólo se revisa si trae algo.
+///
+/// La cuenta de correo para enviar tickets también es opcional, pero va
+/// completa o no va: con un campo escrito se piden los cuatro, porque una
+/// cuenta a medias no envía nada y el error saldría hasta el mostrador, con
+/// un cliente esperando su ticket.
 ErroresEmpresa validarEmpresa(EmpresaData empresa) {
   final direccion = empresa.direccion;
   final telefono = empresa.telefono.trim();
   final correo = empresa.correo.trim();
+  final cuenta = empresa.correoEnvio;
+  final usuario = cuenta.usuario.trim();
 
   return ErroresEmpresa({
     if (empresa.nombre.trim().isEmpty)
@@ -110,5 +124,19 @@ ErroresEmpresa validarEmpresa(EmpresaData empresa) {
       CampoEmpresa.ciudad: 'La ciudad es obligatoria',
     if (direccion.estado.trim().isEmpty)
       CampoEmpresa.estado: 'El estado es obligatorio',
+    if (!cuenta.vacia) ...{
+      if (cuenta.servidor.trim().isEmpty)
+        CampoEmpresa.smtpServidor: 'Falta el servidor de correo',
+      if (cuenta.puerto <= 0)
+        CampoEmpresa.smtpPuerto: 'Falta el puerto'
+      else if (cuenta.puerto > _puertoMaximo)
+        CampoEmpresa.smtpPuerto: 'El puerto no es válido',
+      if (usuario.isEmpty)
+        CampoEmpresa.smtpUsuario: 'Falta el correo de la cuenta'
+      else if (!usuario.isEmail)
+        CampoEmpresa.smtpUsuario: 'El correo no es válido',
+      if (cuenta.password.isEmpty)
+        CampoEmpresa.smtpPassword: 'Falta la contraseña de aplicación',
+    },
   });
 }

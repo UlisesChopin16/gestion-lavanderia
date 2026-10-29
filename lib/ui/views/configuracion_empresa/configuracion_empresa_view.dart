@@ -9,7 +9,8 @@ import 'package:gestion_lavanderia/ui/views/configuracion_empresa/widgets/widget
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
-/// Los datos de la lavandería: contacto, logo, color, contraseña y dirección.
+/// Los datos de la lavandería: contacto, logo, color, contraseña, dirección y
+/// la cuenta de correo desde la que se envían los tickets.
 ///
 /// Es la misma pantalla la primera vez y todas las siguientes. Cuando ya hay
 /// configuración guardada arranca protegida —se desbloquea con la contraseña—,
@@ -87,8 +88,12 @@ class ConfiguracionEmpresaView extends ConsumerWidget {
                               _Aviso(mensaje: mensajeError),
                             if (!editable) const _BarraProtegida(),
                             _Encabezado(anchoCampo: ancho, altoLogo: _altoLogo),
-                            const _SeparadorDireccion(),
+                            const _Separador(titulo: 'Dirección de la empresa'),
                             DatosDireccionForm(anchoCampo: ancho),
+                            const _Separador(
+                              titulo: 'Correo para enviar tickets',
+                            ),
+                            DatosCorreoForm(anchoCampo: ancho),
                           ],
                         ),
                       ),
@@ -263,9 +268,11 @@ class _BotonesEdicion extends ConsumerWidget {
   }
 }
 
-/// El título de la sección de la dirección, entre dos líneas.
-class _SeparadorDireccion extends StatelessWidget {
-  const _SeparadorDireccion();
+/// El título de una sección del formulario, entre dos líneas.
+class _Separador extends StatelessWidget {
+  const _Separador({required this.titulo});
+
+  final String titulo;
 
   @override
   Widget build(BuildContext context) {
@@ -277,7 +284,7 @@ class _SeparadorDireccion extends StatelessWidget {
         const Expanded(child: Divider()),
         Flexible(
           child: Text(
-            'Dirección de la empresa',
+            titulo,
             textAlign: TextAlign.center,
             style: theme.textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.bold,

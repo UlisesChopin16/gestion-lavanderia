@@ -60,6 +60,8 @@ dependencies:
   material_color_utilities: ^0.13.0
   path: ^1.9.1
   path_provider: ^2.1.5
+  pdf: ^3.13.1
+  printing: ^5.15.1
   riverpod_annotation: ^3.0.0-dev.17
   shared_preferences: ^2.5.3
 

@@ -40,6 +40,10 @@ sealed class ConfiguracionEmpresaState with _$ConfiguracionEmpresaState {
     @Default(true) bool editable,
     @Default(false) bool passwordVisible,
 
+    /// Lo mismo para la contraseña de la cuenta de correo. Va aparte: mostrar
+    /// una no tiene por qué destapar la otra.
+    @Default(false) bool passwordCorreoVisible,
+
     /// Los campos que están mal, con el motivo de cada uno.
     @Default(ErroresEmpresa.ninguno()) ErroresEmpresa errores,
 
@@ -89,6 +93,7 @@ class ConfiguracionEmpresaViewModel extends _$ConfiguracionEmpresaViewModel {
         empresa: empresa ?? const EmpresaData(),
         editable: empresa == null,
         passwordVisible: false,
+        passwordCorreoVisible: false,
         errores: const ErroresEmpresa.ninguno(),
       );
     } catch (error, stackTrace) {
@@ -121,6 +126,9 @@ class ConfiguracionEmpresaViewModel extends _$ConfiguracionEmpresaViewModel {
   void cambiarDireccion(DireccionData direccion) =>
       _editar(state.empresa.copyWith(direccion: direccion));
 
+  void cambiarCorreoEnvio(CorreoEnvioData correoEnvio) =>
+      _editar(state.empresa.copyWith(correoEnvio: correoEnvio));
+
   /// Pide una imagen y la deja guardada como logo.
   ///
   /// Cerrar el diálogo sin elegir no es un error ni borra el logo actual.
@@ -142,6 +150,12 @@ class ConfiguracionEmpresaViewModel extends _$ConfiguracionEmpresaViewModel {
     if (!state.editable) return;
 
     state = state.copyWith(passwordVisible: !state.passwordVisible);
+  }
+
+  void alternarPasswordCorreoVisible() {
+    if (!state.editable) return;
+
+    state = state.copyWith(passwordCorreoVisible: !state.passwordCorreoVisible);
   }
 
   /// Valida y guarda. Al terminar, el formulario vuelve a quedar protegido.

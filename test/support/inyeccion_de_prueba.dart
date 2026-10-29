@@ -1,6 +1,7 @@
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/inject/app_module.dart';
 import 'package:gestion_lavanderia/services/logo_storage.dart';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Deja el contenedor con las dependencias de la aplicación, cambiando sólo lo
@@ -20,6 +21,9 @@ Future<void> registrarDependenciasDePrueba({
   LogoStorage? logos,
 }) async {
   SharedPreferences.setMockInitialValues({});
+  // El almacén cifrado de la contraseña del correo, en memoria: el de verdad
+  // habla con el sistema operativo.
+  FlutterSecureStorage.setMockInitialValues({});
 
   await instance.reset();
   instance.allowReassignment = true;

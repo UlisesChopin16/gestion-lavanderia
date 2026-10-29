@@ -154,4 +154,45 @@ void main() {
       );
     });
   });
+
+  group('la cuenta de correo', () {
+    const completa = CorreoEnvioData(
+      servidor: 'smtp.gmail.com',
+      puerto: 465,
+      usuario: 'tickets@gmail.com',
+      password: 'abcd efgh ijkl mnop',
+    );
+
+    ErroresEmpresa con(CorreoEnvioData cuenta) =>
+        validarEmpresa(empresaValida.copyWith(correoEnvio: cuenta));
+
+    test('vacía no pide nada: es opcional', () {
+      expect(con(const CorreoEnvioData()).hay, isFalse);
+    });
+
+    test('completa no tiene errores', () {
+      expect(con(completa).hay, isFalse);
+    });
+
+    test('a medias pide lo que falta', () {
+      final errores = con(const CorreoEnvioData(servidor: 'smtp.gmail.com'));
+
+      expect(errores[CampoEmpresa.smtpServidor], isNull);
+      expect(errores[CampoEmpresa.smtpPuerto], isNotNull);
+      expect(errores[CampoEmpresa.smtpUsuario], isNotNull);
+      expect(errores[CampoEmpresa.smtpPassword], isNotNull);
+    });
+
+    test('el puerto tiene que existir', () {
+      final errores = con(completa.copyWith(puerto: 70000));
+
+      expect(errores[CampoEmpresa.smtpPuerto], isNotNull);
+    });
+
+    test('el usuario tiene que ser un correo', () {
+      final errores = con(completa.copyWith(usuario: 'tickets'));
+
+      expect(errores[CampoEmpresa.smtpUsuario], isNotNull);
+    });
+  });
 }

@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
-import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/historial/orden_historial_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/ticket/orden_ticket_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
@@ -216,11 +216,7 @@ class OrdenesView extends ConsumerWidget {
                   label: 'Ver ticket de la orden',
                   icon: IconsManager.selectedOrdenServicioIcon,
                   color: Colors.amber,
-                  onPressed: () => _pendiente(
-                    context,
-                    titulo: 'Ticket de la orden',
-                    orden: orden,
-                  ),
+                  onPressed: () => _verTicket(context, orden),
                 ),
               ],
             ),
@@ -288,19 +284,12 @@ class OrdenesView extends ConsumerWidget {
     );
   }
 
-  /// Lo que todavía no se ha portado de este módulo: el ticket de la orden.
-  /// Sustituirá esta llamada por su diálogo.
-  Future<void> _pendiente(
-    BuildContext context, {
-    required String titulo,
-    required OrdenListadoData orden,
-  }) {
+  /// Abre el ticket de la orden. Descargarlo o enviarlo no cambia la orden,
+  /// así que tampoco hay nada que releer.
+  Future<void> _verTicket(BuildContext context, OrdenListadoData orden) {
     return showDialog<void>(
       context: context,
-      builder: (context) => DialogoPendiente(
-        titulo: titulo,
-        detalle: 'Orden ${orden.folio} · ${orden.cliente}',
-      ),
+      builder: (context) => OrdenTicketDialog(ordenId: orden.id),
     );
   }
 }

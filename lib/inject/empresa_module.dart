@@ -4,9 +4,11 @@ import 'package:gestion_lavanderia/data/local/configuracion_empresa/direccion_da
 import 'package:gestion_lavanderia/datasource/local/empresa_local_datasource.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/services/logo_storage.dart';
+import 'package:gestion_lavanderia/services/secretos_correo.dart';
 
 /// Todo lo que necesita el módulo de configuración de la empresa: los DAO de
-/// la empresa y su dirección, el datasource y el servicio que guarda el logo.
+/// la empresa y su dirección, el datasource, el servicio que guarda el logo y
+/// el que guarda cifrada la contraseña del correo.
 ///
 /// [LogoStorage] está aquí y no en un módulo de servicios porque sólo lo usa
 /// esta pantalla. Está registrado —y no construido donde se usa— porque sale
@@ -25,8 +27,14 @@ class EmpresaModule extends ModuleInject {
         () => instance<AppDatabase>().direccionDao,
       )
       ..registerLazySingleton<EmpresaLocalDatasource>(
-        () => EmpresaLocalDatasource(instance(), instance(), instance()),
+        () => EmpresaLocalDatasource(
+          instance(),
+          instance(),
+          instance(),
+          instance(),
+        ),
       )
-      ..registerLazySingleton<LogoStorage>(LogoStorage.new);
+      ..registerLazySingleton<LogoStorage>(LogoStorage.new)
+      ..registerLazySingleton<SecretosCorreo>(SecretosCorreo.new);
   }
 }

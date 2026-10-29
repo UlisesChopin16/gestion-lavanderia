@@ -2,7 +2,9 @@ import 'package:drift/native.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
+import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/services/logo_storage.dart';
+import 'package:gestion_lavanderia/services/secretos_correo.dart';
 import 'package:gestion_lavanderia/theme/colores_empresa.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/view_model/configuracion_empresa_view_model.dart';
 
@@ -283,6 +285,81 @@ void main() {
       await notificador().cambiarLogo();
 
       expect(estado().empresa.logo, antes);
+    });
+  });
+
+  group('la cuenta de correo', () {
+    const cuenta = CorreoEnvioData(
+      servidor: 'smtp.gmail.com',
+      puerto: 465,
+      usuario: 'tickets@gmail.com',
+      password: 'abcd efgh ijkl mnop',
+    );
+
+    test('se guarda, y la contraseña fuera de la base', () async {
+      await abrirPantalla();
+      capturarEmpresa(notificador());
+      notificador().cambiarCorreoEnvio(cuenta);
+
+      expect(await notificador().guardar(), ResultadoGuardado.guardado);
+
+      final fila = await db.configuracionEmpresaDao.getById(1);
+      expect(fila?.smtpServidor, 'smtp.gmail.com');
+      expect(fila?.smtpPuerto, 465);
+      expect(fila?.smtpUsuario, 'tickets@gmail.com');
+
+      // Ninguna columna de la base guarda la contraseña del correo...
+      final columnas = await db
+          .customSelect('PRAGMA table_info(configuracion_empresa)')
+          .map((columna) => columna.read<String>('name'))
+          .get();
+      expect(columnas.where((c) => c.startsWith('smtp')), hasLength(3));
+
+      // ...vive en el almacén cifrado.
+      expect(
+        await instance<SecretosCorreo>().password(),
+        'abcd efgh ijkl mnop',
+      );
+    });
+
+    test('al volver a entrar se lee completa', () async {
+      await abrirPantalla();
+      capturarEmpresa(notificador());
+      notificador().cambiarCorreoEnvio(cuenta);
+      await notificador().guardar();
+
+      container.dispose();
+      container = ProviderContainer();
+      addTearDown(container.dispose);
+      await notificador().cargar();
+
+      expect(estado().empresa.correoEnvio, cuenta);
+    });
+
+    test('a medias no se guarda y marca lo que falta', () async {
+      await abrirPantalla();
+      capturarEmpresa(notificador());
+      notificador().cambiarCorreoEnvio(
+        const CorreoEnvioData(servidor: 'smtp.gmail.com'),
+      );
+
+      expect(await notificador().guardar(), ResultadoGuardado.camposInvalidos);
+      expect(estado().errorDe(CampoEmpresa.smtpPassword), isNotNull);
+      expect(await db.configuracionEmpresaDao.getById(1), isNull);
+    });
+
+    test('quitar la cuenta borra su contraseña', () async {
+      await abrirPantalla();
+      capturarEmpresa(notificador());
+      notificador().cambiarCorreoEnvio(cuenta);
+      await notificador().guardar();
+
+      notificador()
+        ..habilitarEdicion('admin')
+        ..cambiarCorreoEnvio(const CorreoEnvioData());
+      await notificador().guardar();
+
+      expect(await instance<SecretosCorreo>().password(), isEmpty);
     });
   });
 }

@@ -20,6 +20,10 @@ export 'package:gestion_lavanderia/types/metodo_pago_type.dart';
 part 'orden_dialog_view_model.freezed.dart';
 part 'orden_dialog_view_model.g.dart';
 
+/// Con qué quedó registrada una orden nueva: su id, para abrirla, y su folio,
+/// para nombrarla.
+typedef OrdenCreada = ({int id, String folio});
+
 @freezed
 sealed class OrdenDialogState with _$OrdenDialogState {
   const OrdenDialogState._();
@@ -27,8 +31,7 @@ sealed class OrdenDialogState with _$OrdenDialogState {
   const factory OrdenDialogState({
     /// El catálogo del que se eligen las prendas: los conceptos vigentes.
     @Default(Filas<PrecioData>()) Filas<PrecioData> conceptos,
-    @Default(Filas<CategoriaData>())
-    Filas<CategoriaData> categorias,
+    @Default(Filas<CategoriaData>()) Filas<CategoriaData> categorias,
 
     /// Con qué se está acotando el catálogo.
     @Default('') String busquedaConcepto,
@@ -107,11 +110,8 @@ sealed class OrdenDialogState with _$OrdenDialogState {
   }
 
   /// Las cuentas del adelanto cuando se paga en efectivo.
-  CobroEnEfectivo get efectivo => CobroEnEfectivo(
-    metodoPago: metodoPago,
-    abono: abono,
-    recibido: recibido,
-  );
+  CobroEnEfectivo get efectivo =>
+      CobroEnEfectivo(metodoPago: metodoPago, abono: abono, recibido: recibido);
 
   /// Una orden necesita cliente y al menos una prenda. Lo demás tiene valor de
   /// omisión: sin abono queda en curso, que es el caso normal. Lo único que la
@@ -157,6 +157,9 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     try {
       final conceptos = await _precios.activos();
       final categorias = await _categorias.todas();
+      // Los recientes, para que el buscador de clientes tenga qué ofrecer en
+      // cuanto se toque, antes de escribir nada.
+      final recientes = await _clientes.recientes();
 
       if (!ref.mounted) return;
 
@@ -164,6 +167,7 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
         cargando: false,
         conceptos: Filas(conceptos),
         categorias: Filas(categorias),
+        encontrados: Filas(recientes),
       );
     } catch (error, stackTrace) {
       _fallar(error, stackTrace, 'No se pudo leer el catálogo de conceptos.');
@@ -180,18 +184,16 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
 
   /// Busca al cliente por nombre, teléfono o correo.
   ///
-  /// Con el buscador vacío no se listan todos: la lista de resultados está
-  /// para reconocer a uno, no para hojear el catálogo de clientes.
+  /// Con el buscador vacío no se listan todos —la lista está para reconocer a
+  /// uno, no para hojear el catálogo—, sino los recientes: los que dejaron
+  /// una orden hace poco, que son los que más probablemente vuelven.
   Future<void> buscarCliente(String texto) async {
     state = state.copyWith(busquedaCliente: texto, mensajeError: '');
 
-    if (texto.trim().isEmpty) {
-      state = state.copyWith(encontrados: const Filas<ClienteData>());
-      return;
-    }
-
     try {
-      final encontrados = await _clientes.buscar(texto);
+      final encontrados = texto.trim().isEmpty
+          ? await _clientes.recientes()
+          : await _clientes.buscar(texto);
 
       if (!ref.mounted) return;
 
@@ -216,8 +218,13 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
   /// Es lo que hace que registrar a un cliente desde aquí no obligue a
   /// buscarlo otra vez: se acaba de capturar con el dato que se tecleó, así
   /// que casi siempre es el único que responde a esa búsqueda.
+  ///
+  /// Sin nada escrito no se elige a nadie: la lista es la de recientes, y que
+  /// tenga uno solo no dice que sea el que se acaba de registrar.
   Future<void> repetirBusquedaDeCliente() async {
     await buscarCliente(state.busquedaCliente);
+
+    if (state.busquedaCliente.trim().isEmpty) return;
 
     final encontrados = state.encontrados;
     if (encontrados.length == 1) elegirCliente(encontrados.first);
@@ -307,13 +314,14 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     state = state.copyWith(descripcion: descripcion);
   }
 
-  /// Escribe la orden. Devuelve el folio con el que quedó registrada, o
+  /// Escribe la orden. Devuelve con qué id y qué folio quedó registrada, o
   /// `null` si no se pudo guardar.
   ///
-  /// Se devuelve el folio y no un `true` porque es lo que hace falta para
-  /// confirmar el alta por su nombre: el `AAMM-NNNN` lo pone la base al
-  /// insertar, y es el número que el cliente se lleva en el ticket.
-  Future<String?> guardar() async {
+  /// Se devuelven los dos y no un `true` porque el listado necesita ambos: el
+  /// folio para confirmar el alta por su nombre —el `AAMM-NNNN` lo pone la
+  /// base al insertar, y es el número que el cliente se lleva—, y el id para
+  /// abrir enseguida el ticket de la orden.
+  Future<OrdenCreada?> guardar() async {
     final cliente = state.cliente;
     if (cliente == null || state.items.isEmpty) return null;
 
@@ -331,11 +339,13 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
         recibido: state.efectivo.aGuardar,
       );
 
-      if (!ref.mounted) return orden.folio;
+      final creada = (id: orden.id, folio: orden.folio);
+
+      if (!ref.mounted) return creada;
 
       state = state.copyWith(guardando: false);
 
-      return orden.folio;
+      return creada;
     } catch (error, stackTrace) {
       _fallar(error, stackTrace, 'No se pudo crear la orden.');
 

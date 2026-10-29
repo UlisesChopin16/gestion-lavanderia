@@ -32,9 +32,9 @@ import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/widgets/widgets.dart
 /// queda con la ventana hasta un tope, porque amontonar dos listas y un cobro
 /// en el ancho de un formulario es lo que hacía lenta la captura.
 ///
-/// Se cierra devolviendo el folio de la orden cuando quedó guardada, y `null`
-/// cuando se salió sin guardar: el listado lo usa para releerse y para decir
-/// con qué número quedó registrada.
+/// Se cierra devolviendo con qué id y folio quedó la orden, o `null` cuando se
+/// salió sin guardar: el listado lo usa para releerse, para decir con qué
+/// número quedó registrada y para abrir su ticket.
 class OrdenDialog extends ConsumerWidget {
   const OrdenDialog({super.key});
 
@@ -406,13 +406,13 @@ class _Pie extends ConsumerWidget {
   }
 
   Future<void> _guardar(BuildContext context, WidgetRef ref) async {
-    final folio = await ref
+    final creada = await ref
         .read(ordenDialogViewModelProvider.notifier)
         .guardar();
 
-    if (folio == null || !context.mounted) return;
+    if (creada == null || !context.mounted) return;
 
-    Navigator.of(context).pop(folio);
+    Navigator.of(context).pop(creada);
   }
 }
 

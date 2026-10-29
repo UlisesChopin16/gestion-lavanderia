@@ -38,6 +38,11 @@ class ClientesLocalDatasource {
   Future<List<ClienteData>> buscar(String info) async =>
       (await _dao.getClientesByInfo(info)).toData();
 
+  /// Los clientes con orden más reciente, y si faltan, los registrados más
+  /// recientemente. Ver `ClientesDao.getRecientes`.
+  Future<List<ClienteData>> recientes({int limite = 8}) async =>
+      (await _dao.getRecientes(limite)).toData();
+
   /// Guarda el cliente y devuelve su id: lo da de alta si es nuevo y lo
   /// actualiza si ya existía.
   ///

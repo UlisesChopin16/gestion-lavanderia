@@ -1,6 +1,9 @@
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
@@ -23,9 +26,9 @@ void main() {
 
   late AppDatabase db;
 
-  /// El folio que el diálogo devolvió al cerrarse, o `null` si se salió
-  /// sin guardar.
-  String? resultado;
+  /// Con qué quedó la orden que el diálogo devolvió al cerrarse, o `null` si
+  /// se salió sin guardar.
+  OrdenCreada? resultado;
 
   Future<void> sembrarCatalogo() async {
     final categoriaId = await db.categoriaServicioDao.insertCategoria(
@@ -89,7 +92,7 @@ void main() {
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () async {
-                  resultado = await showDialog<String>(
+                  resultado = await showDialog<OrdenCreada>(
                     context: context,
                     builder: (context) => const OrdenDialog(),
                   );
@@ -287,7 +290,10 @@ void main() {
     await tester.tap(find.text('Cobija'));
     await tester.pumpAndSettle();
     await tester.enterText(
-      find.ancestor(of: find.text('Adelanto'), matching: find.byType(TextField)),
+      find.ancestor(
+        of: find.text('Adelanto'),
+        matching: find.byType(TextField),
+      ),
       '100',
     );
     await tester.pumpAndSettle();
@@ -331,7 +337,12 @@ void main() {
     final adelanto = campo('Adelanto');
     final recibe = campo('Recibe');
     final cambio = tester.getRect(
-      find.ancestor(of: find.text('Sin cambio'), matching: find.byType(Container)).first,
+      find
+          .ancestor(
+            of: find.text('Sin cambio'),
+            matching: find.byType(Container),
+          )
+          .first,
     );
 
     // Mismo alto que los controles de arriba.
@@ -454,6 +465,135 @@ void main() {
     expect(dentro, greaterThanOrEqualTo(4));
   });
 
+  group('los clientes encontrados', () {
+    const etiqueta = 'Buscar por nombre, teléfono o correo';
+
+    testWidgets('flotan sobre el alta, sin mover lo de abajo', (tester) async {
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+
+      final prendasAntes = tester.getTopLeft(find.text('Prendas'));
+
+      await buscar(tester, etiqueta, 'Lucía');
+
+      expect(find.text('Lucía Pérez'), findsOneWidget);
+      expect(tester.getTopLeft(find.text('Prendas')), prendasAntes);
+
+      // La lista arranca justo debajo del campo, y mide lo que el campo.
+      final campo = tester.getRect(
+        find.ancestor(
+          of: find.text(etiqueta),
+          matching: find.byType(TextField),
+        ),
+      );
+      final lista = tester.getRect(
+        find.ancestor(
+          of: find.text('Lucía Pérez'),
+          matching: find.byType(ListView),
+        ),
+      );
+      expect(lista.top, greaterThanOrEqualTo(campo.bottom));
+      expect(lista.width, closeTo(campo.width, 1));
+    });
+
+    testWidgets('al tocar el buscador ofrece los recientes', (tester) async {
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+
+      expect(find.text('Lucía Pérez'), findsNothing);
+
+      await tester.tap(find.text(etiqueta));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Clientes recientes'), findsOneWidget);
+      expect(find.text('Lucía Pérez'), findsOneWidget);
+    });
+
+    testWidgets('en Windows, tocar un cliente lo elige y queda su ficha', (
+      tester,
+    ) async {
+      // En escritorio, tocar fuera de un campo de texto le quita el foco: sin
+      // compartir grupo con la lista, la lista se escondía al presionar y el
+      // toque no llegaba al cliente.
+      debugDefaultTargetPlatformOverride = TargetPlatform.windows;
+      addTearDown(() => debugDefaultTargetPlatformOverride = null);
+
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+      await buscar(tester, etiqueta, 'Lucía');
+
+      // Como un clic de verdad: entre presionar y soltar se dibuja un cuadro.
+      // Con `tap`, que suelta en el acto, la lista no alcanzaba a esconderse
+      // y el error no se veía.
+      final clic = await tester.startGesture(
+        tester.getCenter(find.text('Lucía Pérez')),
+        kind: PointerDeviceKind.mouse,
+      );
+      await tester.pump();
+      await clic.up();
+      await tester.pumpAndSettle();
+
+      // La ficha del cliente elegido, con su botón para cambiarlo.
+      expect(find.text('Lucía Pérez'), findsOneWidget);
+      expect(find.widgetWithText(TextButton, 'Cambiar'), findsOneWidget);
+      expect(find.text(etiqueta), findsNothing);
+
+      debugDefaultTargetPlatformOverride = null;
+    });
+
+    testWidgets('Esc cierra la lista, no el alta', (tester) async {
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+      await buscar(tester, etiqueta, 'Lucía');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lucía Pérez'), findsNothing);
+      expect(find.byType(OrdenDialog), findsOneWidget);
+
+      // Tocar el campo la vuelve a abrir...
+      await tester.tap(find.text('Lucía'));
+      await tester.pumpAndSettle();
+      expect(find.text('Lucía Pérez'), findsOneWidget);
+
+      // ...y seguir escribiendo también.
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      await buscar(tester, etiqueta, 'Lucí');
+      expect(find.text('Lucía Pérez'), findsOneWidget);
+    });
+
+    testWidgets('salir del campo con Tab la esconde', (tester) async {
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+      await buscar(tester, etiqueta, 'Lucía');
+
+      await tester.sendKeyEvent(LogicalKeyboardKey.tab);
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lucía Pérez'), findsNothing);
+    });
+
+    testWidgets('un toque fuera la cierra', (tester) async {
+      await sembrarCatalogo();
+      await sembrarCliente();
+      await abrirDialogo(tester);
+      await buscar(tester, etiqueta, 'Lucía');
+
+      // Arriba del campo: lo de abajo está tapado por la propia lista.
+      await tester.tap(find.text('Cliente'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Lucía Pérez'), findsNothing);
+    });
+  });
+
   testWidgets('se arma la orden tocando el concepto y se crea', (tester) async {
     await sembrarCatalogo();
     await sembrarCliente();
@@ -482,7 +622,7 @@ void main() {
 
     // El diálogo se cierra con el folio de lo que guardó, y la orden está
     // en la base.
-    expect(resultado, matches(r'^\d{4}-\d{4}$'));
+    expect(resultado?.folio, matches(r'^\d{4}-\d{4}$'));
     expect(find.byType(OrdenDialog), findsNothing);
 
     final ordenes = await instance<OrdenesLocalDatasource>().listado();

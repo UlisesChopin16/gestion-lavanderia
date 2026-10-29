@@ -5,6 +5,8 @@ import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart'
+    show OrdenCreada;
 import 'package:gestion_lavanderia/ui/views/ordenes/historial/orden_historial_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ticket/orden_ticket_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
@@ -216,7 +218,7 @@ class OrdenesView extends ConsumerWidget {
                   label: 'Ver ticket de la orden',
                   icon: IconsManager.selectedOrdenServicioIcon,
                   color: Colors.amber,
-                  onPressed: () => _verTicket(context, orden),
+                  onPressed: () => _abrirTicket(context, orden.id),
                 ),
               ],
             ),
@@ -226,8 +228,8 @@ class OrdenesView extends ConsumerWidget {
     );
   }
 
-  /// Abre el alta, relee el listado si se guardó algo y confirma con qué
-  /// folio quedó la orden.
+  /// Abre el alta, relee el listado si se guardó algo, confirma con qué folio
+  /// quedó la orden y enseña su ticket.
   ///
   /// La relectura se pide aquí y no dentro del diálogo porque el listado es de
   /// esta pantalla: el diálogo sólo devuelve el folio de lo que guardó.
@@ -236,19 +238,31 @@ class OrdenesView extends ConsumerWidget {
   /// cuando se cierre: se confirma y se ve, en ese orden. Y lleva el folio
   /// porque es el número con el que se busca la orden después —el del ticket
   /// que se lleva el cliente—, no un dato de la base que dé igual.
+  ///
+  /// El ticket va al final porque es lo que sigue en el mostrador: la orden
+  /// recién creada se imprime o se le manda al cliente antes de que se vaya.
   Future<void> _agregar(BuildContext context, WidgetRef ref) async {
-    final folio = await showDialog<String>(
+    final creada = await showDialog<OrdenCreada>(
       context: context,
       builder: (context) => const OrdenDialog(),
     );
 
-    if (folio == null) return;
+    if (creada == null) return;
 
     await ref.read(ordenesViewModelProvider.notifier).cargar();
 
     if (!context.mounted) return;
 
-    await context.showSuccessDialog('La orden $folio se creó correctamente.');
+    await context.showSuccessDialog(
+      'La orden ${creada.folio} se creó correctamente.',
+    );
+
+    if (!context.mounted) return;
+
+    // Recién creada, el ticket sólo se cierra con sus botones: ni un clic
+    // fuera ni Esc. Es lo que se le entrega al cliente, y no debe perderse
+    // sin querer.
+    await _abrirTicket(context, creada.id, soloConBotones: true);
   }
 
   /// Abre el detalle de la orden y, si se cobró o se entregó algo, relee el
@@ -286,10 +300,17 @@ class OrdenesView extends ConsumerWidget {
 
   /// Abre el ticket de la orden. Descargarlo o enviarlo no cambia la orden,
   /// así que tampoco hay nada que releer.
-  Future<void> _verTicket(BuildContext context, OrdenListadoData orden) {
+  Future<void> _abrirTicket(
+    BuildContext context,
+    int ordenId, {
+    bool soloConBotones = false,
+  }) {
     return showDialog<void>(
       context: context,
-      builder: (context) => OrdenTicketDialog(ordenId: orden.id),
+      // Sin barrera que cierre, tampoco Esc cierra: las dos cosas las
+      // gobierna la misma bandera de la ruta.
+      barrierDismissible: !soloConBotones,
+      builder: (context) => OrdenTicketDialog(ordenId: ordenId),
     );
   }
 }

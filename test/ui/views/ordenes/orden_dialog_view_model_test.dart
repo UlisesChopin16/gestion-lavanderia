@@ -258,12 +258,49 @@ void main() {
       expect(estado().cliente, isNull);
     });
 
-    test('con el buscador vacío no se lista a nadie', () async {
-      await crearCliente();
+    test('con el buscador vacío se ofrecen los recientes', () async {
+      await crearCliente(nombres: 'Lucía', telefono: '5559998888');
+      await crearCliente(nombres: 'Mario', telefono: '5551112222');
 
       await notificador().buscarCliente('');
 
-      expect(estado().encontrados, isEmpty);
+      // Ninguno ha dejado orden: van los registrados más nuevos primero.
+      expect(estado().encontrados.map((c) => c.nombres), ['Mario', 'Lucía']);
+    });
+
+    test('entre los recientes, quien dejó una orden va primero', () async {
+      final categoriaId = await crearCategoria();
+      await crearConcepto(categoriaId: categoriaId);
+      final luciaId = await crearCliente(
+        nombres: 'Lucía',
+        telefono: '5559998888',
+      );
+      // Mario se registró después, pero nunca ha dejado ropa.
+      await crearCliente(nombres: 'Mario', telefono: '5551112222');
+
+      final catalogo = await instance<PreciosLocalDatasource>().activos();
+      await instance<OrdenesLocalDatasource>().crearOrden(
+        clienteId: luciaId,
+        items: [
+          ItemOrdenData(
+            precio: catalogo.single,
+            fechaEntrega: DateTime(2026, 11),
+          ),
+        ],
+      );
+
+      await notificador().buscarCliente('');
+
+      expect(estado().encontrados.map((c) => c.nombres), ['Lucía', 'Mario']);
+    });
+
+    test('sin nada escrito, registrar a uno no lo elige solo', () async {
+      await crearCliente(nombres: 'Lucía', telefono: '5550001111');
+
+      await notificador().repetirBusquedaDeCliente();
+
+      // Hay un solo cliente reciente, pero nadie lo buscó.
+      expect(estado().cliente, isNull);
     });
 
     test('tras registrar a uno nuevo queda elegido', () async {
@@ -378,11 +415,15 @@ void main() {
       notificador().cambiarAbono(40);
       notificador().cambiarDescripcion('  Una mancha de café  ');
 
-      // Devuelve el folio con el que quedó: `AAMM-NNNN`.
-      expect(await notificador().guardar(), matches(r'^\d{4}-\d{4}$'));
+      // Devuelve con qué quedó: su id y su folio `AAMM-NNNN`.
+      final creada = await notificador().guardar();
+      expect(creada?.folio, matches(r'^\d{4}-\d{4}$'));
 
       final ordenes = await instance<OrdenesLocalDatasource>().listado();
       final orden = ordenes.single;
+
+      expect(creada?.id, orden.id);
+      expect(creada?.folio, orden.folio);
 
       expect(orden.cliente, 'Lucía Pérez');
       expect(orden.total, 100);

@@ -32,6 +32,8 @@ class SearchFilter extends StatefulWidget {
     required this.onChanged,
     this.label = 'Buscar',
     this.debounce = const Duration(milliseconds: 300),
+    this.onTap,
+    this.grupoToque = EditableText,
   });
 
   /// Lo que el campo necesita para que se lea lo que uno escribe.
@@ -55,6 +57,17 @@ class SearchFilter extends StatefulWidget {
 
   /// Cuánto se espera después de la última tecla antes de buscar.
   final Duration debounce;
+
+  /// Cada toque sobre el campo, aunque ya tenga el foco.
+  final GestureTapCallback? onTap;
+
+  /// Con qué otros widgets comparte el campo su zona de toque.
+  ///
+  /// En escritorio, tocar fuera de un campo de texto le quita el foco. Un
+  /// buscador que abre una lista flotante debajo pone aquí el mismo grupo que
+  /// la lista: así tocar un resultado no cuenta como tocar fuera, y la lista
+  /// no desaparece antes de que el toque llegue a su renglón.
+  final Object grupoToque;
 
   @override
   State<SearchFilter> createState() => _SearchFilterState();
@@ -129,6 +142,8 @@ class _SearchFilterState extends State<SearchFilter> {
     return TextField(
       controller: _controller,
       onChanged: _escribir,
+      onTap: widget.onTap,
+      groupId: widget.grupoToque,
       textInputAction: TextInputAction.search,
       decoration: InputDecoration(
         labelText: widget.label,

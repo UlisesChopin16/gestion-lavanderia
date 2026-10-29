@@ -5,10 +5,11 @@ import 'package:gestion_lavanderia/data/local/shared/text_search.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/data/clientes/filtros_clientes.dart';
 import 'package:gestion_lavanderia/models/tables/clientes/cliente.dart';
+import 'package:gestion_lavanderia/models/tables/ordenes/orden_servicio.dart';
 
 part 'cliente_dao.g.dart';
 
-@DriftAccessor(tables: [Cliente])
+@DriftAccessor(tables: [Cliente, OrdenServicio])
 class ClientesDao extends DatabaseAccessor<AppDatabase>
     with _$ClientesDaoMixin {
   ClientesDao(super.db);
@@ -70,6 +71,38 @@ class ClientesDao extends DatabaseAccessor<AppDatabase>
       ..orderBy([(t) => OrderingTerm.asc(t.nombres)]);
 
     return query.get();
+  }
+
+  /// Los [limite] clientes más a mano: primero los que dejaron una orden más
+  /// recientemente, y después —los que nunca han dejado una— los registrados
+  /// más recientemente.
+  ///
+  /// Es lo que se ofrece al abrir el buscador del alta antes de escribir: en
+  /// el mostrador, el cliente de hoy suele ser el de la semana pasada.
+  Future<List<ClienteEntry>> getRecientes(int limite) {
+    final ultimaOrden = ordenServicio.fechaCreacion.max();
+    final query =
+        select(cliente).join([
+            leftOuterJoin(
+              ordenServicio,
+              ordenServicio.clienteId.equalsExp(cliente.id),
+            ),
+          ])
+          ..groupBy([cliente.id])
+          ..orderBy([
+            OrderingTerm(
+              expression: ultimaOrden,
+              mode: OrderingMode.desc,
+              nulls: NullsOrder.last,
+            ),
+            OrderingTerm.desc(cliente.fechaCreacion),
+            // Las fechas se guardan al segundo: dos altas seguidas empatan, y
+            // el id más alto es el registro más nuevo.
+            OrderingTerm.desc(cliente.id),
+          ])
+          ..limit(limite);
+
+    return query.map((fila) => fila.readTable(cliente)).get();
   }
 
   Future<int> insertCliente(ClienteCompanion row) async {

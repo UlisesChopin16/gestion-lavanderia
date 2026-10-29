@@ -1,8 +1,7 @@
-import 'dart:typed_data';
-
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
@@ -113,6 +112,10 @@ void main() {
     creados = 0;
     db = AppDatabase.forTesting(NativeDatabase.memory());
     await registrarDependenciasDePrueba(db: db);
+    // Sin PDFium en las pruebas: el ticket se enseña sin vista previa.
+    instance.registerLazySingleton<VistaPreviaPdf>(
+      () => const _VistaPreviaVacia(),
+    );
   });
 
   tearDown(() async {
@@ -284,6 +287,40 @@ void main() {
 
     // Y detrás del aviso, la orden ya está en la tabla.
     expect(find.text(folio), findsWidgets);
+    expect(find.byType(OrdenTicketDialog), findsNothing);
+
+    // Al cerrar el aviso sigue el ticket de esa misma orden.
+    await tester.tap(find.text('Cerrar').last);
+    await tester.pump();
+
+    final ticket = tester.widget<OrdenTicketDialog>(
+      find.byType(OrdenTicketDialog),
+    );
+    final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+    expect(ticket.ordenId, orden.id);
+
+    await tester.runAsync(
+      () => ProviderScope.containerOf(
+        tester.element(find.byType(OrdenTicketDialog)),
+      ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Ticket · Orden $folio'), findsOneWidget);
+
+    // Recién creada, ni un clic fuera ni Esc la cierran...
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(OrdenTicketDialog), findsOneWidget);
+
+    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+    await tester.pumpAndSettle();
+    expect(find.byType(OrdenTicketDialog), findsOneWidget);
+
+    // ...sólo su botón.
+    await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
+    await tester.pumpAndSettle();
+    expect(find.byType(OrdenTicketDialog), findsNothing);
   });
 
   testWidgets('ver la orden abre su detalle', (tester) async {
@@ -367,10 +404,6 @@ void main() {
   });
 
   testWidgets('ver el ticket abre el de esa orden', (tester) async {
-    // Sin PDFium en las pruebas: la vista previa es una lista vacía.
-    instance.registerLazySingleton<VistaPreviaPdf>(
-      () => const _VistaPreviaVacia(),
-    );
     final clienteId = await crearCliente(nombres: 'Lucía');
     final folio = await crearOrden(clienteId: clienteId);
 
@@ -392,6 +425,11 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Ticket · Orden $folio'), findsOneWidget);
+
+    // Abierto desde el listado es un ticket más: un clic fuera lo cierra.
+    await tester.tapAt(const Offset(5, 5));
+    await tester.pumpAndSettle();
+    expect(find.byType(OrdenTicketDialog), findsNothing);
   });
 }
 

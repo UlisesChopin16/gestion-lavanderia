@@ -40,6 +40,17 @@ void main() {
     return filas.map((fila) => fila.read<String>('name')).toSet();
   }
 
+  /// Las columnas de [tabla] tal como están en el archivo.
+  ///
+  /// Se pregunta a SQLite y no a Drift: Drift lee con `SELECT *` y una columna
+  /// nula que no existe se lee igual que una que existe vacía, así que una
+  /// migración que no la creó pasaría por buena.
+  Future<Set<String>> columnasDe(AppDatabase db, String tabla) async {
+    final filas = await db.customSelect('PRAGMA table_info($tabla)').get();
+
+    return filas.map((fila) => fila.read<String>('name')).toSet();
+  }
+
   /// Una orden con un item ya entregado, para comprobar que la migración no lo
   /// pierde.
   Future<int> sembrar(AppDatabase db) async {
@@ -102,9 +113,17 @@ void main() {
     return orden.id;
   }
 
-  /// Deja la base como la versión 2: sin la columna que liga la entrega con su
-  /// movimiento, ni su índice.
+  /// Deja la base como la versión 3: sin la columna que guarda con cuánto pagó
+  /// el cliente en efectivo.
+  Future<void> degradarAVersion3(AppDatabase db) async {
+    await db.customStatement('ALTER TABLE orden_history DROP COLUMN recibido');
+    await db.customStatement('PRAGMA user_version = 3');
+  }
+
+  /// Deja la base como la versión 2: además de lo anterior, sin la columna que
+  /// liga la entrega con su movimiento, ni su índice.
   Future<void> degradarAVersion2(AppDatabase db) async {
+    await degradarAVersion3(db);
     await db.customStatement('DROP INDEX idx_item_history');
     await db.customStatement(
       'ALTER TABLE item_servicio_orden DROP COLUMN orden_history_id',
@@ -127,7 +146,50 @@ void main() {
     await db.customStatement('PRAGMA user_version = 1');
   }
 
-  test('migra de la versión 2 a la 3', () async {
+  test('migra de la versión 3 a la 4 sin tocar los pagos de antes', () async {
+    var db = abrir();
+    final ordenId = await sembrar(db);
+    await db.ordenHistoryDao.insertHistory(
+      OrdenHistoryCompanion.insert(
+        ordenId: ordenId,
+        monto: 50,
+        restante: 0,
+        metodoPago: MetodoPagoType.efectivo,
+        fecha: DateTime(2026, 10, 17, 9, 30),
+      ),
+    );
+    await degradarAVersion3(db);
+    await db.close();
+
+    db = abrir();
+    addTearDown(db.close);
+
+    expect(await versionDe(db), 4);
+    expect(await columnasDe(db, 'orden_history'), contains('recibido'));
+
+    final antes = await db.ordenHistoryDao.getHistoryByOrden(ordenId);
+    expect(antes.single.monto, 50);
+    expect(antes.single.metodoPago, MetodoPagoType.efectivo);
+    // Un pago de antes no sabe con cuánto se pagó, y no se le inventa.
+    expect(antes.single.recibido, isNull);
+
+    // Y los pagos nuevos ya lo guardan.
+    await db.ordenHistoryDao.insertHistory(
+      OrdenHistoryCompanion.insert(
+        ordenId: ordenId,
+        monto: 30,
+        restante: 0,
+        metodoPago: MetodoPagoType.efectivo,
+        recibido: const Value(100),
+        fecha: DateTime(2026, 10, 18),
+      ),
+    );
+
+    final despues = await db.ordenHistoryDao.getHistoryByOrden(ordenId);
+    expect(despues.first.recibido, 100);
+  });
+
+  test('migra de la versión 2 a la 4', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion2(db);
@@ -136,8 +198,9 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 3);
+    expect(await versionDe(db), 4);
     expect(await indicesDe(db), contains('idx_item_history'));
+    expect(await columnasDe(db, 'orden_history'), contains('recibido'));
 
     final items = await db.itemServicioOrdenDao.getItemsByOrden(ordenId);
     expect(items, hasLength(1));
@@ -149,7 +212,7 @@ void main() {
     expect(items.single.item.ordenHistoryId, isNull);
   });
 
-  test('migra de la versión 1 a la 3 y crea todos los índices', () async {
+  test('migra de la versión 1 a la 4 y crea todos los índices', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion1(db);
@@ -158,7 +221,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 3);
+    expect(await versionDe(db), 4);
     expect(
       await indicesDe(db),
       containsAll([
@@ -173,16 +236,17 @@ void main() {
         'idx_direccion_empresa',
       ]),
     );
+    expect(await columnasDe(db, 'orden_history'), contains('recibido'));
 
     final items = await db.itemServicioOrdenDao.getItemsByOrden(ordenId);
     expect(items.single.item.fechaEntregado, DateTime(2026, 10, 17, 9, 30));
   });
 
-  test('una base nueva nace en la versión 3 y no migra', () async {
+  test('una base nueva nace en la versión 4 y no migra', () async {
     final db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 3);
+    expect(await versionDe(db), 4);
     expect(await indicesDe(db), contains('idx_item_history'));
   });
 }

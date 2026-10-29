@@ -280,6 +280,67 @@ void main() {
     });
   });
 
+  group('el adelanto en efectivo', () {
+    setUp(() async {
+      final categoriaId = await crearCategoria();
+      await crearConcepto(categoriaId: categoriaId, importe: 50);
+
+      await notificador().cargar();
+
+      final clienteId = await crearCliente();
+      final cliente = await instance<ClientesLocalDatasource>().porId(
+        clienteId,
+      );
+      notificador().elegirCliente(cliente!);
+      notificador().agregar(concepto('Sábana'));
+    });
+
+    test('guarda en el historial con cuánto pagó el cliente', () async {
+      notificador().cambiarAbono(30);
+      notificador().cambiarRecibido(100);
+
+      await notificador().guardar();
+
+      final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+      final adelanto = (await instance<OrdenesLocalDatasource>().detalle(
+        orden.id,
+      ))!.historial.single;
+
+      expect(adelanto.monto, 30);
+      expect(adelanto.recibido, 100);
+    });
+
+    test('sin escribir con cuánto paga, se guarda que pagó justo', () async {
+      notificador().cambiarAbono(30);
+
+      await notificador().guardar();
+
+      final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+      final adelanto = (await instance<OrdenesLocalDatasource>().detalle(
+        orden.id,
+      ))!.historial.single;
+
+      expect(adelanto.recibido, 30);
+    });
+
+    test('un billete que no alcanza no deja crear la orden', () {
+      notificador().cambiarAbono(30);
+      notificador().cambiarRecibido(20);
+
+      expect(estado().efectivo.insuficiente, isTrue);
+      expect(estado().puedeGuardar, isFalse);
+    });
+
+    test('con tarjeta no hay efectivo recibido', () {
+      notificador().cambiarAbono(30);
+      notificador().cambiarRecibido(20);
+      notificador().elegirMetodoPago(MetodoPagoType.tarjeta);
+
+      expect(estado().recibido, 0);
+      expect(estado().puedeGuardar, isTrue);
+    });
+  });
+
   group('al guardar', () {
     setUp(() async {
       final categoriaId = await crearCategoria();

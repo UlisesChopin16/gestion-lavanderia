@@ -59,6 +59,7 @@ extension HistoryConItemsToData on HistoryConItemsEntry {
     monto: movimiento.monto,
     restante: movimiento.restante,
     metodoPago: movimiento.metodoPago,
+    recibido: movimiento.recibido,
     fecha: movimiento.fecha,
     entregados: entregados.toData(),
   );
@@ -132,6 +133,7 @@ extension MovimientoDataToCompanion on MovimientoData {
       monto: Value(monto),
       restante: Value(restante),
       metodoPago: Value(metodoPago),
+      recibido: Value(recibido),
       fecha: Value(fecha),
     );
   }

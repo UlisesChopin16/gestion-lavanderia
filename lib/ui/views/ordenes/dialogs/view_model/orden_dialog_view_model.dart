@@ -3,12 +3,14 @@ import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
+import 'package:gestion_lavanderia/models/data/ordenes/cobro_en_efectivo.dart';
 import 'package:gestion_lavanderia/models/data/precios/filtros_precios.dart';
 import 'package:gestion_lavanderia/models/data/shared/filas.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 export 'package:gestion_lavanderia/models/data/categorias/categoria_data.dart';
 export 'package:gestion_lavanderia/models/data/clientes/cliente_data.dart';
+export 'package:gestion_lavanderia/models/data/ordenes/cobro_en_efectivo.dart';
 export 'package:gestion_lavanderia/models/data/ordenes/item_orden_data.dart';
 export 'package:gestion_lavanderia/models/data/precios/filtros_precios.dart'
     show sinCategoria;
@@ -45,6 +47,10 @@ sealed class OrdenDialogState with _$OrdenDialogState {
 
     /// Lo que el cliente paga al dejar la ropa.
     @Default(0.0) double abono,
+
+    /// Con cuánto paga el adelanto cuando lo paga en efectivo: da quinientos
+    /// para dejar trescientos. Se guarda en el primer movimiento de la orden.
+    @Default(0.0) double recibido,
     @Default('') String descripcion,
     @Default(true) bool cargando,
     @Default(false) bool guardando,
@@ -100,9 +106,21 @@ sealed class OrdenDialogState with _$OrdenDialogState {
     return ultima;
   }
 
+  /// Las cuentas del adelanto cuando se paga en efectivo.
+  CobroEnEfectivo get efectivo => CobroEnEfectivo(
+    metodoPago: metodoPago,
+    abono: abono,
+    recibido: recibido,
+  );
+
   /// Una orden necesita cliente y al menos una prenda. Lo demás tiene valor de
-  /// omisión: sin abono queda en curso, que es el caso normal.
-  bool get puedeGuardar => cliente != null && items.isNotEmpty && !guardando;
+  /// omisión: sin abono queda en curso, que es el caso normal. Lo único que la
+  /// detiene es un billete que no alcanza para el adelanto que se deja.
+  bool get puedeGuardar =>
+      cliente != null &&
+      items.isNotEmpty &&
+      !efectivo.insuficiente &&
+      !guardando;
 }
 
 /// El alta de una orden: a quién es, qué ropa trae y cuánto se cobra de
@@ -262,8 +280,17 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     _conItems(items);
   }
 
+  /// El efectivo recibido sólo existe en efectivo: con tarjeta no hay cambio
+  /// que sacar, y un número de antes se quedaría bloqueando el botón.
   void elegirMetodoPago(MetodoPagoType metodoPago) {
-    state = state.copyWith(metodoPago: metodoPago);
+    state = state.copyWith(
+      metodoPago: metodoPago,
+      recibido: metodoPago == MetodoPagoType.efectivo ? state.recibido : 0,
+    );
+  }
+
+  void cambiarRecibido(double recibido) {
+    state = state.copyWith(recibido: recibido < 0 ? 0 : recibido);
   }
 
   /// Lo que se cobra al dejar la ropa, acotado entre nada y el total: cobrar
@@ -301,6 +328,7 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
             : state.descripcion.trim(),
         abono: state.abono,
         metodoPago: state.metodoPago,
+        recibido: state.efectivo.aGuardar,
       );
 
       if (!ref.mounted) return orden.folio;

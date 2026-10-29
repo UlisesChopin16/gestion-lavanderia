@@ -312,8 +312,10 @@ class _Resumen extends ConsumerWidget {
         CobroOrden(
           total: estado.total,
           abono: estado.abono,
+          recibido: estado.recibido,
           metodoPago: estado.metodoPago,
           onAbono: notifier.cambiarAbono,
+          onRecibido: notifier.cambiarRecibido,
           onMetodoPago: notifier.elegirMetodoPago,
         ),
       ],

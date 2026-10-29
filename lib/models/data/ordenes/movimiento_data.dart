@@ -32,6 +32,11 @@ sealed class MovimientoData with _$MovimientoData {
     /// Saldo de la orden después de este movimiento.
     @Default(0.0) double restante,
     @Default(MetodoPagoType.efectivo) MetodoPagoType metodoPago,
+
+    /// Con cuánto pagó el cliente cuando pagó en efectivo. Nulo en cualquier
+    /// otro caso, y en los pagos de antes de que se guardara.
+    double? recibido,
+
     required DateTime fecha,
 
     /// Los renglones entregados en este movimiento. Vacío si sólo se abonó.
@@ -43,4 +48,10 @@ sealed class MovimientoData with _$MovimientoData {
   bool get huboEntrega => entregados.isNotEmpty;
 
   bool get huboAbono => monto > 0;
+
+  /// Lo que se le devolvió al cliente, cuando se sabe con cuánto pagó.
+  double? get cambio {
+    final recibido = this.recibido;
+    return recibido == null ? null : recibido - monto;
+  }
 }

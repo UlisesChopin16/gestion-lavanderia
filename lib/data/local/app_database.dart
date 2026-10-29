@@ -39,13 +39,14 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 3;
+  int get schemaVersion => 4;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
     onUpgrade: (m, from, to) async {
       if (from < 2) await _migrarAVersion2(m);
       if (from < 3) await _migrarAVersion3(m);
+      if (from < 4) await _migrarAVersion4(m);
     },
     beforeOpen: (details) async {
       // Las tablas declaran `references`, pero SQLite no las hace cumplir si
@@ -82,6 +83,14 @@ class AppDatabase extends _$AppDatabase {
   Future<void> _migrarAVersion3(Migrator m) async {
     await m.addColumn(itemServicioOrden, itemServicioOrden.ordenHistoryId);
     await m.create(idxItemHistory);
+  }
+
+  /// Versión 4: cada pago en efectivo guarda con cuánto pagó el cliente.
+  ///
+  /// La columna nace nula: los pagos anteriores no lo registraban, y poner ahí
+  /// el monto sería inventar que todos pagaron justo.
+  Future<void> _migrarAVersion4(Migrator m) async {
+    await m.addColumn(ordenHistory, ordenHistory.recibido);
   }
 
   /// Los índices que el esquema tenía en la versión 2.

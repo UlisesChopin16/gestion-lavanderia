@@ -169,6 +169,36 @@ void main() {
         reason: 'ni la orden ni su movimiento sobrevivieron',
       );
     });
+
+    test('el adelanto queda en el historial con cuánto se pagó', () async {
+      final orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+        abono: 30,
+        recibido: 100,
+      );
+
+      final adelanto = orden.historial.single;
+      expect(adelanto.monto, 30);
+      expect(adelanto.restante, 20);
+      expect(adelanto.metodoPago, MetodoPagoType.efectivo);
+      expect(adelanto.recibido, 100);
+      expect(adelanto.cambio, 70);
+    });
+
+    test('un billete que no alcanza para el adelanto no deja orden', () async {
+      await expectLater(
+        ordenes.crearOrden(
+          clienteId: clienteId,
+          items: [renglon(sabana)],
+          abono: 30,
+          recibido: 20,
+        ),
+        throwsA(isA<Exception>()),
+      );
+
+      expect(await ordenes.listado(), isEmpty);
+    });
   });
 
   group('registrarMovimiento', () {
@@ -256,6 +286,56 @@ void main() {
 
       await expectLater(
         ordenes.registrarMovimiento(ordenId: orden.id, monto: 500),
+        throwsA(isA<Exception>()),
+      );
+
+      final despues = (await ordenes.detalle(orden.id))!;
+      expect(despues.restante, 50);
+      expect(despues.historial, hasLength(1));
+    });
+
+    test('en efectivo guarda con cuánto pagó el cliente', () async {
+      var orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+      );
+
+      orden = await ordenes.registrarMovimiento(
+        ordenId: orden.id,
+        monto: 50,
+        recibido: 200,
+      );
+
+      final pago = orden.ultimoMovimiento!;
+      expect(pago.monto, 50);
+      expect(pago.recibido, 200);
+      expect(pago.cambio, 150);
+    });
+
+    test('con tarjeta no hay efectivo recibido que guardar', () async {
+      var orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+      );
+
+      orden = await ordenes.registrarMovimiento(
+        ordenId: orden.id,
+        monto: 50,
+        metodoPago: MetodoPagoType.tarjeta,
+        recibido: 200,
+      );
+
+      expect(orden.ultimoMovimiento!.recibido, isNull);
+    });
+
+    test('un efectivo que no alcanza no deja movimiento', () async {
+      final orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+      );
+
+      await expectLater(
+        ordenes.registrarMovimiento(ordenId: orden.id, monto: 50, recibido: 20),
         throwsA(isA<Exception>()),
       );
 

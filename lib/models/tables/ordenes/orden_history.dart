@@ -19,5 +19,14 @@ class OrdenHistory extends Table {
   /// "Efectivo", "Tarjeta", "Transferencia", etc. El converter la entrega ya
   /// como `MetodoPagoType`.
   TextColumn get metodoPago => text().map(const MetodoPagoConverter())();
+
+  /// Con cuánto pagó el cliente, cuando pagó en efectivo: lo que entregó, no
+  /// lo que se abonó. Da quinientos para pagar trescientos, y el cambio sale
+  /// de la diferencia con [monto].
+  ///
+  /// Nulo en cualquier otro método, en un movimiento que no cobra, y en los
+  /// movimientos anteriores a la versión 4 del esquema, que no lo guardaban.
+  RealColumn get recibido => real().nullable()();
+
   DateTimeColumn get fecha => dateTime()();
 }

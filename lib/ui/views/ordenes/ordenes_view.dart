@@ -4,6 +4,7 @@ import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/view_model/ordenes_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/widgets.dart';
@@ -204,11 +205,7 @@ class OrdenesView extends ConsumerWidget {
                   label: 'Ver la orden',
                   icon: Icons.assignment_turned_in_rounded,
                   color: orden.estatus.color,
-                  onPressed: () => _pendiente(
-                    context,
-                    titulo: 'Detalle de la orden',
-                    orden: orden,
-                  ),
+                  onPressed: () => _verOrden(context, ref, orden),
                 ),
                 TableAction(
                   label: 'Ver ticket de la orden',
@@ -253,8 +250,32 @@ class OrdenesView extends ConsumerWidget {
     await context.showSuccessDialog('La orden $folio se creó correctamente.');
   }
 
-  /// Lo que todavía no se ha portado de este módulo: el historial, el detalle
-  /// de la orden y su ticket. Cada uno sustituirá esta llamada por su diálogo.
+  /// Abre el detalle de la orden y, si se cobró o se entregó algo, relee el
+  /// listado y dice qué se registró.
+  ///
+  /// Mismo orden que el alta: primero se relee, para que la fila ya traiga su
+  /// saldo y su estatus nuevos cuando se cierre el aviso.
+  Future<void> _verOrden(
+    BuildContext context,
+    WidgetRef ref,
+    OrdenListadoData orden,
+  ) async {
+    final mensaje = await showDialog<String>(
+      context: context,
+      builder: (context) => OrdenDetalleDialog(ordenId: orden.id),
+    );
+
+    if (mensaje == null) return;
+
+    await ref.read(ordenesViewModelProvider.notifier).cargar();
+
+    if (!context.mounted) return;
+
+    await context.showSuccessDialog(mensaje);
+  }
+
+  /// Lo que todavía no se ha portado de este módulo: el historial de la orden
+  /// y su ticket. Cada uno sustituirá esta llamada por su diálogo.
   Future<void> _pendiente(
     BuildContext context, {
     required String titulo,

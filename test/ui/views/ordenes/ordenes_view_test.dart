@@ -8,6 +8,8 @@ import 'package:gestion_lavanderia/ui/shared/dialogs/dialogo_pendiente.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/detalle/view_model/orden_detalle_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
@@ -256,9 +258,9 @@ void main() {
     await tester.pumpAndSettle();
 
     alta.agregar(contenedor.read(ordenDialogViewModelProvider).conceptos.first);
-    alta.elegirCliente((await instance<ClientesLocalDatasource>().porId(
-      clienteId,
-    ))!);
+    alta.elegirCliente(
+      (await instance<ClientesLocalDatasource>().porId(clienteId))!,
+    );
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(FilledButton, 'Crear orden · 100.00'));
@@ -269,14 +271,44 @@ void main() {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    final folio = (await instance<OrdenesLocalDatasource>().listado())
-        .single
-        .folio;
+    final folio =
+        (await instance<OrdenesLocalDatasource>().listado()).single.folio;
 
     expect(find.text('La orden $folio se creó correctamente.'), findsOneWidget);
 
     // Y detrás del aviso, la orden ya está en la tabla.
     expect(find.text(folio), findsWidgets);
+  });
+
+  testWidgets('ver la orden abre su detalle', (tester) async {
+    final clienteId = await crearCliente(nombres: 'Lucía');
+    final folio = await crearOrden(clienteId: clienteId);
+
+    await abrirModulo(tester);
+
+    // Son tres acciones, así que la tabla las agrupa en un menú.
+    await tester.tap(find.byType(PopupMenuButton<TableAction>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Ver la orden'));
+    await tester.pump();
+
+    final dialogo = tester.widget<OrdenDetalleDialog>(
+      find.byType(OrdenDetalleDialog),
+    );
+    await ProviderScope.containerOf(
+      tester.element(find.byType(OrdenDetalleDialog)),
+    ).read(ordenDetalleViewModelProvider(dialogo.ordenId).notifier).cargar();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Orden $folio'), findsOneWidget);
+    // Dentro del diálogo: detrás, en la tabla, también está el nombre.
+    expect(
+      find.descendant(
+        of: find.byType(OrdenDetalleDialog),
+        matching: find.text('Lucía Pérez'),
+      ),
+      findsOneWidget,
+    );
   });
 
   group('lo que todavía está por portar', () {

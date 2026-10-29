@@ -3,6 +3,7 @@ export 'animating_loading.dart';
 export 'block_progress.dart';
 export 'button_add.dart';
 export 'button_clear_filters.dart';
+export 'campo_importe.dart';
 export 'card_padding.dart';
 export 'date_picker_component.dart';
 export 'date_range_picker.dart';

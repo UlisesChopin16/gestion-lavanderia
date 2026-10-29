@@ -248,7 +248,10 @@ void main() {
     await abrirDialogo(tester);
 
     TextField campo() => tester.widget<TextField>(
-      find.ancestor(of: find.text('Adelanto'), matching: find.byType(TextField)),
+      find.ancestor(
+        of: find.text('Adelanto'),
+        matching: find.byType(TextField),
+      ),
     );
 
     // Una orden nace sin nada pagado: el campo está vacío y lo que se ve es
@@ -269,6 +272,77 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(campo().controller?.text, isEmpty);
+  });
+
+  testWidgets('con adelanto en efectivo pide con cuánto paga y da el cambio', (
+    tester,
+  ) async {
+    await sembrarCatalogo();
+
+    await abrirDialogo(tester);
+
+    // Sin adelanto no hay billete: la fila no ocupa sitio.
+    expect(find.text('Recibe'), findsNothing);
+
+    await tester.tap(find.text('Cobija'));
+    await tester.pumpAndSettle();
+    await tester.enterText(
+      find.ancestor(of: find.text('Adelanto'), matching: find.byType(TextField)),
+      '100',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recibe'), findsOneWidget);
+    expect(find.text('Sin cambio'), findsOneWidget);
+
+    await tester.enterText(
+      find.ancestor(of: find.text('Recibe'), matching: find.byType(TextField)),
+      '500',
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Cambio'), findsOneWidget);
+    expect(find.text('400.00'), findsOneWidget);
+
+    // Con tarjeta no hay cambio que sacar.
+    await tester.tap(find.byType(DropdownMenu<MetodoPagoType>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Tarjeta').last);
+    await tester.pumpAndSettle();
+
+    expect(find.text('Recibe'), findsNothing);
+  });
+
+  testWidgets('la fila del efectivo cuadra con la de arriba', (tester) async {
+    await sembrarCatalogo();
+
+    await abrirDialogo(tester);
+
+    await tester.tap(find.text('Cobija'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.widgetWithText(OutlinedButton, 'Todo'));
+    await tester.pumpAndSettle();
+
+    Rect campo(String etiqueta) => tester.getRect(
+      find.ancestor(of: find.text(etiqueta), matching: find.byType(TextField)),
+    );
+
+    final metodo = tester.getRect(find.byType(DropdownMenu<MetodoPagoType>));
+    final adelanto = campo('Adelanto');
+    final recibe = campo('Recibe');
+    final cambio = tester.getRect(
+      find.ancestor(of: find.text('Sin cambio'), matching: find.byType(Container)).first,
+    );
+
+    // Mismo alto que los controles de arriba.
+    expect(recibe.height, metodo.height);
+    expect(cambio.height, metodo.height);
+
+    // Y a plomo: «Recibe» bajo el método de pago, el cambio bajo el adelanto.
+    expect(recibe.left, metodo.left);
+    expect(recibe.right, metodo.right);
+    expect(cambio.left, adelanto.left);
+    expect(cambio.top, recibe.top);
   });
 
   testWidgets('los cuatro controles del cobro miden y empiezan igual', (
@@ -351,13 +425,10 @@ void main() {
     final contenedor = ProviderScope.containerOf(
       tester.element(find.byType(OrdenDialog)),
     );
-    final notificador = contenedor.read(
-      ordenDialogViewModelProvider.notifier,
-    );
+    final notificador = contenedor.read(ordenDialogViewModelProvider.notifier);
 
-    for (final concepto in contenedor
-        .read(ordenDialogViewModelProvider)
-        .conceptos) {
+    for (final concepto
+        in contenedor.read(ordenDialogViewModelProvider).conceptos) {
       notificador.agregar(concepto);
     }
     await tester.pumpAndSettle();

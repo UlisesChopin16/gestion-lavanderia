@@ -102,6 +102,7 @@ class OrdenesLocalDatasource {
     String? descripcion,
     double abono = 0,
     MetodoPagoType metodoPago = MetodoPagoType.efectivo,
+    double? recibido,
   }) async {
     if (items.isEmpty) {
       throw const SQLException(
@@ -112,6 +113,13 @@ class OrdenesLocalDatasource {
     final renglones = items.map(_conImporte).toList();
     final total = _importeDe(renglones);
     final restante = _saldo(total - _abonoValido(abono, total));
+    // Se valida antes de abrir la transacción, igual que el abono: un billete
+    // que no alcanza no tiene por qué llegar a escribir nada.
+    final efectivo = _recibidoValido(
+      recibido: recibido,
+      monto: abono,
+      metodoPago: metodoPago,
+    );
 
     return _db.transaction(() async {
       final orden = await _ordenes.insertOrden(
@@ -131,13 +139,15 @@ class OrdenesLocalDatasource {
       );
 
       // Comparte la fecha de la orden a propósito: el alta y su primer
-      // movimiento son el mismo hecho.
+      // movimiento son el mismo hecho. Es también donde queda el adelanto, y
+      // con cuánto se pagó cuando fue en efectivo.
       await _history.insertHistory(
         OrdenHistoryCompanion.insert(
           ordenId: orden.id,
           monto: abono,
           restante: restante,
           metodoPago: metodoPago,
+          recibido: Value(efectivo),
           fecha: orden.fechaCreacion,
         ),
       );
@@ -162,10 +172,16 @@ class OrdenesLocalDatasource {
   ///
   /// Se puede abonar sin entregar y entregar sin abonar: ninguno de los dos
   /// argumentos es obligatorio.
+  ///
+  /// [recibido] es con cuánto pagó el cliente, y sólo se guarda en un cobro en
+  /// efectivo —con tarjeta no hay billete ni cambio—. Lo que esta clase no
+  /// hace es suponerlo: si no llega, queda nulo, y es la pantalla la que
+  /// decide si "no escribió nada" quiere decir "pagó justo".
   Future<OrdenDetalleData> registrarMovimiento({
     required int ordenId,
     double monto = 0,
     MetodoPagoType metodoPago = MetodoPagoType.efectivo,
+    double? recibido,
     Iterable<int> itemsAEntregar = const [],
   }) {
     return _db.transaction(() async {
@@ -181,6 +197,13 @@ class OrdenesLocalDatasource {
           monto: monto,
           restante: restante,
           metodoPago: metodoPago,
+          recibido: Value(
+            _recibidoValido(
+              recibido: recibido,
+              monto: monto,
+              metodoPago: metodoPago,
+            ),
+          ),
           fecha: fecha,
         ),
       );
@@ -318,6 +341,29 @@ class OrdenesLocalDatasource {
       message:
           'El abono de ${monto.toStringAsFixed(2)} es mayor que el saldo '
           'de ${tope.toStringAsFixed(2)}.',
+    );
+  }
+
+  /// Lo que se guarda como recibido: sólo en un cobro en efectivo, y nunca
+  /// menos de lo que se cobra.
+  ///
+  /// Fuera del efectivo se descarta en lugar de rechazarse: una pantalla que
+  /// cambió de método después de escribir el billete no tiene por qué fallar,
+  /// pero tampoco se guarda un efectivo que no se recibió.
+  double? _recibidoValido({
+    required double? recibido,
+    required double monto,
+    required MetodoPagoType metodoPago,
+  }) {
+    if (recibido == null) return null;
+    if (metodoPago != MetodoPagoType.efectivo || monto <= 0) return null;
+
+    if (recibido + _margenSaldo >= monto) return recibido;
+
+    throw SQLException(
+      message:
+          'Lo recibido (${recibido.toStringAsFixed(2)}) no alcanza para el '
+          'pago de ${monto.toStringAsFixed(2)}.',
     );
   }
 

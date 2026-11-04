@@ -215,23 +215,29 @@ class PreciosView extends ConsumerWidget {
       return;
     }
 
-    final guardado = await showDialog<bool>(
+    // Cuántos se crearon: uno por categoría elegida.
+    final creados = await showDialog<int>(
       context: context,
       builder: (context) => const PrecioDialog(),
     );
 
-    if (guardado != true || !context.mounted) return;
+    if (creados == null || !context.mounted) return;
 
-    await context.showSuccessDialog('El concepto se creó correctamente.');
+    await context.showSuccessDialog(
+      creados == 1
+          ? 'El concepto se creó correctamente.'
+          : 'Se crearon $creados conceptos correctamente, uno en cada '
+                'categoría.',
+    );
   }
 
   Future<void> _editar(BuildContext context, PrecioData precio) async {
-    final guardado = await showDialog<bool>(
+    final guardados = await showDialog<int>(
       context: context,
       builder: (context) => PrecioDialog(precio: precio),
     );
 
-    if (guardado != true || !context.mounted) return;
+    if (guardados == null || !context.mounted) return;
 
     await context.showSuccessDialog('El concepto se actualizó correctamente.');
   }

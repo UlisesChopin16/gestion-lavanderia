@@ -157,6 +157,23 @@ class PreciosViewModel extends _$PreciosViewModel {
     );
   }
 
+  /// Da de alta el mismo concepto en varias categorías, todas o ninguna.
+  Future<bool> guardarVarios(List<PrecioData> precios) {
+    final limpios = [
+      for (final precio in precios)
+        precio.copyWith(
+          nombreConcepto: precio.nombreConcepto.normalizeSpaces(),
+        ),
+    ];
+
+    return _escribir(
+      () => _precios.guardarVarios(limpios),
+      precios.length == 1
+          ? 'No se pudo guardar el concepto.'
+          : 'No se pudieron guardar los conceptos.',
+    );
+  }
+
   Future<bool> desactivar(int id) => _escribir(
     () => _precios.desactivar(id),
     'No se pudo desactivar el concepto.',

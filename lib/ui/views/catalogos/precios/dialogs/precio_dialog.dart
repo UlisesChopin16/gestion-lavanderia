@@ -2,21 +2,30 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
-import 'package:gestion_lavanderia/ui/shared/dialogs/dialogs.dart';
+import 'package:gestion_lavanderia/theme/color_row_theme.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
+import 'package:gestion_lavanderia/ui/views/catalogos/precios/dialogs/formulario_precio.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/precios/view_model/precios_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/precios/widgets/widgets.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 import 'package:gestion_lavanderia/validations/precio_validation.dart';
 
+/// Un cambio al formulario: recibe el de ahora y devuelve el nuevo.
+typedef CambioFormulario = FormularioPrecio Function(FormularioPrecio actual);
+
 /// El formulario de un concepto de ropa, para darlo de alta o editarlo.
 ///
-/// Los campos se acomodan en un `Wrap`: son seis y de ancho fijo, así que en
-/// una ventana amplia van de dos en dos y en una angosta se apilan solos.
+/// Se lee de arriba abajo en el orden en que se piensa: qué es —nombre—, en
+/// qué categorías se ofrece, cómo se mide —tamaño y unidad— y cuánto cuesta.
 ///
-/// Se cierra devolviendo `true` cuando se guardó. Si el concepto ya existe
-/// —misma categoría, mismo tamaño, mismo nombre— la base lo rechaza y el
-/// diálogo se queda abierto con el motivo a la vista.
+/// En un alta se pueden elegir varias categorías: el mismo concepto se crea
+/// en cada una, con su propio precio. Los precios van al final en una tabla,
+/// un renglón por categoría, rayados como los listados para que el importe
+/// de una no se confunda con el de la de junto.
+///
+/// Se cierra devolviendo cuántos conceptos guardó, o `null` si se canceló. Si
+/// alguno ya existe —misma categoría, mismo tamaño, mismo nombre— la base lo
+/// rechaza, no se guarda ninguno y el diálogo se queda abierto.
 class PrecioDialog extends ConsumerStatefulWidget {
   const PrecioDialog({super.key, this.precio});
 
@@ -28,253 +37,627 @@ class PrecioDialog extends ConsumerStatefulWidget {
 }
 
 class _PrecioDialogState extends ConsumerState<PrecioDialog> {
-  late PrecioData _precio =
-      widget.precio ??
-      const PrecioData(categoriaId: 0, categoria: '', nombreConcepto: '');
+  late FormularioPrecio _formulario = widget.precio == null
+      ? const FormularioPrecio.alta()
+      : FormularioPrecio.edicion(widget.precio!);
 
-  /// Lo capturado en los dos campos numéricos, tal cual se escribió.
-  ///
-  /// Se guarda el texto y no sólo el número porque "", "0" y "0.0" son cosas
-  /// distintas mientras se teclea: con el número a secas, borrar el importe
-  /// repondría un `0` en el campo y habría que borrarlo de nuevo.
-  late String _dias = widget.precio == null ? '' : '${widget.precio!.diasEntrega}';
-  late String _importe = widget.precio == null
-      ? ''
-      : widget.precio!.importe.toStringAsFixed(2);
+  /// Si ya se intentó guardar: antes de eso los campos vacíos no se marcan,
+  /// porque nadie quiere ver errores en un formulario recién abierto.
+  bool _mostrarErrores = false;
 
-  Map<CampoPrecio, String> _errores = const {};
-
-  static const _anchoCampo = 240.0;
-  static const _anchoContenido = 520.0;
-  static const _digitosDias = 3;
-
-  bool get _esAlta => widget.precio == null;
+  static const double _anchoMaximo = 560;
 
   @override
   Widget build(BuildContext context) {
     final estado = ref.watch(preciosViewModelProvider);
+    final formulario = _formulario;
 
-    return Stack(
-      children: [
-        BaseDialog(
-          title: _esAlta ? 'Nuevo concepto de ropa' : 'Editar concepto',
-          icon: const Icon(IconsManager.clotheIcon),
-          actionText: 'Guardar',
-          closeOnAction: false,
-          onActionPressed: _guardar,
-          content: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: _anchoContenido),
-            child: SingleChildScrollView(
-              child: Wrap(
-                spacing: 15,
-                runSpacing: 15,
-                alignment: WrapAlignment.center,
-                children: [
-                  FormTextField(
-                    value: _precio.nombreConcepto,
-                    onChanged: (valor) => _cambiar(
-                      _precio.copyWith(nombreConcepto: valor),
-                    ),
-                    autofocus: true,
-                    width: _anchoCampo,
-                    label: 'Nombre del concepto',
-                    hint: 'Playera, Pantalón, Sábana',
-                    icon: IconsManager.clotheIcon,
-                    errorText: _errores[CampoPrecio.nombreConcepto],
+    return Dialog(
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+      clipBehavior: Clip.antiAlias,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: _anchoMaximo),
+        child: Stack(
+          children: [
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _Encabezado(
+                  titulo: formulario.esAlta ? 'Nuevo concepto de ropa' : 'Editar concepto',
+                ),
+                Flexible(
+                  child: _Campos(
+                    formulario: formulario,
+                    disponibles: _disponibles(estado.categoriasActivas),
+                    mostrarErrores: _mostrarErrores,
+                    onCambiar: _cambiar,
+                    onListo: _guardar,
                   ),
-                  _SelectorCategoria(
-                    categorias: estado.categoriasActivas,
-                    seleccionada: _precio.categoriaId,
-                    error: _errores[CampoPrecio.categoria],
-                    onChanged: _elegirCategoria,
-                  ),
-                  SelectorTamano(
-                    tamano: _precio.clotheSize,
-                    width: _anchoCampo,
-                    onChanged: (tamano) => _cambiar(
-                      _precio.copyWith(
-                        clotheSize: tamano ?? ClotheSizeType.emptySize,
-                      ),
-                    ),
-                  ),
-                  _SelectorUnidad(
-                    unidad: _precio.tipoUnidad,
-                    onChanged: (unidad) =>
-                        _cambiar(_precio.copyWith(tipoUnidad: unidad)),
-                  ),
-                  FormTextField(
-                    value: _dias,
-                    onChanged: _cambiarDias,
-                    width: _anchoCampo,
-                    label: 'Días de entrega',
-                    hint: '1, 2, 3...',
-                    icon: Icons.calendar_today_rounded,
-                    keyboardType: TextInputType.number,
-                    inputFormatters: [
-                      FilteringTextInputFormatter.digitsOnly,
-                      LengthLimitingTextInputFormatter(_digitosDias),
-                    ],
-                    errorText: _errores[CampoPrecio.diasEntrega],
-                  ),
-                  FormTextField(
-                    value: _importe,
-                    onChanged: _cambiarImporte,
-                    width: _anchoCampo,
-                    label: 'Importe',
-                    hint: '55.50',
-                    icon: IconsManager.selectedPreciosIcon,
-                    keyboardType: const TextInputType.numberWithOptions(
-                      decimal: true,
-                    ),
-                    inputFormatters: [
-                      FilteringTextInputFormatter.allow(
-                        RegExp(r'^\d*\.?\d{0,2}'),
-                      ),
-                    ],
-                    errorText: _errores[CampoPrecio.importe],
-                    onSubmitted: (_) => _guardar(),
-                  ),
-                ],
-              ),
+                ),
+                _Pie(etiqueta: _etiquetaGuardar, onGuardar: _guardar),
+              ],
             ),
-          ),
+            if (estado.cargando)
+              const Positioned.fill(
+                child: AbsorbPointer(child: Center(child: CircularProgressIndicator())),
+              ),
+          ],
         ),
-        if (estado.cargando) const AbsorbPointer(child: BlockProgress()),
-      ],
+      ),
     );
   }
 
-  /// Al elegir categoría, un concepto nuevo hereda sus días de entrega, que es
-  /// lo que casi siempre corresponde. En una edición no se tocan: el concepto
-  /// pudo haberlos cambiado a propósito.
-  void _elegirCategoria(CategoriaData categoria) {
-    final conCategoria = _precio.copyWith(
-      categoriaId: categoria.id,
-      categoria: categoria.nombre,
-    );
-
-    if (!_esAlta) {
-      _cambiar(conCategoria);
-      return;
+  /// Las categorías que se pueden elegir: las vigentes y, al editar, también
+  /// la del concepto aunque se haya dado de baja, para que se vea cuál es.
+  List<CategoriaData> _disponibles(List<CategoriaData> activas) {
+    final original = widget.precio;
+    if (original == null || activas.any((c) => c.id == original.categoriaId)) {
+      return activas;
     }
 
-    setState(() => _dias = '${categoria.diasEntrega}');
-    _cambiar(conCategoria.copyWith(diasEntrega: categoria.diasEntrega));
+    return [_formulario.categorias.first, ...activas];
   }
 
-  void _cambiarDias(String valor) {
-    _dias = valor;
-    _cambiar(_precio.copyWith(diasEntrega: int.tryParse(valor) ?? 0));
+  String get _etiquetaGuardar {
+    final cuantos = _formulario.categorias.length;
+
+    if (!_formulario.esAlta) return 'Guardar cambios';
+
+    return cuantos > 1 ? 'Guardar $cuantos conceptos' : 'Guardar';
   }
 
-  void _cambiarImporte(String valor) {
-    _importe = valor;
-    _cambiar(_precio.copyWith(importe: double.tryParse(valor) ?? 0));
+  /// Aplica [cambio] sobre el formulario de ahora, no sobre el que había
+  /// cuando se dibujó el campo: dos cambios antes de que se vuelva a dibujar
+  /// —escribir y tocar una categoría en el mismo instante— no se pisan.
+  void _cambiar(CambioFormulario cambio) {
+    setState(() => _formulario = cambio(_formulario));
   }
 
-  /// Aplica un cambio y retira la marca de un campo en cuanto queda bien.
-  void _cambiar(PrecioData precio) {
-    setState(() {
-      _precio = precio;
-
-      if (_errores.isEmpty) return;
-
-      final vigentes = validarPrecio(precio);
-      _errores = {for (final campo in _errores.keys) campo: ?vigentes[campo]};
-    });
-  }
-
+  /// Guarda, o marca lo que falta.
   Future<void> _guardar() async {
-    final errores = validarPrecio(_precio);
+    final formulario = _formulario;
 
-    if (errores.isNotEmpty) {
-      setState(() => _errores = errores);
+    if (!formulario.completo) {
+      setState(() => _mostrarErrores = true);
       return;
     }
 
-    final guardado = await ref
-        .read(preciosViewModelProvider.notifier)
-        .guardar(_precio);
+    final notifier = ref.read(preciosViewModelProvider.notifier);
+    final conceptos = formulario.conceptos;
+    final guardado = formulario.esAlta
+        ? await notifier.guardarVarios(conceptos)
+        : await notifier.guardar(conceptos.single);
 
     if (!mounted) return;
 
     if (guardado) {
-      Navigator.of(context).pop(true);
+      Navigator.of(context).pop(conceptos.length);
       return;
     }
 
-    await context.showErrorDialog(
-      ref.read(preciosViewModelProvider).mensajeError,
+    await context.showErrorDialog(ref.read(preciosViewModelProvider).mensajeError);
+  }
+}
+
+/// El icono y el título.
+class _Encabezado extends StatelessWidget {
+  const _Encabezado({required this.titulo});
+
+  final String titulo;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 24, 24, 12),
+      child: Column(
+        spacing: 8,
+        children: [
+          Icon(IconsManager.clotheIcon, color: theme.colorScheme.secondary),
+          Text(titulo, textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
+        ],
+      ),
     );
   }
 }
 
-/// La categoría a la que pertenece el concepto.
-///
-/// Sólo ofrece las activas: la base rechaza un concepto en una categoría dada
-/// de baja.
-class _SelectorCategoria extends StatelessWidget {
-  const _SelectorCategoria({
-    required this.categorias,
-    required this.seleccionada,
-    required this.onChanged,
-    this.error,
+/// Todo lo que se captura: lo que el concepto es en todas sus categorías y,
+/// al final, el precio en cada una.
+class _Campos extends StatelessWidget {
+  const _Campos({
+    required this.formulario,
+    required this.disponibles,
+    required this.mostrarErrores,
+    required this.onCambiar,
+    required this.onListo,
   });
 
-  final List<CategoriaData> categorias;
-  final int seleccionada;
-  final ValueChanged<CategoriaData> onChanged;
-  final String? error;
+  final FormularioPrecio formulario;
+  final List<CategoriaData> disponibles;
+  final bool mostrarErrores;
+  final ValueChanged<CambioFormulario> onCambiar;
+
+  /// Enter en un campo de precio: lo mismo que el botón de guardar.
+  final VoidCallback onListo;
 
   @override
   Widget build(BuildContext context) {
+    final errores = mostrarErrores ? formulario.erroresComunes : const <CampoPrecio, String>{};
+
+    return SingleChildScrollView(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        spacing: 20,
+        children: [
+          FormTextField(
+            value: formulario.nombre,
+            onChanged: (nombre) => onCambiar((actual) => actual.conNombre(nombre)),
+            autofocus: formulario.esAlta,
+            label: 'Nombre del concepto',
+            hint: 'Playera, Pantalón, Sábana',
+            icon: IconsManager.clotheIcon,
+            errorText: errores[CampoPrecio.nombreConcepto],
+          ),
+          _Categorias(
+            disponibles: disponibles,
+            formulario: formulario,
+            error: errores[CampoPrecio.categoria],
+            onAlternar: (categoria) => onCambiar((actual) => actual.alternarCategoria(categoria)),
+          ),
+          Row(
+            spacing: 12,
+            children: [
+              Expanded(
+                child: SelectorTamano(
+                  tamano: formulario.tamano,
+                  onChanged: (tamano) =>
+                      onCambiar((actual) => actual.conTamano(tamano ?? ClotheSizeType.emptySize)),
+                ),
+              ),
+              Expanded(
+                child: _SelectorUnidad(
+                  unidad: formulario.unidad,
+                  onChanged: (unidad) => onCambiar((actual) => actual.conUnidad(unidad)),
+                ),
+              ),
+            ],
+          ),
+          _Precios(
+            formulario: formulario,
+            mostrarErrores: mostrarErrores,
+            onCambiar: onCambiar,
+            onListo: onListo,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Las categorías como etiquetas que se prenden y se apagan.
+///
+/// Etiquetas y no un desplegable: se ven todas de un vistazo, se elige más
+/// de una sin abrir y cerrar un menú, y queda a la vista qué se eligió.
+class _Categorias extends StatelessWidget {
+  const _Categorias({
+    required this.disponibles,
+    required this.formulario,
+    required this.error,
+    required this.onAlternar,
+  });
+
+  final List<CategoriaData> disponibles;
+  final FormularioPrecio formulario;
+  final String? error;
+  final ValueChanged<CategoriaData> onAlternar;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     final error = this.error;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      spacing: 4,
-      children: [
-        DropdownMenuBase<CategoriaData>(
-          label: 'Categoría',
-          width: _PrecioDialogState._anchoCampo,
-          leadingIcon: const Icon(IconsManager.selectedCategoriasIcon),
-          value: _seleccionada,
-          items: [
-            for (final categoria in categorias)
-              DropdownMenuEntry<CategoriaData>(
-                value: categoria,
-                label: categoria.nombre,
+    return _Seccion(
+      titulo: formulario.esAlta ? 'Categorías' : 'Categoría',
+      ayuda: formulario.esAlta ? 'Elige una o varias. Cada una tendrá su propio precio.' : null,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 6,
+        children: [
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              for (final categoria in disponibles)
+                FilterChip(
+                  label: Text(categoria.nombre),
+                  tooltip: 'Entrega en ${categoria.diasFormato}',
+                  selected: formulario.estaElegida(categoria),
+                  // Al editar es una sola: la marca de "elegida" sobra, el
+                  // color ya lo dice.
+                  showCheckmark: formulario.esAlta,
+                  onSelected: (_) => onAlternar(categoria),
+                ),
+            ],
+          ),
+          if (error != null)
+            Text(error, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+        ],
+      ),
+    );
+  }
+}
+
+/// El precio del concepto en cada categoría elegida.
+class _Precios extends StatelessWidget {
+  const _Precios({
+    required this.formulario,
+    required this.mostrarErrores,
+    required this.onCambiar,
+    required this.onListo,
+  });
+
+  final FormularioPrecio formulario;
+  final bool mostrarErrores;
+  final ValueChanged<CambioFormulario> onCambiar;
+  final VoidCallback onListo;
+
+  @override
+  Widget build(BuildContext context) {
+    final categorias = formulario.categorias;
+    final primera = categorias.firstOrNull;
+    final importePrimera = primera == null ? '' : formulario.precioDe(primera).importe;
+    // Copiar sólo sirve si hay de dónde y a dónde: un importe escrito en la
+    // primera y alguna otra con uno distinto.
+    final puedeCopiar =
+        importePrimera.isNotEmpty &&
+        categorias.any((c) => formulario.precioDe(c).importe != importePrimera);
+
+    return _Seccion(
+      titulo: formulario.variasCategorias ? 'Precios' : 'Precio',
+      ayuda: formulario.esAlta && primera != null
+          ? 'Los días vienen de la categoría; cámbialos si este concepto '
+                'tarda distinto.'
+          : null,
+      // La tabla crece y se encoge al elegir categorías: sin animación, el
+      // diálogo daría un salto con cada etiqueta.
+      child: AnimatedSize(
+        duration: const Duration(milliseconds: 200),
+        curve: Curves.easeOutCubic,
+        alignment: Alignment.topCenter,
+        child: primera == null
+            ? const _SinCategorias()
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                spacing: 4,
+                children: [
+                  _TablaPrecios(
+                    formulario: formulario,
+                    mostrarErrores: mostrarErrores,
+                    onCambiar: onCambiar,
+                    onListo: onListo,
+                  ),
+                  if (puedeCopiar)
+                    TextButton.icon(
+                      onPressed: () => onCambiar((actual) => actual.conImporteEnTodas(primera)),
+                      icon: const Icon(Icons.content_copy_rounded, size: 18),
+                      label: Text(
+                        'Usar el importe de ${primera.nombre} '
+                        '(\$$importePrimera) en todas',
+                      ),
+                    ),
+                ],
               ),
-          ],
-          onChanged: (categoria) {
-            if (categoria != null) onChanged(categoria);
-          },
-        ),
-        // El desplegable no tiene dónde poner un error, así que va debajo con
-        // el mismo aspecto que el de los campos de texto.
-        if (error != null)
-          Padding(
-            padding: const EdgeInsets.only(left: 12),
+      ),
+    );
+  }
+}
+
+/// Antes de elegir categoría: el lugar de los precios, y qué falta para
+/// llenarlo.
+class _SinCategorias extends StatelessWidget {
+  const _SinCategorias();
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        border: Border.all(color: scheme.outlineVariant),
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        spacing: 12,
+        children: [
+          Icon(Icons.sell_outlined, color: scheme.onSurfaceVariant),
+          Expanded(
             child: Text(
-              error,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.error,
-              ),
+              'Elige una categoría para ponerle precio.',
+              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Un renglón por categoría con su importe y sus días, en cuadrícula.
+///
+/// Las columnas alineadas dejan comparar los importes de un vistazo, y el
+/// rayado —el mismo de los listados— separa un renglón del otro. Los campos
+/// van sin etiqueta: la dice el encabezado.
+class _TablaPrecios extends StatelessWidget {
+  const _TablaPrecios({
+    required this.formulario,
+    required this.mostrarErrores,
+    required this.onCambiar,
+    required this.onListo,
+  });
+
+  final FormularioPrecio formulario;
+  final bool mostrarErrores;
+  final ValueChanged<CambioFormulario> onCambiar;
+  final VoidCallback onListo;
+
+  static const _radio = BorderRadius.all(Radius.circular(12));
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final rayado = ColorRowTheme.of(context);
+
+    return Theme(
+      // En una columna angosta el error no cabe en un renglón.
+      data: theme.copyWith(
+        inputDecorationTheme: theme.inputDecorationTheme.copyWith(errorMaxLines: 3),
+      ),
+      child: ClipRRect(
+        borderRadius: _radio,
+        child: Table(
+          border: TableBorder.all(color: scheme.outlineVariant, borderRadius: _radio),
+          columnWidths: const {0: FlexColumnWidth(1.2), 1: FlexColumnWidth(), 2: FlexColumnWidth()},
+          defaultVerticalAlignment: TableCellVerticalAlignment.middle,
+          children: [
+            TableRow(
+              decoration: BoxDecoration(color: scheme.primary),
+              children: const [
+                _Titulo('Categoría'),
+                _Titulo('Importe'),
+                _Titulo('Días de entrega'),
+              ],
+            ),
+            for (final (indice, categoria) in formulario.categorias.indexed)
+              TableRow(
+                key: ValueKey(categoria.id),
+                decoration: BoxDecoration(color: rayado.colorForRow(indice)),
+                children: [
+                  _CeldaCategoria(categoria: categoria),
+                  _CeldaImporte(
+                    formulario: formulario,
+                    categoria: categoria,
+                    mostrarErrores: mostrarErrores,
+                    onCambiar: onCambiar,
+                    onListo: onListo,
+                  ),
+                  _CeldaDias(
+                    formulario: formulario,
+                    categoria: categoria,
+                    mostrarErrores: mostrarErrores,
+                    onCambiar: onCambiar,
+                    onListo: onListo,
+                  ),
+                ],
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// El encabezado de una columna de la tabla de precios, con los colores del
+/// de los listados.
+class _Titulo extends StatelessWidget {
+  const _Titulo(this.texto);
+
+  final String texto;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      child: Text(
+        texto,
+        style: theme.textTheme.labelLarge?.copyWith(
+          color: theme.colorScheme.onPrimary,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+/// El nombre de la categoría y los días que tarda de por sí.
+class _CeldaCategoria extends StatelessWidget {
+  const _CeldaCategoria({required this.categoria});
+
+  final CategoriaData categoria;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        spacing: 2,
+        children: [
+          Text(categoria.nombre, style: theme.textTheme.titleSmall),
+          Text(
+            'Entrega en ${categoria.diasFormato}',
+            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// El importe del concepto en [categoria].
+class _CeldaImporte extends StatelessWidget {
+  const _CeldaImporte({
+    required this.formulario,
+    required this.categoria,
+    required this.mostrarErrores,
+    required this.onCambiar,
+    required this.onListo,
+  });
+
+  final FormularioPrecio formulario;
+  final CategoriaData categoria;
+  final bool mostrarErrores;
+  final ValueChanged<CambioFormulario> onCambiar;
+  final VoidCallback onListo;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: FormTextField(
+        // Uno por categoría: el mismo campo no debe arrastrar el texto de
+        // una categoría a otra.
+        key: ValueKey('importe-${categoria.id}'),
+        value: formulario.precioDe(categoria).importe,
+        onChanged: (importe) => onCambiar((actual) => actual.conImporte(categoria, importe)),
+        hint: '00.00',
+        keyboardType: const TextInputType.numberWithOptions(decimal: true),
+        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
+        errorText: mostrarErrores ? formulario.erroresDe(categoria)[CampoPrecio.importe] : null,
+        onSubmitted: (_) => onListo(),
+      ),
+    );
+  }
+}
+
+/// Los días de entrega del concepto en [categoria].
+class _CeldaDias extends StatelessWidget {
+  const _CeldaDias({
+    required this.formulario,
+    required this.categoria,
+    required this.mostrarErrores,
+    required this.onCambiar,
+    required this.onListo,
+  });
+
+  final FormularioPrecio formulario;
+  final CategoriaData categoria;
+  final bool mostrarErrores;
+  final ValueChanged<CambioFormulario> onCambiar;
+  final VoidCallback onListo;
+
+  static const _digitosDias = 3;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.all(8),
+      child: FormTextField(
+        key: ValueKey('dias-${categoria.id}'),
+        value: formulario.precioDe(categoria).dias,
+        onChanged: (dias) => onCambiar((actual) => actual.conDias(categoria, dias)),
+        hint: '1, 2, 3...',
+        keyboardType: TextInputType.number,
+        inputFormatters: [
+          FilteringTextInputFormatter.digitsOnly,
+          LengthLimitingTextInputFormatter(_digitosDias),
+        ],
+        errorText: mostrarErrores ? formulario.erroresDe(categoria)[CampoPrecio.diasEntrega] : null,
+        onSubmitted: (_) => onListo(),
+      ),
+    );
+  }
+}
+
+/// Un título chico con su contenido debajo.
+class _Seccion extends StatelessWidget {
+  const _Seccion({required this.titulo, required this.child, this.ayuda});
+
+  final String titulo;
+  final String? ayuda;
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final ayuda = this.ayuda;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 8,
+      children: [
+        Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          spacing: 2,
+          children: [
+            Text(titulo, style: theme.textTheme.titleSmall),
+            if (ayuda != null)
+              Text(
+                ayuda,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: theme.colorScheme.onSurfaceVariant,
+                ),
+              ),
+          ],
+        ),
+        child,
       ],
     );
   }
+}
 
-  /// La categoría elegida dentro de la lista, para que el desplegable la
-  /// reconozca: el concepto guarda su id, no la fila.
-  CategoriaData? get _seleccionada {
-    for (final categoria in categorias) {
-      if (categoria.id == seleccionada) return categoria;
-    }
+/// Cancelar y guardar.
+class _Pie extends StatelessWidget {
+  const _Pie({required this.etiqueta, required this.onGuardar});
 
-    return null;
+  final String etiqueta;
+  final VoidCallback onGuardar;
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
+      // En Wrap: en una ventana angosta los dos botones bajan de renglón en
+      // lugar de desbordarse.
+      child: Wrap(
+        alignment: WrapAlignment.end,
+        crossAxisAlignment: WrapCrossAlignment.center,
+        spacing: 8,
+        runSpacing: 8,
+        children: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text('Cancelar', style: TextStyle(color: scheme.error)),
+          ),
+          FilledButton.icon(
+            onPressed: onGuardar,
+            icon: const Icon(Icons.check_rounded),
+            label: Text(etiqueta),
+          ),
+        ],
+      ),
+    );
   }
 }
 
@@ -289,7 +672,6 @@ class _SelectorUnidad extends StatelessWidget {
   Widget build(BuildContext context) {
     return DropdownMenuBase<UnitType>(
       label: 'Unidad',
-      width: _PrecioDialogState._anchoCampo,
       leadingIcon: const Icon(Icons.widgets_rounded),
       value: unidad,
       items: [

@@ -14,7 +14,7 @@ class FormTextField extends StatefulWidget {
     super.key,
     required this.value,
     required this.onChanged,
-    required this.label,
+    this.label,
     this.hint,
     this.icon,
     this.suffix,
@@ -32,7 +32,9 @@ class FormTextField extends StatefulWidget {
   final String value;
   final ValueChanged<String> onChanged;
 
-  final String label;
+  /// En `null` el campo va sin etiqueta: cuando ya la dice el encabezado de
+  /// una tabla.
+  final String? label;
   final String? hint;
   final IconData? icon;
   final Widget? suffix;

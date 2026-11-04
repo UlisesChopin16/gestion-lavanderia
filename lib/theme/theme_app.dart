@@ -56,14 +56,30 @@ class ThemeApp {
         contentPadding: const EdgeInsets.symmetric(vertical: 5, horizontal: 10),
         labelStyle: TextStyle(color: scheme.primary),
         errorStyle: TextStyle(color: scheme.error),
-        enabledBorder: OutlineInputBorder(
+        // En reposo, sólo la raya de abajo. El campo enfocado pasa a marco, y
+        // con él la etiqueta sube a cortar la línea: el cambio de acomodo es a
+        // propósito, para que se vea en qué campo se está escribiendo. Con
+        // error no se declara borde: queda el subrayado de Material, en color
+        // de error.
+        enabledBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: scheme.primary),
         ),
         focusedBorder: OutlineInputBorder(
           borderSide: BorderSide(color: scheme.primary, width: 2),
         ),
-        disabledBorder: OutlineInputBorder(
+        disabledBorder: UnderlineInputBorder(
           borderSide: BorderSide(color: scheme.outlineVariant),
+        ),
+      ),
+      // `DropdownMenu` no toma el relleno del tema de los campos sino del
+      // suyo, que lo trae apagado: sin esto, el desplegable quedaba como una
+      // raya suelta junto a campos rellenos. Sólo se le pasa el relleno; lo
+      // demás lo sigue tomando del tema de los campos que tenga encima, que
+      // algunas pantallas ajustan.
+      dropdownMenuTheme: DropdownMenuThemeData(
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: esOscuro ? null : Colors.white,
         ),
       ),
       // La barra de módulos no es un `NavigationBar` sino botones propios,

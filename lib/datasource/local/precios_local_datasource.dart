@@ -60,6 +60,18 @@ class PreciosLocalDatasource {
     return precio.id;
   }
 
+  /// Da de alta varios conceptos de una vez: el mismo concepto en varias
+  /// categorías, cada una con su precio.
+  ///
+  /// Van en una transacción porque es una sola decisión del usuario: si uno
+  /// choca con un concepto que ya existía, no se crea ninguno, y no queda la
+  /// mitad dada de alta y la otra mitad por adivinar.
+  Future<List<int>> guardarVarios(List<PrecioData> precios) {
+    return _dao.transaction(() async {
+      return [for (final precio in precios) await guardar(precio)];
+    });
+  }
+
   /// Avisa si el concepto ya existe, antes de pedir confirmación al usuario.
   Future<void> verificarDuplicado(PrecioData precio) {
     return _dao.ensurePrecioUnico(precio.toCompanion());

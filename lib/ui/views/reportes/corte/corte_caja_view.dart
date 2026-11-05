@@ -5,10 +5,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/extensions/double_ext.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/corte/widgets/barras_metodo.dart';
-import 'package:gestion_lavanderia/ui/views/reportes/corte/widgets/grafica_columnas.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/widgets/grafica_columnas.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/corte/widgets/indicadores_corte.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/corte/widgets/tabla_cobros.dart';
-import 'package:gestion_lavanderia/ui/views/reportes/corte/widgets/tarjeta_corte.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/widgets/pantalla_estadistica.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/widgets/tarjeta_estadistica.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/view_model/corte_caja_view_model.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 import 'package:intl/intl.dart';
@@ -18,8 +19,7 @@ import 'package:intl/intl.dart';
 /// —por hora, por método y contra los días anteriores— y al final cada
 /// cobro.
 ///
-/// Se abre dentro de la sección de reportes, en lugar de las tarjetas, y
-/// [onVolver] regresa a ellas.
+/// [onVolver] regresa a las tarjetas de la sección de reportes.
 class CorteCajaView extends ConsumerWidget {
   const CorteCajaView({super.key, required this.onVolver});
 
@@ -31,112 +31,66 @@ class CorteCajaView extends ConsumerWidget {
     final notifier = ref.read(corteCajaViewModelProvider.notifier);
     final estadisticas = estado.estadisticas;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        _Barra(
+    return PantallaEstadistica(
+      titulo: 'Corte de caja',
+      onVolver: onVolver,
+      onRecargar: notifier.recargar,
+      cargando: estado.cargando,
+      mensajeError: estado.mensajeError,
+      acciones: [
+        _SelectorDia(
           dia: estado.dia,
-          onVolver: onVolver,
           onMover: notifier.moverDia,
           onElegir: notifier.elegirDia,
-          onRecargar: notifier.recargar,
-        ),
-        // Reservado aunque no cargue: si apareciera y desapareciera, la
-        // pantalla brincaría cada vez que se cambia de día.
-        SizedBox(
-          height: 3,
-          child: estado.cargando ? const LinearProgressIndicator() : null,
-        ),
-        Expanded(
-          child: switch (estadisticas) {
-            null when estado.mensajeError.isNotEmpty => SinDatosCorte(
-              texto: estado.mensajeError,
-            ),
-            null => const SizedBox.shrink(),
-            final estadisticas => SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-              child: _Contenido(estadisticas: estadisticas),
-            ),
-          },
         ),
       ],
+      contenido: estadisticas == null
+          ? null
+          : _Contenido(estadisticas: estadisticas),
     );
   }
 }
 
-/// Volver, el nombre del corte y qué día es, con las flechas para ir al día
-/// anterior o al siguiente: el corte se revisa día por día.
-class _Barra extends StatelessWidget {
-  const _Barra({
+/// Qué día es, con las flechas para ir al anterior o al siguiente: el corte
+/// se revisa día por día.
+class _SelectorDia extends StatelessWidget {
+  const _SelectorDia({
     required this.dia,
-    required this.onVolver,
     required this.onMover,
     required this.onElegir,
-    required this.onRecargar,
   });
 
   final DateTime dia;
-  final VoidCallback onVolver;
   final ValueChanged<int> onMover;
   final ValueChanged<DateTime> onElegir;
-  final VoidCallback onRecargar;
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
     final hoy = DateTime.now().soloDia;
     final esHoy = dia == hoy;
     final fecha = dia.formatLongDate;
 
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 12, 16, 8),
-      child: Wrap(
-        crossAxisAlignment: WrapCrossAlignment.center,
-        alignment: WrapAlignment.spaceBetween,
-        spacing: 8,
-        runSpacing: 8,
-        children: [
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 4,
-            children: [
-              IconButton(
-                tooltip: 'Volver a reportes',
-                onPressed: onVolver,
-                icon: const Icon(Icons.arrow_back_rounded),
-              ),
-              Text('Corte de caja', style: theme.textTheme.headlineSmall),
-            ],
-          ),
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            spacing: 4,
-            children: [
-              IconButton(
-                tooltip: 'Día anterior',
-                onPressed: () => onMover(-1),
-                icon: const Icon(Icons.chevron_left_rounded),
-              ),
-              OutlinedButton.icon(
-                onPressed: () => _elegir(context, hoy),
-                icon: const Icon(Icons.calendar_today_rounded, size: 18),
-                label: Text(esHoy ? 'Hoy, $fecha' : _mayuscula(fecha)),
-              ),
-              IconButton(
-                tooltip: 'Día siguiente',
-                // Mañana todavía no se cobra nada.
-                onPressed: esHoy ? null : () => onMover(1),
-                icon: const Icon(Icons.chevron_right_rounded),
-              ),
-              IconButton(
-                tooltip: 'Actualizar',
-                onPressed: onRecargar,
-                icon: const Icon(Icons.refresh_rounded),
-              ),
-            ],
-          ),
-        ],
-      ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      spacing: 4,
+      children: [
+        IconButton(
+          tooltip: 'Día anterior',
+          onPressed: () => onMover(-1),
+          icon: const Icon(Icons.chevron_left_rounded),
+        ),
+        OutlinedButton.icon(
+          onPressed: () => _elegir(context, hoy),
+          icon: const Icon(Icons.calendar_today_rounded, size: 18),
+          label: Text(esHoy ? 'Hoy, $fecha' : _mayuscula(fecha)),
+        ),
+        IconButton(
+          tooltip: 'Día siguiente',
+          // Mañana todavía no se cobra nada.
+          onPressed: esHoy ? null : () => onMover(1),
+          icon: const Icon(Icons.chevron_right_rounded),
+        ),
+      ],
     );
   }
 
@@ -169,18 +123,18 @@ class _Contenido extends StatelessWidget {
     final corte = estadisticas.corte;
     final sinCobros = corte.cobros.isEmpty;
 
-    final porHora = TarjetaCorte(
+    final porHora = TarjetaEstadistica(
       titulo: 'Cobrado por hora',
       nota: 'Pasa el mouse sobre una columna para ver su detalle.',
       child: sinCobros
-          ? const SinDatosCorte(texto: 'No se cobró nada este día.', alto: 220)
+          ? const SinDatos(texto: 'No se cobró nada este día.', alto: 220)
           : _GraficaPorHora(corte: corte),
     );
-    final porMetodo = TarjetaCorte(
+    final porMetodo = TarjetaEstadistica(
       titulo: 'Por método de pago',
       nota: 'Cuánto entró por cada uno y qué parte es del total.',
       child: sinCobros
-          ? const SinDatosCorte(texto: 'No se cobró nada este día.', alto: 220)
+          ? const SinDatos(texto: 'No se cobró nada este día.', alto: 220)
           : BarrasMetodo(porMetodo: corte.porMetodo, total: corte.total),
     );
 
@@ -211,12 +165,12 @@ class _Contenido extends StatelessWidget {
             );
           },
         ),
-        TarjetaCorte(
+        TarjetaEstadistica(
           titulo: 'Los últimos ${EstadisticasCorte.dias} días',
           nota: 'El día del corte va en color; los anteriores, en gris.',
           child: _GraficaSemana(semana: estadisticas.semana),
         ),
-        TarjetaCorte(
+        TarjetaEstadistica(
           titulo: 'Detalle de cobros',
           nota: sinCobros
               ? null
@@ -224,7 +178,7 @@ class _Contenido extends StatelessWidget {
                     '${corte.cobros.length == 1 ? 'cobro' : 'cobros'}, '
                     'por folio.',
           child: sinCobros
-              ? const SinDatosCorte(texto: 'No se cobró nada este día.')
+              ? const SinDatos(texto: 'No se cobró nada este día.')
               : TablaCobros(cobros: corte.cobros),
         ),
       ],

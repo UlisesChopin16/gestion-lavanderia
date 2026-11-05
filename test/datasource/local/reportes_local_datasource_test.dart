@@ -4,8 +4,9 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 
-/// Lo que el reporte de ventas lee de la base: las órdenes recibidas en el
-/// periodo, con todo lo que se les ha cobrado y cómo.
+/// Lo que los reportes leen de la base: las órdenes recibidas en el periodo
+/// con lo que se les ha cobrado, los cobros de cada día, lo que se debe y la
+/// ropa que falta por entregar.
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
@@ -62,7 +63,11 @@ void main() {
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
-    reportes = ReportesLocalDatasource(db.ordenServicioDao, db.ordenHistoryDao);
+    reportes = ReportesLocalDatasource(
+      db.ordenServicioDao,
+      db.ordenHistoryDao,
+      db.itemServicioOrdenDao,
+    );
 
     clienteId = await db.clientesDao.insertCliente(
       ClienteCompanion.insert(
@@ -255,6 +260,124 @@ void main() {
         ]);
         // El corte es sólo del último día.
         expect(estadisticas.corte.total, 40);
+      },
+    );
+  });
+
+  group('las cuentas por cobrar', () {
+    test(
+      'son las órdenes con saldo, sin las pagadas ni las canceladas',
+      () async {
+        final debe = await orden(
+          dia: DateTime(2026, 10, 1),
+          total: 300,
+          cobros: [(DateTime(2026, 10, 1), 100, MetodoPagoType.efectivo)],
+        );
+        await orden(
+          dia: DateTime(2026, 10, 2),
+          total: 50,
+          cobros: [(DateTime(2026, 10, 2), 50, MetodoPagoType.efectivo)],
+        );
+        await orden(
+          dia: DateTime(2026, 10, 3),
+          total: 80,
+          estatus: EstatusOrdenType.cancelada,
+        );
+
+        final cuentas = await reportes.cuentasPorCobrar(
+          ahora: DateTime(2026, 11, 5, 9),
+        );
+
+        final saldo = cuentas.saldos.single;
+        expect(saldo.folio, debe);
+        expect(saldo.saldo, 200);
+        expect(saldo.cliente, 'Ana López');
+        expect(saldo.telefono, '5551234567');
+        expect(saldo.antiguedadAl(cuentas.hoy), AntiguedadSaldo.masDeUnMes);
+      },
+    );
+  });
+
+  group('la ropa pendiente', () {
+    late int precioId;
+
+    setUp(() async {
+      final categoriaId = await db.categoriaServicioDao.insertCategoria(
+        CategoriaServicioCompanion.insert(
+          nombre: 'Planchado',
+          estatus: EstatusType.activo,
+          diasEntrega: 2,
+          fechaCreacion: DateTime.now(),
+        ),
+      );
+      precioId = await db.preciosConceptosDao.insertPrecio(
+        PreciosConceptosCompanion.insert(
+          categoriaId: categoriaId,
+          clotheSize: ClotheSizeType.king,
+          nombreConcepto: 'Camisa',
+          diasEntrega: 2,
+          tipoUnidad: UnitType.pieza,
+          importe: 25,
+          estatus: EstatusType.activo,
+          fechaCreacion: DateTime.now(),
+        ),
+      );
+    });
+
+    /// Agrega a la orden [folio] un renglón prometido para [entrega].
+    Future<void> item(
+      String folio,
+      DateTime entrega, {
+      double cantidad = 1,
+      bool entregado = false,
+    }) async {
+      final ordenId = (await (db.select(
+        db.ordenServicio,
+      )..where((t) => t.folio.equals(folio))).getSingle()).id;
+      await db.itemServicioOrdenDao.insertItem(
+        ItemServicioOrdenCompanion.insert(
+          ordenId: ordenId,
+          precioConceptoId: precioId,
+          cantidad: cantidad,
+          importe: 25 * cantidad,
+          estaEntregado: Value(entregado),
+          fechaEntrega: entrega,
+          fechaCreacion: DateTime.now(),
+        ),
+      );
+    }
+
+    test(
+      'junta por orden lo que falta, sin lo entregado ni lo cancelado',
+      () async {
+        final pendiente = await orden(dia: DateTime(2026, 11, 1), total: 75);
+        await item(pendiente, DateTime(2026, 11, 3), cantidad: 2);
+        await item(pendiente, DateTime(2026, 11, 7));
+        await item(pendiente, DateTime(2026, 11, 2), entregado: true);
+
+        final entregada = await orden(dia: DateTime(2026, 11, 1), total: 25);
+        await item(entregada, DateTime(2026, 11, 3), entregado: true);
+
+        final cancelada = await orden(
+          dia: DateTime(2026, 11, 1),
+          total: 25,
+          estatus: EstatusOrdenType.cancelada,
+        );
+        await item(cancelada, DateTime(2026, 11, 3));
+
+        final ropa = await reportes.ropaPendiente(
+          ahora: DateTime(2026, 11, 5, 9),
+        );
+
+        final conRopa = ropa.ordenes.single;
+        expect(conRopa.folio, pendiente);
+        expect(conRopa.conceptos.map((c) => c.descripcion), [
+          '2 Piezas Camisa',
+          '1 Pieza Camisa',
+        ]);
+        expect(conRopa.saldo, 75);
+        expect(conRopa.estadoAl(ropa.hoy), EstadoEntrega.vencida);
+        expect(conRopa.diasDeRetraso(ropa.hoy), 2);
       },
     );
   });

@@ -2,7 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/title_container.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/corte/corte_caja_view.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/cuentas/cuentas_por_cobrar_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/dialogs/reporte_ventas_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/ropa/ropa_pendiente_view.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Reportes y estadísticas: una tarjeta por reporte que se puede sacar.
@@ -12,8 +14,9 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// —qué trae y para qué sirve— y así quedan los que se agreguen después, uno
 /// junto al otro.
 ///
-/// El corte de caja no es un archivo sino una pantalla con gráficas: se abre
-/// aquí mismo, en lugar de las tarjetas, y su flecha regresa a ellas.
+/// El corte de caja, las cuentas por cobrar y la ropa pendiente no son
+/// archivos sino pantallas con gráficas: se abren aquí mismo, en lugar de las
+/// tarjetas, y su flecha regresa a ellas.
 class ReportesView extends StatefulWidget {
   const ReportesView({super.key});
 
@@ -24,14 +27,23 @@ class ReportesView extends StatefulWidget {
 class _ReportesViewState extends State<ReportesView> {
   static const double _margen = 16;
 
-  bool _corteAbierto = false;
+  /// La pantalla abierta; en `null`, las tarjetas.
+  _Pantalla? _abierta;
 
-  void _verCorte(bool abierto) => setState(() => _corteAbierto = abierto);
+  void _abrir(_Pantalla? pantalla) => setState(() => _abierta = pantalla);
 
   @override
   Widget build(BuildContext context) {
-    if (_corteAbierto) {
-      return Scaffold(body: CorteCajaView(onVolver: () => _verCorte(false)));
+    if (_abierta case final abierta?) {
+      void volver() => _abrir(null);
+
+      return Scaffold(
+        body: switch (abierta) {
+          _Pantalla.corte => CorteCajaView(onVolver: volver),
+          _Pantalla.cuentas => CuentasPorCobrarView(onVolver: volver),
+          _Pantalla.ropa => RopaPendienteView(onVolver: volver),
+        },
+      );
     }
 
     return Scaffold(
@@ -60,7 +72,31 @@ class _ReportesViewState extends State<ReportesView> {
                   nota: 'Se ve en pantalla, día por día.',
                   accion: 'Ver el corte',
                   iconoAccion: Icons.insights_rounded,
-                  onGenerar: () => _verCorte(true),
+                  onGenerar: () => _abrir(_Pantalla.corte),
+                ),
+                _TarjetaReporte(
+                  icono: Icons.account_balance_wallet_rounded,
+                  titulo: 'Cuentas por cobrar',
+                  descripcion:
+                      'Las órdenes que todavía deben algo: cuánto, desde '
+                      'cuándo y quién, con su teléfono para llamarle. Lo que '
+                      'lleva más de un mes, aparte.',
+                  nota: 'Se ve en pantalla.',
+                  accion: 'Ver las cuentas',
+                  iconoAccion: Icons.insights_rounded,
+                  onGenerar: () => _abrir(_Pantalla.cuentas),
+                ),
+                _TarjetaReporte(
+                  icono: Icons.local_laundry_service_rounded,
+                  titulo: 'Ropa pendiente',
+                  descripcion:
+                      'La ropa que ya pasó su fecha de entrega, la de hoy y '
+                      'la de los próximos días, y las órdenes pagadas que '
+                      'nadie ha venido a recoger.',
+                  nota: 'Se ve en pantalla.',
+                  accion: 'Ver la ropa',
+                  iconoAccion: Icons.insights_rounded,
+                  onGenerar: () => _abrir(_Pantalla.ropa),
                 ),
                 _TarjetaReporte(
                   icono: Icons.point_of_sale_rounded,
@@ -71,7 +107,8 @@ class _ReportesViewState extends State<ReportesView> {
                       'método de pago y contra lo pendiente, y el detalle de '
                       'cada pago.',
                   nota: 'Sale en PDF y, si lo pides, también en Excel.',
-                  onGenerar: () => _abrir(context, const ReporteVentasDialog()),
+                  onGenerar: () =>
+                      _abrirDialogo(context, const ReporteVentasDialog()),
                 ),
               ],
             ),
@@ -82,7 +119,7 @@ class _ReportesViewState extends State<ReportesView> {
   }
 
   /// Abre el diálogo de un reporte y, si se guardó, lo avisa.
-  Future<void> _abrir(BuildContext context, Widget dialogo) async {
+  Future<void> _abrirDialogo(BuildContext context, Widget dialogo) async {
     final mensaje = await showDialog<String>(
       context: context,
       builder: (context) => dialogo,
@@ -93,6 +130,9 @@ class _ReportesViewState extends State<ReportesView> {
     await context.showSuccessDialog(mensaje);
   }
 }
+
+/// Las pantallas de estadísticas que se abren en lugar de las tarjetas.
+enum _Pantalla { corte, cuentas, ropa }
 
 /// Un reporte: qué es, qué trae y el botón para sacarlo.
 class _TarjetaReporte extends StatelessWidget {

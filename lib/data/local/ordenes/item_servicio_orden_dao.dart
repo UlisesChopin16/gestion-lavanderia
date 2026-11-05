@@ -3,10 +3,19 @@ import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/item_con_precio_entry.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/tables/ordenes/item_servicio_orden.dart';
+import 'package:gestion_lavanderia/types/estatus_orden_type.dart';
 
 export 'package:gestion_lavanderia/data/local/ordenes/item_con_precio_entry.dart';
 
 part 'item_servicio_orden_dao.g.dart';
+
+/// Un item que falta por entregar, con su orden y el cliente al que hay que
+/// avisarle.
+typedef ItemPendienteEntry = ({
+  ItemConPrecioEntry item,
+  OrdenServicioEntry orden,
+  ClienteEntry cliente,
+});
 
 /// Los items de una orden. Se insertan y actualizan por lotes, dentro de la
 /// transacción de la orden.
@@ -47,6 +56,36 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
       );
 
     return (await query.getSingle()).read(cuenta) ?? 0;
+  }
+
+  /// Toda la ropa que falta por entregar, de cualquier orden, con su orden y
+  /// su cliente: la ropa pendiente. La de las órdenes canceladas no, porque
+  /// ya no se va a entregar.
+  Future<List<ItemPendienteEntry>> pendientesDeEntrega() async {
+    final query =
+        _queryJoined().join([
+            innerJoin(
+              ordenServicio,
+              ordenServicio.id.equalsExp(itemServicioOrden.ordenId),
+            ),
+            innerJoin(cliente, cliente.id.equalsExp(ordenServicio.clienteId)),
+          ])
+          ..where(
+            itemServicioOrden.estaEntregado.equals(false) &
+                ordenServicio.estatus
+                    .equalsValue(EstatusOrdenType.cancelada)
+                    .not(),
+          )
+          ..orderBy([OrderingTerm.asc(itemServicioOrden.id)]);
+
+    return [
+      for (final fila in await query.get())
+        (
+          item: ItemConPrecioEntry.fromRow(fila, attachedDatabase),
+          orden: fila.readTable(ordenServicio),
+          cliente: fila.readTable(cliente),
+        ),
+    ];
   }
 
   /// Marca como entregados los items indicados y los liga al movimiento del

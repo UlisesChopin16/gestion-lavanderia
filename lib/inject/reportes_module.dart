@@ -17,7 +17,7 @@ class ReportesModule extends ModuleInject {
   Future<void> injectAll() async {
     instance
       ..registerLazySingleton<ReportesLocalDatasource>(
-        () => ReportesLocalDatasource(instance(), instance()),
+        () => ReportesLocalDatasource(instance(), instance(), instance()),
       )
       ..registerLazySingleton<ReporteVentasPdf>(ReporteVentasPdf.new)
       ..registerLazySingleton<ReporteVentasExcel>(ReporteVentasExcel.new)

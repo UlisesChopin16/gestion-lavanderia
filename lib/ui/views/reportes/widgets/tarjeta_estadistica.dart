@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/historial/widgets/colores_historial.dart';
 
-/// El recuadro de cada parte del corte: un título que dice qué se mide, una
-/// nota opcional debajo y el contenido.
+/// El recuadro de cada parte de una pantalla de estadísticas: un título que
+/// dice qué se mide, una nota opcional debajo y el contenido.
 ///
 /// Lleva los mismos fondos que las tarjetas del historial, que ya resolvieron
 /// cómo se despega una tarjeta en claro y en oscuro.
-class TarjetaCorte extends StatelessWidget {
-  const TarjetaCorte({
+class TarjetaEstadistica extends StatelessWidget {
+  const TarjetaEstadistica({
     super.key,
     required this.titulo,
     this.nota,
@@ -52,8 +52,8 @@ class TarjetaCorte extends StatelessWidget {
 }
 
 /// Lo que va en lugar de una gráfica que no tiene nada que enseñar.
-class SinDatosCorte extends StatelessWidget {
-  const SinDatosCorte({super.key, required this.texto, this.alto = 120});
+class SinDatos extends StatelessWidget {
+  const SinDatos({super.key, required this.texto, this.alto = 120});
 
   final String texto;
   final double alto;

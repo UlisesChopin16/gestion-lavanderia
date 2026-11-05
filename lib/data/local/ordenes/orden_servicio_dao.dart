@@ -2,8 +2,12 @@ import 'package:drift/drift.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/models/tables/ordenes/orden_servicio.dart';
+import 'package:gestion_lavanderia/types/estatus_orden_type.dart';
 
 part 'orden_servicio_dao.g.dart';
+
+/// Una orden con saldo y su cliente, para las cuentas por cobrar.
+typedef OrdenConCliente = ({OrdenServicioEntry orden, ClienteEntry cliente});
 
 @DriftAccessor(tables: [OrdenServicio])
 class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
@@ -33,6 +37,31 @@ class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
       ]);
 
     return query.get();
+  }
+
+  /// Las órdenes que todavía deben algo, con su cliente: las cuentas por
+  /// cobrar. Las canceladas no, aunque les quede saldo: ya no se van a
+  /// cobrar.
+  ///
+  /// El margen es el mismo medio centavo con el que se da un saldo por cero.
+  Future<List<OrdenConCliente>> conSaldo() async {
+    final query =
+        select(ordenServicio).join([
+          innerJoin(cliente, cliente.id.equalsExp(ordenServicio.clienteId)),
+        ])..where(
+          ordenServicio.restante.isBiggerThanValue(0.005) &
+              ordenServicio.estatus
+                  .equalsValue(EstatusOrdenType.cancelada)
+                  .not(),
+        );
+
+    return [
+      for (final fila in await query.get())
+        (
+          orden: fila.readTable(ordenServicio),
+          cliente: fila.readTable(cliente),
+        ),
+    ];
   }
 
   /// Inserta la orden asignándole folio.

@@ -30,18 +30,31 @@ class ColumnaGrafica {
   final bool resaltada;
 }
 
-/// Una serie de columnas sobre un eje en pesos, con el detalle de cada una
-/// al pasar el mouse.
+/// Una serie de columnas —en pesos de entrada, o en lo que diga
+/// [etiquetaEje]— con el detalle de cada una al pasar el mouse.
 ///
 /// Es una sola serie, así que no lleva leyenda: el título de la tarjeta dice
 /// qué se mide. Las columnas son delgadas —no llenan su espacio—, con la
 /// punta redonda y la base recta sobre el eje, y la cuadrícula es una línea
 /// fina que no compite con los datos.
 class GraficaColumnas extends StatelessWidget {
-  const GraficaColumnas({super.key, required this.columnas, this.alto = 220});
+  const GraficaColumnas({
+    super.key,
+    required this.columnas,
+    this.alto = 220,
+    this.etiquetaEje = pesosCortos,
+    this.soloEnteros = false,
+  });
 
   final List<ColumnaGrafica> columnas;
   final double alto;
+
+  /// Cómo se escribe cada valor del eje: `$1.2k`, `12 conceptos`.
+  final String Function(double valor) etiquetaEje;
+
+  /// Si lo que se cuenta son cosas enteras —conceptos, órdenes—: el eje no
+  /// lleva líneas en 2.5.
+  final bool soloEnteros;
 
   /// El ancho máximo de una columna: más ancha deja de leerse como columna.
   static const double _anchoColumna = 22;
@@ -50,7 +63,10 @@ class GraficaColumnas extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
-    final escala = _Escala.para(columnas.map((c) => c.valor));
+    final escala = _Escala.para(
+      columnas.map((c) => c.valor),
+      soloEnteros: soloEnteros,
+    );
     final estiloEje = theme.textTheme.labelSmall?.copyWith(
       color: scheme.onSurfaceVariant,
     );
@@ -116,7 +132,7 @@ class GraficaColumnas extends StatelessWidget {
                     interval: escala.intervalo,
                     getTitlesWidget: (valor, meta) => SideTitleWidget(
                       meta: meta,
-                      child: Text(pesosCortos(valor), style: estiloEje),
+                      child: Text(etiquetaEje(valor), style: estiloEje),
                     ),
                   ),
                 ),
@@ -191,11 +207,16 @@ String pesosCortos(double valor) {
 class _Escala {
   const _Escala(this.maximo, this.intervalo);
 
-  factory _Escala.para(Iterable<double> valores) {
+  factory _Escala.para(Iterable<double> valores, {bool soloEnteros = false}) {
     final mayor = valores.fold<double>(0, math.max);
-    if (mayor <= 0) return const _Escala(100, 25);
+    if (mayor <= 0) {
+      return soloEnteros ? const _Escala(4, 1) : const _Escala(100, 25);
+    }
 
-    final intervalo = _redondo(mayor / 4);
+    var intervalo = _redondo(mayor / 4);
+    // Contando cosas, una línea en 2.5 no quiere decir nada.
+    if (soloEnteros) intervalo = math.max(1, intervalo.ceilToDouble());
+
     return _Escala((mayor / intervalo).ceil() * intervalo, intervalo);
   }
 

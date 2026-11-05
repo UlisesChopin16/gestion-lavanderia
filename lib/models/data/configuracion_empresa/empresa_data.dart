@@ -49,6 +49,17 @@ sealed class EmpresaData with _$EmpresaData {
   bool get esNueva => id == 0;
 
   bool get tieneLogo => logo != null && logo!.isNotEmpty;
+
+  /// La dirección en una línea, o vacía si todavía no se captura.
+  String get direccionImpresa => direccion.esNueva ? '' : direccion.completa;
+
+  /// Cómo contactar a la lavandería, en el orden en que se imprime: teléfono,
+  /// correo y página. Sólo lo que esté capturado.
+  List<String> get contacto => [
+    if (telefono.isNotEmpty) 'Tel. $telefono',
+    if (correo.isNotEmpty) correo,
+    if (paginaWeb.isNotEmpty) paginaWeb,
+  ];
 }
 
 /// La cuenta de correo desde la que la lavandería envía los tickets.

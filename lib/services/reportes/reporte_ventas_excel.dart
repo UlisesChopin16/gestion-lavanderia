@@ -1,23 +1,30 @@
 import 'dart:typed_data';
 
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
+import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 import 'package:gestion_lavanderia/services/reportes/libro_xlsx.dart';
 
-/// El reporte general de ventas como libro de Excel: el de los periodos de
-/// más de un mes, donde las órdenes son muchas y se quieren filtrar.
+/// El reporte general de ventas como libro de Excel: sale junto al PDF
+/// cuando se pide, para filtrar y sumar las órdenes en una hoja de cálculo.
 ///
-/// Arriba, de qué es y de cuándo; luego la tabla, con filtro en el
+/// Arriba, de quién es, de qué y de cuándo; luego la tabla, con filtro en el
 /// encabezado y el encabezado fijo al desplazarse; luego el resumen, y al
 /// final el detalle de pagos, del que salen lo cobrado y lo cobrado por
 /// método.
 class ReporteVentasExcel {
   const ReporteVentasExcel();
 
-  Uint8List generar(ReporteVentas reporte, {String empresa = ''}) {
+  Uint8List generar(ReporteVentas reporte, {EmpresaData? empresa}) {
+    final nombre = empresa?.nombre ?? '';
+    final direccion = empresa?.direccionImpresa ?? '';
+    final contacto = (empresa?.contacto ?? const <String>[]).join('  ·  ');
+
     final filas = <List<CeldaXlsx?>>[
       [const TextoXlsx('Reporte general de ventas', EstiloXlsx.titulo)],
-      if (empresa.isNotEmpty) [TextoXlsx(empresa, EstiloXlsx.nota)],
+      if (nombre.isNotEmpty) [TextoXlsx(nombre, EstiloXlsx.seccion)],
+      if (direccion.isNotEmpty) [TextoXlsx(direccion, EstiloXlsx.nota)],
+      if (contacto.isNotEmpty) [TextoXlsx(contacto, EstiloXlsx.nota)],
       [
         TextoXlsx(
           'Del ${reporte.rango.desde.formatDate} '

@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/title_container.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/dialogs/corte_caja_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/dialogs/reporte_ventas_dialog.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Reportes y estadísticas: una tarjeta por reporte que se puede sacar.
 ///
-/// De momento es uno, el general de ventas. Van en tarjetas y no en una
-/// lista porque cada uno se explica en dos renglones —qué trae y para qué
-/// sirve— y así quedan los que se agreguen después, uno junto al otro.
+/// El corte de caja va primero porque es el de todos los días. Van en
+/// tarjetas y no en una lista porque cada uno se explica en dos renglones
+/// —qué trae y para qué sirve— y así quedan los que se agreguen después, uno
+/// junto al otro.
 class ReportesView extends StatelessWidget {
   const ReportesView({super.key});
 
@@ -32,6 +34,16 @@ class ReportesView extends StatelessWidget {
               runSpacing: 16,
               children: [
                 _TarjetaReporte(
+                  icono: Icons.savings_rounded,
+                  titulo: 'Corte de caja',
+                  descripcion:
+                      'Todo lo que se cobró en un día, de cualquier orden: '
+                      'el total, lo cobrado por método de pago y cuánto '
+                      'efectivo debe haber en la caja. Al final, cada cobro.',
+                  nota: 'Sale en PDF.',
+                  onGenerar: () => _abrir(context, const CorteCajaDialog()),
+                ),
+                _TarjetaReporte(
                   icono: Icons.point_of_sale_rounded,
                   titulo: 'Reporte general de ventas',
                   descripcion:
@@ -39,8 +51,8 @@ class ReportesView extends StatelessWidget {
                       'que falta. Después, el total cobrado, lo cobrado por '
                       'método de pago y contra lo pendiente, y el detalle de '
                       'cada pago.',
-                  nota: 'Hasta un mes sale en PDF; más de un mes, en Excel.',
-                  onGenerar: () => _reporteVentas(context),
+                  nota: 'Sale en PDF y, si lo pides, también en Excel.',
+                  onGenerar: () => _abrir(context, const ReporteVentasDialog()),
                 ),
               ],
             ),
@@ -50,10 +62,11 @@ class ReportesView extends StatelessWidget {
     );
   }
 
-  Future<void> _reporteVentas(BuildContext context) async {
+  /// Abre el diálogo de un reporte y, si se guardó, lo avisa.
+  Future<void> _abrir(BuildContext context, Widget dialogo) async {
     final mensaje = await showDialog<String>(
       context: context,
-      builder: (context) => const ReporteVentasDialog(),
+      builder: (context) => dialogo,
     );
 
     if (mensaje == null || !context.mounted) return;

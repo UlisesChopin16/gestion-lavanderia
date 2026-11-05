@@ -37,4 +37,20 @@ class GuardadoArchivo {
 
     return destino;
   }
+
+  /// Escribe [bytes] junto a [hermano] —en su carpeta y con su nombre—, con
+  /// otra [extension]. Es el Excel que acompaña al PDF de un reporte: el
+  /// usuario eligió dónde guardar uno, y no tiene por qué elegirlo dos veces.
+  ///
+  /// Devuelve dónde quedó.
+  Future<String> guardarJunto(
+    Uint8List bytes, {
+    required String hermano,
+    required String extension,
+  }) async {
+    final destino = p.setExtension(hermano, '.$extension');
+    await File(destino).writeAsBytes(bytes, flush: true);
+
+    return destino;
+  }
 }

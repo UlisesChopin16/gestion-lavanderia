@@ -2,9 +2,11 @@ import 'package:collection/collection.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_history_dao.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_servicio_dao.dart';
+import 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 import 'package:gestion_lavanderia/types/estatus_orden_type.dart';
 
+export 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 export 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 
 /// Los datos de los reportes, ya armados como modelos.
@@ -33,6 +35,28 @@ class ReportesLocalDatasource {
       ventas: [
         for (final orden in ordenes)
           _venta(orden, movimientos[orden.id] ?? const []),
+      ],
+    );
+  }
+
+  /// Lo que se cobró el [dia], de cualquier orden: el corte de caja.
+  Future<CorteCaja> corteCaja(DateTime dia, {DateTime? ahora}) async {
+    final rango = RangoReporte(dia, dia);
+    final cobros = await _history.cobrosEntre(rango.inicio, rango.fin);
+
+    return CorteCaja(
+      dia: rango.desde,
+      generado: ahora ?? DateTime.now(),
+      cobros: [
+        for (final (:movimiento, :folio, :cliente) in cobros)
+          CobroCorte(
+            folio: folio,
+            cliente: cliente,
+            fecha: movimiento.fecha,
+            metodo: movimiento.metodoPago,
+            monto: movimiento.monto,
+            recibido: movimiento.recibido,
+          ),
       ],
     );
   }

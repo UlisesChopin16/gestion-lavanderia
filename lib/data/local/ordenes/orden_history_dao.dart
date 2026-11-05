@@ -11,6 +11,14 @@ export 'package:gestion_lavanderia/data/local/ordenes/orden_con_detalles_entry.d
 
 part 'orden_history_dao.g.dart';
 
+/// Un cobro con lo que hace falta para reconocerlo en el corte de caja: a
+/// qué orden fue y de quién.
+typedef CobroConOrden = ({
+  OrdenHistoryEntry movimiento,
+  String folio,
+  String cliente,
+});
+
 /// Bitácora de pagos de las órdenes.
 ///
 /// Es además la fuente de la lista de órdenes, porque cada renglón muestra la
@@ -86,6 +94,38 @@ class OrdenHistoryDao extends DatabaseAccessor<AppDatabase>
 
     return [for (final fila in await query.get()) fila.readTable(ordenHistory)];
   }
+
+  /// Los cobros hechos entre [inicio] —incluido— y [fin] —excluido—, con
+  /// el folio de su orden y el nombre del cliente, para el corte de caja.
+  ///
+  /// Van por la fecha del movimiento y no por la de la orden: el corte es del
+  /// dinero que entró en esos días. Sólo los movimientos que traen dinero.
+  Future<List<CobroConOrden>> cobrosEntre(DateTime inicio, DateTime fin) async {
+    final query =
+        select(ordenHistory).join([
+          innerJoin(
+            ordenServicio,
+            ordenServicio.id.equalsExp(ordenHistory.ordenId),
+          ),
+          innerJoin(cliente, cliente.id.equalsExp(ordenServicio.clienteId)),
+        ])..where(
+          ordenHistory.fecha.isBiggerOrEqualValue(inicio) &
+              ordenHistory.fecha.isSmallerThanValue(fin) &
+              ordenHistory.monto.isBiggerThanValue(0),
+        );
+
+    return [
+      for (final fila in await query.get())
+        (
+          movimiento: fila.readTable(ordenHistory),
+          folio: fila.readTable(ordenServicio).folio,
+          cliente: _nombreCliente(fila.readTable(cliente)),
+        ),
+    ];
+  }
+
+  static String _nombreCliente(ClienteEntry cliente) =>
+      '${cliente.nombres} ${cliente.apellidos}'.trim();
 
   Future<int> insertHistory(OrdenHistoryCompanion row) {
     return into(ordenHistory).insert(row);

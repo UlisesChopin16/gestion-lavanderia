@@ -97,7 +97,7 @@ class _MetodoPago extends StatelessWidget {
       value: metodoPago,
       leadingIcon: Icon(metodoPago.icon),
       items: [
-        for (final metodo in MetodoPagoType.values)
+        for (final metodo in MetodoPagoType.seleccionables)
           DropdownMenuEntry<MetodoPagoType>(
             value: metodo,
             label: metodo.value,

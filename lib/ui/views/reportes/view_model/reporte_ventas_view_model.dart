@@ -26,6 +26,9 @@ sealed class ReporteVentasState with _$ReporteVentasState {
     /// calendario: vacía, con una mientras se elige la segunda, o con dos.
     @Default(<DateTime?>[]) List<DateTime?> fechas,
 
+    /// Si además del PDF se guarda el Excel, junto a él.
+    @Default(false) bool tambienExcel,
+
     @Default(false) bool generando,
     @Default('') String mensajeError,
   }) = _ReporteVentasState;
@@ -50,8 +53,8 @@ sealed class ReporteVentasState with _$ReporteVentasState {
 
 /// El reporte general de ventas: se elige el periodo, se genera y se guarda.
 ///
-/// Sale en PDF hasta un mes y en Excel de ahí en adelante; quien lo pide no
-/// lo elige, pero el diálogo le dice en cuál saldrá antes de generarlo.
+/// Sale siempre en PDF. Si se pide, también en Excel, que se guarda junto al
+/// PDF con el mismo nombre: así se elige la carpeta una sola vez.
 @riverpod
 class ReporteVentasViewModel extends _$ReporteVentasViewModel {
   final _reportes = instance<ReportesLocalDatasource>();
@@ -71,6 +74,10 @@ class ReporteVentasViewModel extends _$ReporteVentasViewModel {
     state = state.copyWith(fechas: fechas, mensajeError: '');
   }
 
+  void pedirExcel(bool tambienExcel) {
+    state = state.copyWith(tambienExcel: tambienExcel);
+  }
+
   /// Genera el reporte y pide dónde guardarlo. Devuelve lo que se hizo,
   /// dicho para el aviso, o `null` si se canceló o falló: el porqué queda en
   /// [ReporteVentasState.mensajeError].
@@ -87,23 +94,32 @@ class ReporteVentasViewModel extends _$ReporteVentasViewModel {
 
     try {
       final reporte = await _reportes.ventas(rango, ahora: ahora);
-      final empresa = (await _empresas.empresa())?.nombre ?? '';
-      final formato = rango.formato;
-      final archivo = switch (formato) {
-        FormatoReporte.pdf => await _pdf.generar(reporte, empresa: empresa),
-        FormatoReporte.excel => _excel.generar(reporte, empresa: empresa),
-      };
+      final empresa = await _empresas.empresa();
 
       final ruta = await _guardado.guardar(
-        archivo,
-        nombre: nombreArchivo(rango, formato),
-        extension: formato.extension,
+        await _pdf.generar(reporte, empresa: empresa),
+        nombre: nombreArchivo(rango),
+        extension: 'pdf',
         titulo: 'Guardar el reporte',
       );
 
+      // El Excel sólo se arma si se guardó el PDF: se cerró el diálogo, no
+      // hay a dónde ponerlo.
+      final rutaExcel = ruta == null || !state.tambienExcel
+          ? null
+          : await _guardado.guardarJunto(
+              _excel.generar(reporte, empresa: empresa),
+              hermano: ruta,
+              extension: 'xlsx',
+            );
+
       if (ref.mounted) state = state.copyWith(generando: false);
 
-      return ruta == null ? null : 'El reporte se guardó en $ruta';
+      if (ruta == null) return null;
+
+      return rutaExcel == null
+          ? 'El reporte se guardó en $ruta'
+          : 'El reporte se guardó en $ruta, y el Excel junto a él.';
     } catch (error, stackTrace) {
       debugPrint('No se pudo generar el reporte.\n$error\n$stackTrace');
 
@@ -120,9 +136,9 @@ class ReporteVentasViewModel extends _$ReporteVentasViewModel {
     }
   }
 
-  /// `Reporte de ventas 2026-10-05 al 2026-11-04.xlsx`. Con la fecha al
-  /// revés de como se lee, para que en la carpeta queden en orden.
-  static String nombreArchivo(RangoReporte rango, FormatoReporte formato) {
+  /// `Reporte de ventas 2026-10-05 al 2026-11-04.pdf`. Con la fecha al revés
+  /// de como se lee, para que en la carpeta queden en orden.
+  static String nombreArchivo(RangoReporte rango) {
     String dia(DateTime fecha) =>
         '${fecha.year}-${_dosCifras(fecha.month)}-${_dosCifras(fecha.day)}';
 
@@ -130,7 +146,7 @@ class ReporteVentasViewModel extends _$ReporteVentasViewModel {
         ? dia(rango.desde)
         : '${dia(rango.desde)} al ${dia(rango.hasta)}';
 
-    return 'Reporte de ventas $periodo.${formato.extension}';
+    return 'Reporte de ventas $periodo.pdf';
   }
 
   static String _dosCifras(int numero) => numero.toString().padLeft(2, '0');

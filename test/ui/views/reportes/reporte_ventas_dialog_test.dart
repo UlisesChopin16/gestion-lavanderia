@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:typed_data';
 
 import 'package:drift/drift.dart' show Value;
 import 'package:drift/native.dart';
@@ -14,32 +13,8 @@ import 'package:gestion_lavanderia/ui/views/reportes/reportes_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/view_model/reporte_ventas_view_model.dart';
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 
+import '../../../support/guardado_falso.dart';
 import '../../../support/inyeccion_de_prueba.dart';
-
-/// Sin diálogo del sistema: anota qué le pidieron guardar.
-class _GuardadoFalso extends GuardadoArchivo {
-  Uint8List? bytes;
-  String? nombre;
-  String? extension;
-
-  /// En `true`, hace como si se cerrara el diálogo sin guardar.
-  bool cancelar = false;
-
-  @override
-  Future<String?> guardar(
-    Uint8List bytes, {
-    required String nombre,
-    required String extension,
-    required String titulo,
-  }) async {
-    if (cancelar) return null;
-
-    this.bytes = bytes;
-    this.nombre = nombre;
-    this.extension = extension;
-    return 'C:/Reportes/$nombre';
-  }
-}
 
 /// La sección de reportes y el diálogo del reporte de ventas: se elige el
 /// periodo, se dice en qué sale y se guarda.
@@ -49,13 +24,13 @@ void main() {
   setUpAll(ConstantsManager.initFormats);
 
   late AppDatabase db;
-  late _GuardadoFalso guardado;
+  late GuardadoFalso guardado;
 
   setUp(() async {
     db = AppDatabase.forTesting(NativeDatabase.memory());
     await registrarDependenciasDePrueba(db: db);
 
-    guardado = _GuardadoFalso();
+    guardado = GuardadoFalso();
     instance.registerLazySingleton<GuardadoArchivo>(() => guardado);
 
     final clienteId = await db.clientesDao.insertCliente(
@@ -99,7 +74,7 @@ void main() {
         ),
       ),
     );
-    await tester.tap(find.text('Generar reporte'));
+    await tester.tap(botonDeLaTarjeta('Reporte general de ventas'));
     await tester.pumpAndSettle();
   }
 
@@ -127,8 +102,6 @@ void main() {
   ) async {
     await abrirDialogo(tester);
 
-    expect(find.text('Sale en PDF.'), findsOneWidget);
-
     await generar(tester, 'Generar PDF');
 
     final hoy = DateTime.now();
@@ -142,19 +115,40 @@ void main() {
       find.text('El reporte se guardó en C:/Reportes/${guardado.nombre}'),
       findsOneWidget,
     );
+    // Sin la casilla, sólo el PDF.
+    expect(guardado.bytesJunto, isNull);
   });
 
-  testWidgets('tres meses sale en Excel', (tester) async {
+  testWidgets('aunque sean tres meses, sale en PDF', (tester) async {
     await abrirDialogo(tester);
     await elegir(tester, 'Tres meses');
 
-    expect(find.textContaining('Sale en Excel'), findsOneWidget);
+    await generar(tester, 'Generar PDF');
 
-    await generar(tester, 'Generar Excel');
+    expect(guardado.extension, 'pdf');
+    expect(ascii.decode(guardado.bytes!.take(5).toList()), '%PDF-');
+  });
 
-    expect(guardado.extension, 'xlsx');
+  testWidgets('con la casilla, el Excel se guarda junto al PDF', (
+    tester,
+  ) async {
+    await abrirDialogo(tester);
+    await tester.tap(find.text('También en Excel'));
+    await tester.pumpAndSettle();
+
+    await generar(tester, 'Generar PDF y Excel');
+
+    expect(guardado.extension, 'pdf');
     // Un .xlsx es un zip: empieza con `PK`.
-    expect(ascii.decode(guardado.bytes!.take(2).toList()), 'PK');
+    expect(ascii.decode(guardado.bytesJunto!.take(2).toList()), 'PK');
+    expect(guardado.rutaJunto, endsWith('.xlsx'));
+    expect(
+      find.text(
+        'El reporte se guardó en C:/Reportes/${guardado.nombre}, y el '
+        'Excel junto a él.',
+      ),
+      findsOneWidget,
+    );
   });
 
   testWidgets('otras fechas pide las fechas antes de generar', (tester) async {
@@ -164,7 +158,9 @@ void main() {
     expect(find.text('Elige las fechas del reporte.'), findsOneWidget);
     expect(
       tester
-          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Generar'))
+          .widget<FilledButton>(
+            find.widgetWithText(FilledButton, 'Generar PDF'),
+          )
           .onPressed,
       isNull,
     );
@@ -206,14 +202,12 @@ void main() {
       final rango = estado.rangoAl(ahora)!;
       expect(rango.desde, DateTime(2026, 9));
       expect(rango.hasta, DateTime(2026, 10, 20));
-      expect(rango.formato, FormatoReporte.excel);
     });
 
     test('el nombre del archivo lleva las dos fechas', () {
       expect(
         ReporteVentasViewModel.nombreArchivo(
           RangoReporte(DateTime(2026, 10, 5), DateTime(2026, 11, 4)),
-          FormatoReporte.pdf,
         ),
         'Reporte de ventas 2026-10-05 al 2026-11-04.pdf',
       );

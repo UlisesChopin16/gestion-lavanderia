@@ -36,7 +36,7 @@ class FiltroMetodoPago extends StatelessWidget {
       onDelete: () => onChanged(null),
       leadingIcon: Icon(metodoPago?.icon ?? Icons.payments_outlined),
       items: [
-        for (final opcion in MetodoPagoType.values)
+        for (final opcion in MetodoPagoType.seleccionables)
           DropdownMenuEntry<MetodoPagoType>(
             value: opcion,
             label: opcion.value,

@@ -2,7 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 
 /// Las reglas del reporte de ventas sin base ni archivo: qué días abarca
-/// cada periodo, cuándo sale en Excel y qué suma.
+/// cada periodo y qué suma.
 void main() {
   // Un miércoles por la tarde: la hora no debe mover ningún periodo.
   final ahora = DateTime(2026, 11, 4, 18, 30);
@@ -28,27 +28,6 @@ void main() {
 
     test('otras fechas no tiene rango hasta que se eligen', () {
       expect(PeriodoReporte.rango.rangoDesde(ahora), isNull);
-    });
-
-    test('hasta un mes sale en PDF; de ahí en adelante, en Excel', () {
-      expect(rango(PeriodoReporte.hoy).formato, FormatoReporte.pdf);
-      expect(rango(PeriodoReporte.semana).formato, FormatoReporte.pdf);
-      expect(rango(PeriodoReporte.mes).formato, FormatoReporte.pdf);
-      expect(rango(PeriodoReporte.tresMeses).formato, FormatoReporte.excel);
-      expect(rango(PeriodoReporte.anio).formato, FormatoReporte.excel);
-    });
-
-    test('un rango elegido a mano corta en el mismo mes', () {
-      final hasta = DateTime(2026, 11, 4);
-
-      expect(
-        RangoReporte(DateTime(2026, 10, 4), hasta).formato,
-        FormatoReporte.pdf,
-      );
-      expect(
-        RangoReporte(DateTime(2026, 10, 3), hasta).formato,
-        FormatoReporte.excel,
-      );
     });
 
     test('las fechas se aceptan en cualquier orden y con hora', () {

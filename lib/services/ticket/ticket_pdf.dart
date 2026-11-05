@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
@@ -6,6 +5,7 @@ import 'package:gestion_lavanderia/extensions/double_ext.dart';
 import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/orden_detalle_data.dart';
 import 'package:gestion_lavanderia/services/fuentes_pdf.dart';
+import 'package:gestion_lavanderia/services/logo_pdf.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -33,7 +33,7 @@ class TicketPdf {
       author: empresa?.nombre,
       theme: await FuentesPdf.tema(),
     );
-    final logo = await _logo(empresa);
+    final logo = await LogoPdf.de(empresa);
     final nota = orden.descripcion?.trim() ?? '';
 
     documento.addPage(
@@ -79,19 +79,6 @@ class TicketPdf {
 
     return 'Pagó con ${recibido.enPesos}  ·  $vuelto';
   }
-
-  /// El logo de la empresa, o `null` si no tiene o el archivo ya no está. Un
-  /// logo que falta no impide el ticket: sale sin él.
-  Future<pw.MemoryImage?> _logo(EmpresaData? empresa) async {
-    final ruta = empresa?.logo;
-    if (ruta == null || ruta.isEmpty) return null;
-
-    try {
-      return pw.MemoryImage(await File(ruta).readAsBytes());
-    } on FileSystemException {
-      return null;
-    }
-  }
 }
 
 // Las secciones son widgets del paquete `pdf` —`pw.StatelessWidget`—, no de
@@ -112,15 +99,8 @@ class _Empresa extends pw.StatelessWidget {
   pw.Widget build(pw.Context context) {
     final empresa = this.empresa;
     final logo = this.logo;
-    final contacto = [
-      if (empresa != null && empresa.telefono.isNotEmpty)
-        'Tel. ${empresa.telefono}',
-      if (empresa != null && empresa.correo.isNotEmpty) empresa.correo,
-      if (empresa != null && empresa.paginaWeb.isNotEmpty) empresa.paginaWeb,
-    ];
-    final direccion = empresa == null || empresa.direccion.esNueva
-        ? ''
-        : empresa.direccion.completa;
+    final contacto = empresa?.contacto ?? const <String>[];
+    final direccion = empresa?.direccionImpresa ?? '';
 
     return pw.Column(
       children: [

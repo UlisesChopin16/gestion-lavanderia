@@ -141,4 +141,79 @@ void main() {
     expect(reporte.ventas.single.estado, EstadoPagoVenta.cancelado);
     expect(reporte.totalVendido, 0);
   });
+
+  group('el corte de caja', () {
+    final hoy = DateTime(2026, 11, 4);
+
+    test('va por el día del cobro, no por el de la orden', () async {
+      // Una orden de octubre que se terminó de pagar hoy: el abono de hoy
+      // está en el corte de hoy.
+      final vieja = await orden(
+        dia: DateTime(2026, 10, 20, 9),
+        total: 300,
+        cobros: [
+          (DateTime(2026, 10, 20, 9), 100, MetodoPagoType.efectivo),
+          (DateTime(2026, 11, 4, 17), 200, MetodoPagoType.tarjeta),
+        ],
+      );
+      // El último instante del día entra; la medianoche siguiente, no.
+      final nueva = await orden(
+        dia: DateTime(2026, 11, 4, 23, 59),
+        total: 50,
+        cobros: [(DateTime(2026, 11, 4, 23, 59), 50, MetodoPagoType.efectivo)],
+      );
+      await orden(
+        dia: DateTime(2026, 11, 5),
+        total: 70,
+        cobros: [(DateTime(2026, 11, 5), 70, MetodoPagoType.efectivo)],
+      );
+
+      final corte = await reportes.corteCaja(hoy);
+
+      expect(
+        [for (final c in corte.cobros) (c.folio, c.monto, c.metodo)],
+        [
+          (vieja, 200, MetodoPagoType.tarjeta),
+          (nueva, 50, MetodoPagoType.efectivo),
+        ]..sort((a, b) => a.$1.compareTo(b.$1)),
+      );
+      expect(corte.cobros.first.cliente, 'Ana López');
+      expect(corte.dia, hoy);
+    });
+
+    test('el alta sin abono no es un cobro', () async {
+      // `orden` deja siempre el movimiento del alta, en cero.
+      await orden(dia: DateTime(2026, 11, 4, 10), total: 80);
+
+      expect((await reportes.corteCaja(hoy)).cobros, isEmpty);
+    });
+
+    test('trae con cuánto pagó el cliente', () async {
+      final creada = await db.ordenServicioDao.insertOrden(
+        OrdenServicioCompanion.insert(
+          clienteId: clienteId,
+          folio: '',
+          estatus: EstatusOrdenType.pagado,
+          total: 150,
+          restante: 0,
+          fechaCreacion: DateTime(2026, 11, 4, 9),
+        ),
+      );
+      await db.ordenHistoryDao.insertHistory(
+        OrdenHistoryCompanion.insert(
+          ordenId: creada.id,
+          monto: 150,
+          restante: 0,
+          metodoPago: MetodoPagoType.efectivo,
+          recibido: const Value(500),
+          fecha: DateTime(2026, 11, 4, 9),
+        ),
+      );
+
+      final cobro = (await reportes.corteCaja(hoy)).cobros.single;
+
+      expect(cobro.recibido, 500);
+      expect(cobro.cambio, 350);
+    });
+  });
 }

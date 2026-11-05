@@ -6,9 +6,8 @@ import 'package:gestion_lavanderia/ui/views/reportes/view_model/reporte_ventas_v
 
 /// Pide el periodo del reporte general de ventas y lo genera.
 ///
-/// Antes de generar dice qué días abarca y en qué archivo saldrá: el formato
-/// lo decide el largo del periodo, y es mejor saberlo antes que encontrarse
-/// un Excel donde se esperaba un PDF.
+/// Antes de generar dice qué días abarca. Sale siempre en PDF; el Excel es
+/// opcional, para quien quiera filtrar y sumar en una hoja de cálculo.
 ///
 /// Se cierra devolviendo lo que se hizo, dicho para el aviso, o `null` si se
 /// canceló.
@@ -52,6 +51,10 @@ class ReporteVentasDialog extends ConsumerWidget {
                         onDelete: () => notifier.elegirFechas(const []),
                       ),
                     _Resumen(rango: rango),
+                    _OpcionExcel(
+                      elegida: estado.tambienExcel,
+                      onCambiar: notifier.pedirExcel,
+                    ),
                     if (estado.mensajeError.isNotEmpty)
                       _Error(mensaje: estado.mensajeError),
                   ],
@@ -59,7 +62,8 @@ class ReporteVentasDialog extends ConsumerWidget {
               ),
             ),
             _Pie(
-              formato: rango?.formato,
+              listo: rango != null,
+              conExcel: estado.tambienExcel,
               generando: estado.generando,
               onGenerar: () => _generar(context, notifier),
             ),
@@ -138,7 +142,7 @@ class _Periodos extends StatelessWidget {
   }
 }
 
-/// Qué días abarca el reporte y en qué archivo sale.
+/// Qué días abarca el reporte.
 class _Resumen extends StatelessWidget {
   const _Resumen({required this.rango});
 
@@ -152,19 +156,9 @@ class _Resumen extends StatelessWidget {
     final rango = this.rango;
     final colorTexto = scheme.onSecondaryContainer;
 
-    final (icono, dias, formato) = switch (rango) {
-      null => (
-        Icons.event_rounded,
-        'Elige las fechas del reporte.',
-        'Hasta un mes sale en PDF; más de un mes, en Excel.',
-      ),
-      RangoReporte(formato: FormatoReporte.excel) => (
-        Icons.table_chart_rounded,
-        _dias(rango),
-        'Sale en Excel: es más de un mes, y ahí se filtra y se suma mejor.',
-      ),
-      _ => (Icons.picture_as_pdf_rounded, _dias(rango), 'Sale en PDF.'),
-    };
+    final (icono, dias) = rango == null
+        ? (Icons.event_rounded, 'Elige las fechas del reporte.')
+        : (Icons.date_range_rounded, _dias(rango));
 
     return Container(
       padding: const EdgeInsets.all(14),
@@ -177,21 +171,9 @@ class _Resumen extends StatelessWidget {
         children: [
           Icon(icono, color: colorTexto),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 2,
-              children: [
-                Text(
-                  dias,
-                  style: theme.textTheme.titleSmall?.copyWith(
-                    color: colorTexto,
-                  ),
-                ),
-                Text(
-                  formato,
-                  style: theme.textTheme.bodySmall?.copyWith(color: colorTexto),
-                ),
-              ],
+            child: Text(
+              dias,
+              style: theme.textTheme.titleSmall?.copyWith(color: colorTexto),
             ),
           ),
         ],
@@ -202,6 +184,29 @@ class _Resumen extends StatelessWidget {
   static String _dias(RangoReporte rango) => rango.desde == rango.hasta
       ? 'El ${rango.desde.formatDate}'
       : 'Del ${rango.desde.formatDate} al ${rango.hasta.formatDate}';
+}
+
+/// Si además del PDF se quiere el Excel.
+class _OpcionExcel extends StatelessWidget {
+  const _OpcionExcel({required this.elegida, required this.onCambiar});
+
+  final bool elegida;
+  final ValueChanged<bool> onCambiar;
+
+  @override
+  Widget build(BuildContext context) {
+    return CheckboxListTile(
+      value: elegida,
+      onChanged: (valor) => onCambiar(valor ?? false),
+      contentPadding: EdgeInsets.zero,
+      controlAffinity: ListTileControlAffinity.leading,
+      title: const Text('También en Excel'),
+      subtitle: const Text(
+        'Para filtrar y sumar las órdenes en una hoja de cálculo. Se guarda '
+        'junto al PDF, con el mismo nombre.',
+      ),
+    );
+  }
 }
 
 class _Error extends StatelessWidget {
@@ -222,22 +227,25 @@ class _Error extends StatelessWidget {
   }
 }
 
-/// Cancelar y generar. El botón dice en qué sale el reporte.
+/// Cancelar y generar. El botón dice qué archivos salen.
 class _Pie extends StatelessWidget {
   const _Pie({
-    required this.formato,
+    required this.listo,
+    required this.conExcel,
     required this.generando,
     required this.onGenerar,
   });
 
-  final FormatoReporte? formato;
+  /// Si ya hay fechas: sin ellas no hay qué generar.
+  final bool listo;
+
+  final bool conExcel;
   final bool generando;
   final VoidCallback onGenerar;
 
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
-    final formato = this.formato;
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 20),
@@ -252,16 +260,14 @@ class _Pie extends StatelessWidget {
             child: Text('Cancelar', style: TextStyle(color: scheme.error)),
           ),
           FilledButton.icon(
-            onPressed: formato == null || generando ? null : onGenerar,
+            onPressed: !listo || generando ? null : onGenerar,
             icon: generando
                 ? const SizedBox.square(
                     dimension: 18,
                     child: CircularProgressIndicator(strokeWidth: 2),
                   )
                 : const Icon(Icons.description_rounded),
-            label: Text(
-              formato == null ? 'Generar' : 'Generar ${formato.titulo}',
-            ),
+            label: Text(conExcel ? 'Generar PDF y Excel' : 'Generar PDF'),
           ),
         ],
       ),

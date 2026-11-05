@@ -26,17 +26,6 @@ class RangoReporte {
   /// Exclusivo: la medianoche que cierra el último día.
   DateTime get fin => DateTime(hasta.year, hasta.month, hasta.day + 1);
 
-  /// Si abarca más que "un mes": de ahí en adelante el reporte sale en
-  /// Excel, que con muchas órdenes se filtra y se suma mejor que un PDF.
-  ///
-  /// "Un mes" es el mismo que el del atajo del selector de fechas: del mismo
-  /// día del mes anterior a hoy.
-  bool get pasaDeUnMes =>
-      desde.isBefore(DateTime(hasta.year, hasta.month - 1, hasta.day));
-
-  FormatoReporte get formato =>
-      pasaDeUnMes ? FormatoReporte.excel : FormatoReporte.pdf;
-
   static DateTime _dia(DateTime fecha) =>
       DateTime(fecha.year, fecha.month, fecha.day);
 
@@ -46,17 +35,6 @@ class RangoReporte {
 
   @override
   int get hashCode => Object.hash(desde, hasta);
-}
-
-/// En qué archivo sale un reporte.
-enum FormatoReporte {
-  pdf(titulo: 'PDF', extension: 'pdf'),
-  excel(titulo: 'Excel', extension: 'xlsx');
-
-  const FormatoReporte({required this.titulo, required this.extension});
-
-  final String titulo;
-  final String extension;
 }
 
 /// Los periodos que se pueden pedir para un reporte.

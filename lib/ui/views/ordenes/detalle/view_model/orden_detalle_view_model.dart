@@ -13,6 +13,11 @@ export 'package:gestion_lavanderia/models/data/shared/filas.dart';
 part 'orden_detalle_view_model.freezed.dart';
 part 'orden_detalle_view_model.g.dart';
 
+/// Lo que se registró en el detalle: el aviso para el listado y si con ese
+/// cobro la orden quedó pagada, que es cuando el listado vuelve a enseñar el
+/// ticket.
+typedef MovimientoRegistrado = ({String mensaje, bool saldoLaOrden});
+
 @freezed
 sealed class OrdenDetalleState with _$OrdenDetalleState {
   const OrdenDetalleState._();
@@ -216,9 +221,12 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
     state = state.copyWith(recibido: recibido < 0 ? 0 : recibido);
   }
 
-  /// Escribe el movimiento. Devuelve lo que se registró, dicho para el aviso
-  /// de la pantalla, o `null` si no se pudo.
-  Future<String?> registrar() async {
+  /// Escribe el movimiento. Devuelve lo que se registró, o `null` si no se
+  /// pudo.
+  ///
+  /// La orden queda saldada por este movimiento sólo si en él se cobró algo:
+  /// entregar la ropa de una orden que ya estaba pagada no la salda otra vez.
+  Future<MovimientoRegistrado?> registrar() async {
     final orden = state.orden;
     if (orden == null || !state.puedeRegistrar) return null;
 
@@ -250,11 +258,15 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
         state = state.copyWith(guardando: false, orden: actualizada);
       }
 
-      return _mensaje(
-        folio: orden.folio,
-        abono: abono,
-        entregadas: entregadas,
-        cerrada: actualizada.estatus == EstatusOrdenType.cerrada,
+      return (
+        mensaje: _mensaje(
+          folio: orden.folio,
+          abono: abono,
+          entregadas: entregadas,
+          cerrada: actualizada.estatus == EstatusOrdenType.cerrada,
+        ),
+        saldoLaOrden:
+            abono > 0 && actualizada.restante <= OrdenDetalleState.margenSaldo,
       );
     } catch (error, stackTrace) {
       _fallar(error, stackTrace, 'No se pudo registrar el movimiento.');

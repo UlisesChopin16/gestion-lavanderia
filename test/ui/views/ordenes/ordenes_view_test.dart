@@ -225,7 +225,7 @@ void main() {
     expect(find.byType(OrdenDialog), findsOneWidget);
   });
 
-  testWidgets('crear la orden avisa con qué folio quedó y la trae al listado', (
+  testWidgets('crear la orden enseña su ticket, luego avisa con qué folio quedó', (
     tester,
   ) async {
     final categoriaId = await db.categoriaServicioDao.insertCategoria(
@@ -273,31 +273,20 @@ void main() {
     await tester.pumpAndSettle();
 
     await tester.tap(find.widgetWithText(FilledButton, 'Crear orden · 100.00'));
-
-    // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se repite
-    // sola y nunca se queda quieta.
     for (var i = 0; i < 10; i++) {
       await tester.pump(const Duration(milliseconds: 50));
     }
 
-    final folio =
-        (await instance<OrdenesLocalDatasource>().listado()).single.folio;
+    final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+    final folio = orden.folio;
+    final aviso = find.text('La orden $folio se creó correctamente.');
 
-    expect(find.text('La orden $folio se creó correctamente.'), findsOneWidget);
-
-    // Y detrás del aviso, la orden ya está en la tabla.
-    expect(find.text(folio), findsWidgets);
-    expect(find.byType(OrdenTicketDialog), findsNothing);
-
-    // Al cerrar el aviso sigue el ticket de esa misma orden.
-    await tester.tap(find.text('Cerrar').last);
-    await tester.pump();
-
+    // Lo primero es el ticket de esa misma orden, sin aviso que cerrar antes.
     final ticket = tester.widget<OrdenTicketDialog>(
       find.byType(OrdenTicketDialog),
     );
-    final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
     expect(ticket.ordenId, orden.id);
+    expect(aviso, findsNothing);
 
     await tester.runAsync(
       () => ProviderScope.containerOf(
@@ -319,8 +308,17 @@ void main() {
 
     // ...sólo su botón.
     await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
-    await tester.pumpAndSettle();
+    // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se repite
+    // sola y nunca se queda quieta.
+    for (var i = 0; i < 10; i++) {
+      await tester.pump(const Duration(milliseconds: 50));
+    }
     expect(find.byType(OrdenTicketDialog), findsNothing);
+
+    // Al cerrar el ticket, el aviso con el folio; detrás, la orden ya está en
+    // la tabla.
+    expect(aviso, findsOneWidget);
+    expect(find.text(folio), findsWidgets);
   });
 
   testWidgets('ver la orden abre su detalle', (tester) async {
@@ -352,6 +350,91 @@ void main() {
       ),
       findsOneWidget,
     );
+  });
+
+  group('cobrar desde el detalle', () {
+    /// Abre el detalle de la única orden, cobra [abono] y lo registra.
+    Future<void> cobrar(WidgetTester tester, double abono) async {
+      await tester.tap(find.byType(PopupMenuButton<TableAction>));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Ver la orden'));
+      await tester.pump();
+
+      final dialogo = tester.widget<OrdenDetalleDialog>(
+        find.byType(OrdenDetalleDialog),
+      );
+      final detalle = ProviderScope.containerOf(
+        tester.element(find.byType(OrdenDetalleDialog)),
+      ).read(ordenDetalleViewModelProvider(dialogo.ordenId).notifier);
+      await detalle.cargar();
+      await tester.pumpAndSettle();
+
+      detalle.cambiarAbono(abono);
+      await tester.pump();
+      await tester.tap(
+        find.widgetWithText(
+          FilledButton,
+          'Cobrar ${abono.toStringAsFixed(2)}',
+        ),
+      );
+      // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se
+      // repite sola y nunca se queda quieta.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+    }
+
+    final aviso = find.textContaining('Se registró el pago');
+
+    testWidgets('si la deja pagada, vuelve a salir el ticket y luego el aviso', (
+      tester,
+    ) async {
+      final clienteId = await crearCliente(nombres: 'Lucía');
+      final folio = await crearOrden(clienteId: clienteId, restante: 50);
+
+      await abrirModulo(tester);
+      await cobrar(tester, 50);
+
+      // Primero el ticket de esa orden, ya con el pago final.
+      final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+      expect(
+        tester.widget<OrdenTicketDialog>(find.byType(OrdenTicketDialog)).ordenId,
+        orden.id,
+      );
+      expect(aviso, findsNothing);
+
+      await tester.runAsync(
+        () => ProviderScope.containerOf(
+          tester.element(find.byType(OrdenTicketDialog)),
+        ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
+      );
+      await tester.pumpAndSettle();
+      expect(find.text('Ticket · Orden $folio'), findsOneWidget);
+
+      // Como el de una orden nueva, sólo se cierra con su botón.
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(find.byType(OrdenTicketDialog), findsOneWidget);
+
+      await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+
+      expect(find.byType(OrdenTicketDialog), findsNothing);
+      expect(aviso, findsOneWidget);
+    });
+
+    testWidgets('si todavía debe, sólo avisa', (tester) async {
+      final clienteId = await crearCliente(nombres: 'Lucía');
+      await crearOrden(clienteId: clienteId, restante: 50);
+
+      await abrirModulo(tester);
+      await cobrar(tester, 20);
+
+      expect(find.byType(OrdenTicketDialog), findsNothing);
+      expect(aviso, findsOneWidget);
+    });
   });
 
   testWidgets('una orden cerrada ya no ofrece ver la orden', (tester) async {

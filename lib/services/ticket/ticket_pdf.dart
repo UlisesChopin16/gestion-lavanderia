@@ -71,6 +71,19 @@ class TicketPdf {
     return documento.save();
   }
 
+  /// `Pagó con $500.00  ·  Cambio $330.00`: el renglón que va bajo un pago
+  /// en efectivo. En `null` cuando no se sabe con cuánto pagó: con otro
+  /// método, o en los pagos de antes de que se guardara.
+  static String? efectivoRecibido(MovimientoData movimiento) {
+    final recibido = movimiento.recibido;
+    final cambio = movimiento.cambio;
+    if (recibido == null || cambio == null) return null;
+
+    final vuelto = cambio > 0.005 ? 'Cambio ${_pesos(cambio)}' : 'Sin cambio';
+
+    return 'Pagó con ${_pesos(recibido)}  ·  $vuelto';
+  }
+
   /// Las fuentes se leen una vez por sesión: el mismo ticket se vuelve a
   /// generar cada vez que se abre, y la fuente no cambia.
   static final _fuentes = <String, pw.Font>{};
@@ -293,7 +306,8 @@ class _Cuentas extends pw.StatelessWidget {
   }
 }
 
-/// Los cobros, del primero al último.
+/// Los cobros, del primero al último. Bajo los que fueron en efectivo, con
+/// cuánto pagó el cliente y cuánto se le devolvió.
 class _Pagos extends pw.StatelessWidget {
   _Pagos({required this.historial});
 
@@ -313,22 +327,44 @@ class _Pagos extends pw.StatelessWidget {
           if (movimiento.huboAbono)
             pw.Padding(
               padding: const pw.EdgeInsets.only(bottom: 2),
-              child: pw.Row(
-                children: [
-                  pw.Expanded(
-                    child: pw.Text(
-                      '${movimiento.fecha.formatFullDate}  ·  '
-                      // El más antiguo es el del alta: su cobro es el
-                      // adelanto.
-                      '${indice == 0 ? 'Adelanto' : 'Pago'} en '
-                      '${movimiento.metodoPago.value.toLowerCase()}',
-                      style: const pw.TextStyle(fontSize: 7),
-                    ),
-                  ),
-                  pw.Text(_pesos(movimiento.monto)),
-                ],
+              child: _Pago(movimiento: movimiento, esAdelanto: indice == 0),
+            ),
+      ],
+    );
+  }
+}
+
+/// Un cobro: cuándo, de qué y cuánto; debajo, si fue en efectivo, con
+/// cuánto pagó y su cambio.
+class _Pago extends pw.StatelessWidget {
+  _Pago({required this.movimiento, required this.esAdelanto});
+
+  final MovimientoData movimiento;
+
+  /// El más antiguo es el del alta: su cobro es el adelanto.
+  final bool esAdelanto;
+
+  @override
+  pw.Widget build(pw.Context context) {
+    final efectivo = TicketPdf.efectivoRecibido(movimiento);
+
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.stretch,
+      children: [
+        pw.Row(
+          children: [
+            pw.Expanded(
+              child: pw.Text(
+                '${movimiento.fecha.formatFullDate}  ·  '
+                '${esAdelanto ? 'Adelanto' : 'Pago'} en '
+                '${movimiento.metodoPago.value.toLowerCase()}',
+                style: const pw.TextStyle(fontSize: 7),
               ),
             ),
+            pw.Text(_pesos(movimiento.monto)),
+          ],
+        ),
+        if (efectivo != null) _Pequeno(efectivo, centrado: false),
       ],
     );
   }

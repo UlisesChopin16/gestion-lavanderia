@@ -21,8 +21,8 @@ import 'package:gestion_lavanderia/ui/views/ordenes/widgets/encabezado_orden.dar
 /// * si está pagada y entregada —o cancelada—, un resumen sin nada que
 ///   tocar.
 ///
-/// Se cierra devolviendo lo que se registró, dicho para el aviso del listado,
-/// o `null` si se salió sin registrar nada.
+/// Se cierra devolviendo lo que se registró —el aviso para el listado y si la
+/// orden quedó pagada—, o `null` si se salió sin registrar nada.
 class OrdenDetalleDialog extends ConsumerWidget {
   const OrdenDetalleDialog({super.key, required this.ordenId});
 
@@ -309,13 +309,13 @@ class _Pie extends ConsumerWidget {
   }
 
   Future<void> _registrar(BuildContext context, WidgetRef ref) async {
-    final mensaje = await ref
+    final registrado = await ref
         .read(ordenDetalleViewModelProvider(ordenId).notifier)
         .registrar();
 
-    if (mensaje == null || !context.mounted) return;
+    if (registrado == null || !context.mounted) return;
 
-    Navigator.of(context).pop(mensaje);
+    Navigator.of(context).pop(registrado);
   }
 }
 

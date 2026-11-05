@@ -9,6 +9,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
+import 'package:gestion_lavanderia/theme/theme_app.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/clientes/dialogs/cliente_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart';
@@ -66,9 +67,13 @@ void main() {
   }
 
   /// Abre el diálogo como lo abre el listado y espera a que lea el catálogo.
+  ///
+  /// [tema] reemplaza al de omisión cuando la prueba depende de los bordes de
+  /// la aplicación.
   Future<void> abrirDialogo(
     WidgetTester tester, {
     Size tamano = const Size(1400, 900),
+    ThemeData? tema,
   }) async {
     await tester.binding.setSurfaceSize(tamano);
     addTearDown(() => tester.binding.setSurfaceSize(null));
@@ -84,7 +89,7 @@ void main() {
           // ventana de verdad. Se declara aquí en lugar de cambiar la
           // plataforma de las pruebas porque el framework no deja tocar esa
           // variable global sin reponerla dentro de cada prueba.
-          theme: ThemeData(
+          theme: (tema ?? ThemeData()).copyWith(
             visualDensity: VisualDensity.compact,
             materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
           ),
@@ -354,6 +359,48 @@ void main() {
     expect(recibe.right, metodo.right);
     expect(cambio.left, adelanto.left);
     expect(cambio.top, recibe.top);
+  });
+
+  testWidgets('en reposo, la etiqueta del adelanto no se encima con su texto', (
+    tester,
+  ) async {
+    await sembrarCatalogo();
+
+    // Con los bordes de la aplicación: subrayado en reposo, marco enfocado.
+    await abrirDialogo(tester, tema: const ThemeApp().light);
+
+    // Subrayado, el campo lleva la etiqueta dentro, encima del texto: con el
+    // alto fijo de la fila muy justo, las dos se pintaban una sobre otra.
+    final etiqueta = tester.getRect(find.text('Adelanto'));
+    final texto = tester.getRect(
+      find.descendant(
+        of: find.ancestor(
+          of: find.text('Adelanto'),
+          matching: find.byType(TextField),
+        ),
+        matching: find.text('0.00'),
+      ),
+    );
+
+    expect(etiqueta.bottom, lessThanOrEqualTo(texto.top));
+
+    // Enfocado pasa a marco, que pide menos alto: el marco que se pinta
+    // tiene que seguir midiendo lo que la fila, no encogerse a su contenido.
+    final adelanto = find.ancestor(
+      of: find.text('Adelanto'),
+      matching: find.byType(TextField),
+    );
+    await tester.tap(adelanto);
+    await tester.pumpAndSettle();
+
+    final marco = find.descendant(
+      of: adelanto,
+      matching: find.byWidgetPredicate(
+        (widget) => widget.runtimeType.toString() == '_BorderContainer',
+      ),
+    );
+    final metodo = tester.getRect(find.byType(DropdownMenu<MetodoPagoType>));
+    expect(tester.getSize(marco).height, metodo.height);
   });
 
   testWidgets('los cuatro controles del cobro miden y empiezan igual', (

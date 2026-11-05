@@ -26,7 +26,7 @@ void main() {
   late List<PrecioData> catalogo;
 
   /// Lo que el diálogo devolvió al cerrarse.
-  String? resultado;
+  MovimientoRegistrado? resultado;
 
   OrdenesLocalDatasource ordenes() => instance<OrdenesLocalDatasource>();
 
@@ -62,7 +62,7 @@ void main() {
             body: Builder(
               builder: (context) => TextButton(
                 onPressed: () async {
-                  resultado = await showDialog<String>(
+                  resultado = await showDialog<MovimientoRegistrado>(
                     context: context,
                     builder: (context) => OrdenDetalleDialog(ordenId: ordenId),
                   );
@@ -317,7 +317,8 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.byType(OrdenDetalleDialog), findsNothing);
-    expect(resultado, contains('quedó pagada y entregada'));
+    expect(resultado?.mensaje, contains('quedó pagada y entregada'));
+    expect(resultado?.saldoLaOrden, isTrue);
 
     final cerrada = await ordenes().detalle(orden.id);
     expect(cerrada?.estatus, EstatusOrdenType.cerrada);

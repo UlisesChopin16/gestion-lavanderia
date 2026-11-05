@@ -4,6 +4,8 @@ import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/orden_detalle_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/ordenes/detalle/view_model/orden_detalle_view_model.dart'
+    show MovimientoRegistrado;
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/orden_dialog.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/dialogs/view_model/orden_dialog_view_model.dart'
     show OrdenCreada;
@@ -228,19 +230,19 @@ class OrdenesView extends ConsumerWidget {
     );
   }
 
-  /// Abre el alta, relee el listado si se guardó algo, confirma con qué folio
-  /// quedó la orden y enseña su ticket.
+  /// Abre el alta, relee el listado si se guardó algo, enseña el ticket de la
+  /// orden y confirma con qué folio quedó.
   ///
   /// La relectura se pide aquí y no dentro del diálogo porque el listado es de
   /// esta pantalla: el diálogo sólo devuelve el folio de lo que guardó.
   ///
-  /// El aviso va después de releer para que la orden ya esté en la tabla
-  /// cuando se cierre: se confirma y se ve, en ese orden. Y lleva el folio
-  /// porque es el número con el que se busca la orden después —el del ticket
-  /// que se lleva el cliente—, no un dato de la base que dé igual.
+  /// El ticket va primero porque es lo que sigue en el mostrador: la orden
+  /// recién creada se imprime o se le manda al cliente antes de que se vaya,
+  /// sin pasar antes por un aviso que cerrar.
   ///
-  /// El ticket va al final porque es lo que sigue en el mostrador: la orden
-  /// recién creada se imprime o se le manda al cliente antes de que se vaya.
+  /// El aviso va al final, con la orden ya en la tabla. Lleva el folio porque
+  /// es el número con el que se busca la orden después —el del ticket que se
+  /// lleva el cliente—, no un dato de la base que dé igual.
   Future<void> _agregar(BuildContext context, WidgetRef ref) async {
     final creada = await showDialog<OrdenCreada>(
       context: context,
@@ -253,16 +255,16 @@ class OrdenesView extends ConsumerWidget {
 
     if (!context.mounted) return;
 
-    await context.showSuccessDialog(
-      'La orden ${creada.folio} se creó correctamente.',
-    );
-
-    if (!context.mounted) return;
-
     // Recién creada, el ticket sólo se cierra con sus botones: ni un clic
     // fuera ni Esc. Es lo que se le entrega al cliente, y no debe perderse
     // sin querer.
     await _abrirTicket(context, creada.id, soloConBotones: true);
+
+    if (!context.mounted) return;
+
+    await context.showSuccessDialog(
+      'La orden ${creada.folio} se creó correctamente.',
+    );
   }
 
   /// Abre el detalle de la orden y, si se cobró o se entregó algo, relee el
@@ -270,23 +272,34 @@ class OrdenesView extends ConsumerWidget {
   ///
   /// Mismo orden que el alta: primero se relee, para que la fila ya traiga su
   /// saldo y su estatus nuevos cuando se cierre el aviso.
+  ///
+  /// Si con ese cobro la orden quedó pagada, antes del aviso vuelve a salir
+  /// su ticket, ya con el pago final: es el comprobante que se lleva el
+  /// cliente. Que le falte ropa por recoger no importa; lo que se le entrega
+  /// es la prueba de que ya no debe.
   Future<void> _verOrden(
     BuildContext context,
     WidgetRef ref,
     OrdenListadoData orden,
   ) async {
-    final mensaje = await showDialog<String>(
+    final registrado = await showDialog<MovimientoRegistrado>(
       context: context,
       builder: (context) => OrdenDetalleDialog(ordenId: orden.id),
     );
 
-    if (mensaje == null) return;
+    if (registrado == null) return;
 
     await ref.read(ordenesViewModelProvider.notifier).cargar();
 
     if (!context.mounted) return;
 
-    await context.showSuccessDialog(mensaje);
+    if (registrado.saldoLaOrden) {
+      await _abrirTicket(context, orden.id, soloConBotones: true);
+
+      if (!context.mounted) return;
+    }
+
+    await context.showSuccessDialog(registrado.mensaje);
   }
 
   /// Abre el historial de la orden. Sólo se mira, así que no hay nada que

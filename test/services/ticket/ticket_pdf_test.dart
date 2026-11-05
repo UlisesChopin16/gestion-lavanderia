@@ -85,6 +85,52 @@ void main() {
       esUnPdf(await const TicketPdf().generar(orden: orden()));
     });
 
+    test('bajo un pago en efectivo dice con cuánto pagó y su cambio', () {
+      final fecha = DateTime(2026, 10, 28);
+
+      expect(
+        TicketPdf.efectivoRecibido(
+          MovimientoData(monto: 170, recibido: 500, fecha: fecha),
+        ),
+        r'Pagó con $500.00  ·  Cambio $330.00',
+      );
+      expect(
+        TicketPdf.efectivoRecibido(
+          MovimientoData(monto: 170, recibido: 170, fecha: fecha),
+        ),
+        r'Pagó con $170.00  ·  Sin cambio',
+      );
+      // Con tarjeta, o de antes de que se guardara, no se sabe.
+      expect(
+        TicketPdf.efectivoRecibido(
+          MovimientoData(
+            monto: 170,
+            metodoPago: MetodoPagoType.tarjeta,
+            fecha: fecha,
+          ),
+        ),
+        isNull,
+      );
+    });
+
+    test('con un pago en efectivo también sale', () async {
+      final conEfectivo = orden().copyWith(
+        historial: [
+          MovimientoData(
+            id: 1,
+            monto: 20,
+            restante: 30,
+            recibido: 50,
+            fecha: DateTime(2026, 10, 28, 10),
+          ),
+        ],
+      );
+
+      esUnPdf(
+        await const TicketPdf().generar(orden: conEfectivo, empresa: empresa),
+      );
+    });
+
     test('un logo que ya no está en disco no lo impide', () async {
       final conLogo = empresa.copyWith(logo: '/no/existe/logo.png');
 

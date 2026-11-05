@@ -216,21 +216,50 @@ void main() {
       notificador(id).abonarTodo();
       notificador(id).marcarTodo(true);
 
-      final mensaje = await notificador(id).registrar();
+      final registrado = await notificador(id).registrar();
 
       expect(
-        mensaje,
+        registrado?.mensaje,
         allOf(
           contains('el pago de 170.00'),
           contains('la entrega de 2 conceptos'),
           contains('quedó pagada y entregada'),
         ),
       );
+      expect(registrado?.saldoLaOrden, isTrue);
 
       final orden = await ordenes().detalle(id);
       expect(orden?.estatus, EstatusOrdenType.cerrada);
       expect(orden?.restante, 0);
       expect(orden?.todoEntregado, isTrue);
+    });
+
+    test('pagar lo que falta salda la orden aunque quede ropa', () async {
+      final id = await abrirOrden(abono: 20);
+
+      notificador(id).abonarTodo();
+      final registrado = await notificador(id).registrar();
+
+      expect(registrado?.saldoLaOrden, isTrue);
+      expect((await ordenes().detalle(id))?.todoEntregado, isFalse);
+    });
+
+    test('un pago que no cubre todo no salda la orden', () async {
+      final id = await abrirOrden();
+
+      notificador(id).cambiarAbono(100);
+      final registrado = await notificador(id).registrar();
+
+      expect(registrado?.saldoLaOrden, isFalse);
+    });
+
+    test('entregar ropa de una orden ya pagada no la salda otra vez', () async {
+      final id = await abrirOrden(abono: 170);
+
+      notificador(id).alternarEntrega(item(id, 'Sábana'));
+      final registrado = await notificador(id).registrar();
+
+      expect(registrado?.saldoLaOrden, isFalse);
     });
 
     test('en efectivo guarda con cuánto pagó el cliente', () async {

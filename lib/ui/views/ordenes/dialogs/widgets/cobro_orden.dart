@@ -71,7 +71,11 @@ class CobroOrden extends StatelessWidget {
 
   /// El alto de los controles. Van iguales porque están en fila: uno más alto
   /// que los otros se lee como un error antes que como un detalle.
-  static const double _altoControl = 44;
+  ///
+  /// Lo pide el campo en reposo: subrayado, lleva la etiqueta dentro, encima
+  /// del texto, y con menos de esto se enciman. Enfocado pasa a marco, sube
+  /// la etiqueta a la línea y le sobra sitio.
+  static const double _altoControl = 48;
 
   @override
   Widget build(BuildContext context) {
@@ -181,7 +185,7 @@ class _Controles extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Los campos, en su versión densa. Se cambia el tema en lugar de cada
+    // Los campos, con poco aire. Se cambia el tema en lugar de cada
     // control porque el desplegable no recibe su decoración por parámetro: la
     // lee de aquí. Lo único que cambia son los rellenos y la densidad; los
     // bordes y los colores siguen siendo los de la aplicación.
@@ -201,9 +205,14 @@ class _Controles extends StatelessWidget {
       data: theme.copyWith(
         visualDensity: VisualDensity.standard,
         inputDecorationTheme: theme.inputDecorationTheme.copyWith(
-          isDense: true,
+          // Sin `isDense`: denso, el marco del campo enfocado mide lo que su
+          // contenido —treinta y dos— y no el alto de la fila. Sin él, Material
+          // lo estira a sus cuarenta y ocho, que es [_altoControl].
+          //
+          // Poco aire arriba y abajo: en reposo la etiqueta y el texto van
+          // uno encima del otro y tienen que caber en [_altoControl].
           contentPadding: const EdgeInsets.symmetric(
-            vertical: 10,
+            vertical: 4,
             horizontal: 10,
           ),
           // El alto, a mano: el icono que el desplegable lleva delante pide

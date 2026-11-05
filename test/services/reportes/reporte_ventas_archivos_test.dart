@@ -3,9 +3,7 @@ import 'dart:convert';
 import 'package:archive/archive.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
-import 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
-import 'package:gestion_lavanderia/services/reportes/corte_caja_pdf.dart';
 import 'package:gestion_lavanderia/services/reportes/libro_xlsx.dart';
 import 'package:gestion_lavanderia/services/reportes/reporte_ventas_excel.dart';
 import 'package:gestion_lavanderia/services/reportes/reporte_ventas_pdf.dart';
@@ -230,44 +228,6 @@ void main() {
           .allMatches(latin1.decode(pdf))
           .length;
       expect(paginas, greaterThan(1));
-    });
-  });
-
-  group('CorteCajaPdf', () {
-    test('sale con cobros y sin ellos', () async {
-      final corte = CorteCaja(
-        dia: DateTime(2026, 11, 4),
-        generado: DateTime(2026, 11, 4, 21),
-        cobros: [
-          CobroCorte(
-            folio: '2611-0001',
-            cliente: 'Ana López',
-            fecha: DateTime(2026, 11, 4, 9),
-            metodo: MetodoPagoType.efectivo,
-            monto: 150,
-            recibido: 500,
-          ),
-          CobroCorte(
-            folio: '2611-0002',
-            cliente: 'Luis Pérez',
-            fecha: DateTime(2026, 11, 4, 10),
-            metodo: MetodoPagoType.tarjeta,
-            monto: 200,
-          ),
-        ],
-      );
-      final vacio = CorteCaja(
-        dia: DateTime(2026, 11, 4),
-        generado: DateTime(2026, 11, 4, 21),
-        cobros: const [],
-      );
-
-      for (final pdf in [
-        await const CorteCajaPdf().generar(corte, empresa: empresa),
-        await const CorteCajaPdf().generar(vacio),
-      ]) {
-        expect(ascii.decode(pdf.take(5).toList()), '%PDF-');
-      }
     });
   });
 }

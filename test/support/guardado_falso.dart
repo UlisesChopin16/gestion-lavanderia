@@ -44,9 +44,9 @@ class GuardadoFalso extends GuardadoArchivo {
   }
 }
 
-/// El botón "Generar reporte" de la tarjeta de la sección de reportes que
-/// lleva [titulo]: hay uno por tarjeta.
+/// El botón de la tarjeta de la sección de reportes que lleva [titulo]: hay
+/// uno por tarjeta, y cada uno dice lo suyo.
 Finder botonDeLaTarjeta(String titulo) => find.descendant(
   of: find.ancestor(of: find.text(titulo), matching: find.byType(Card)),
-  matching: find.text('Generar reporte'),
+  matching: find.byType(FilledButton),
 );

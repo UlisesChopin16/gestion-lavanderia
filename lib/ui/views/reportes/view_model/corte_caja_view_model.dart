@@ -4,9 +4,9 @@ import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
-import 'package:gestion_lavanderia/services/guardado_archivo.dart';
-import 'package:gestion_lavanderia/services/reportes/corte_caja_pdf.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+
+export 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 
 part 'corte_caja_view_model.freezed.dart';
 part 'corte_caja_view_model.g.dart';
@@ -16,71 +16,66 @@ sealed class CorteCajaState with _$CorteCajaState {
   const factory CorteCajaState({
     /// El día del corte, a medianoche.
     required DateTime dia,
-    @Default(false) bool generando,
+
+    /// En `null` mientras se cargan por primera vez, o si falló la carga.
+    EstadisticasCorte? estadisticas,
+    @Default(true) bool cargando,
     @Default('') String mensajeError,
   }) = _CorteCajaState;
 }
 
-/// El corte de caja: se elige el día —hoy, de entrada—, se genera el PDF y
-/// se guarda.
+/// El corte de caja en pantalla: el día elegido —hoy, de entrada— con sus
+/// cifras y sus gráficas.
 @riverpod
 class CorteCajaViewModel extends _$CorteCajaViewModel {
   final _reportes = instance<ReportesLocalDatasource>();
-  final _empresas = instance<EmpresaLocalDatasource>();
-  final _pdf = instance<CorteCajaPdf>();
-  final _guardado = instance<GuardadoArchivo>();
 
   @override
-  CorteCajaState build() => CorteCajaState(dia: DateTime.now().soloDia);
+  CorteCajaState build() {
+    final hoy = DateTime.now().soloDia;
+    Future.microtask(() => _cargar(hoy));
 
-  void elegirDia(DateTime dia) {
-    state = state.copyWith(dia: dia.soloDia, mensajeError: '');
+    return CorteCajaState(dia: hoy);
   }
 
-  /// Genera el corte y pide dónde guardarlo. Devuelve lo que se hizo, dicho
-  /// para el aviso, o `null` si se canceló o falló: el porqué queda en
-  /// [CorteCajaState.mensajeError].
-  Future<String?> generar({DateTime? ahora}) async {
-    if (state.generando) return null;
+  /// Cambia de día y lo carga. No pasa de hoy: mañana no se ha cobrado nada.
+  Future<void> elegirDia(DateTime dia) {
+    final hoy = DateTime.now().soloDia;
+    final elegido = dia.soloDia.isAfter(hoy) ? hoy : dia.soloDia;
 
-    state = state.copyWith(generando: true, mensajeError: '');
+    return _cargar(elegido);
+  }
+
+  /// El día anterior o el siguiente al que se ve.
+  Future<void> moverDia(int dias) {
+    final dia = state.dia;
+    return elegirDia(DateTime(dia.year, dia.month, dia.day + dias));
+  }
+
+  /// Vuelve a leer el día que se ve: lo que se cobró desde que se abrió.
+  Future<void> recargar() => _cargar(state.dia);
+
+  Future<void> _cargar(DateTime dia) async {
+    state = state.copyWith(dia: dia, cargando: true, mensajeError: '');
 
     try {
-      final corte = await _reportes.corteCaja(state.dia, ahora: ahora);
-      final empresa = await _empresas.empresa();
+      final estadisticas = await _reportes.estadisticasCorte(dia);
 
-      final ruta = await _guardado.guardar(
-        await _pdf.generar(corte, empresa: empresa),
-        nombre: nombreArchivo(state.dia),
-        extension: 'pdf',
-        titulo: 'Guardar el corte de caja',
-      );
+      // Si mientras tanto se pidió otro día, esta respuesta ya no sirve.
+      if (!ref.mounted || state.dia != dia) return;
 
-      if (ref.mounted) state = state.copyWith(generando: false);
-
-      return ruta == null ? null : 'El corte de caja se guardó en $ruta';
+      state = state.copyWith(estadisticas: estadisticas, cargando: false);
     } catch (error, stackTrace) {
-      debugPrint('No se pudo generar el corte de caja.\n$error\n$stackTrace');
+      debugPrint('No se pudo cargar el corte de caja.\n$error\n$stackTrace');
 
-      if (ref.mounted) {
-        state = state.copyWith(
-          generando: false,
-          mensajeError: error is SQLException
-              ? error.message
-              : 'No se pudo generar el corte de caja.',
-        );
-      }
+      if (!ref.mounted || state.dia != dia) return;
 
-      return null;
+      state = state.copyWith(
+        cargando: false,
+        mensajeError: error is SQLException
+            ? error.message
+            : 'No se pudo cargar el corte de caja.',
+      );
     }
-  }
-
-  /// `Corte de caja 2026-11-04.pdf`, con la fecha al revés de como se lee
-  /// para que en la carpeta queden en orden.
-  static String nombreArchivo(DateTime dia) {
-    String dosCifras(int numero) => numero.toString().padLeft(2, '0');
-
-    return 'Corte de caja ${dia.year}-${dosCifras(dia.month)}-'
-        '${dosCifras(dia.day)}.pdf';
   }
 }

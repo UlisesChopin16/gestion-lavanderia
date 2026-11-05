@@ -2,6 +2,7 @@ import 'package:collection/collection.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_history_dao.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_servicio_dao.dart';
+import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 import 'package:gestion_lavanderia/types/estatus_orden_type.dart';
@@ -39,23 +40,56 @@ class ReportesLocalDatasource {
     );
   }
 
-  /// Lo que se cobró el [dia], de cualquier orden: el corte de caja.
-  Future<CorteCaja> corteCaja(DateTime dia, {DateTime? ahora}) async {
-    final rango = RangoReporte(dia, dia);
-    final cobros = await _history.cobrosEntre(rango.inicio, rango.fin);
+  /// El corte de caja del [dia] —lo que se cobró, de cualquier orden— y lo
+  /// cobrado en los días anteriores, para compararlo.
+  ///
+  /// Es una sola consulta por los siete días: el corte sale de los cobros del
+  /// último, y la comparación de sumar los de cada uno.
+  Future<EstadisticasCorte> estadisticasCorte(
+    DateTime dia, {
+    DateTime? ahora,
+  }) async {
+    final hasta = RangoReporte(dia, dia).desde;
+    final desde = DateTime(
+      hasta.year,
+      hasta.month,
+      hasta.day - (EstadisticasCorte.dias - 1),
+    );
+    final rango = RangoReporte(desde, hasta);
 
-    return CorteCaja(
-      dia: rango.desde,
-      generado: ahora ?? DateTime.now(),
-      cobros: [
-        for (final (:movimiento, :folio, :cliente) in cobros)
-          CobroCorte(
-            folio: folio,
-            cliente: cliente,
-            fecha: movimiento.fecha,
-            metodo: movimiento.metodoPago,
-            monto: movimiento.monto,
-            recibido: movimiento.recibido,
+    final cobros = [
+      for (final (:movimiento, :folio, :cliente) in await _history.cobrosEntre(
+        rango.inicio,
+        rango.fin,
+      ))
+        CobroCorte(
+          folio: folio,
+          cliente: cliente,
+          fecha: movimiento.fecha,
+          metodo: movimiento.metodoPago,
+          monto: movimiento.monto,
+          recibido: movimiento.recibido,
+        ),
+    ];
+    final porDia = groupBy(cobros, (cobro) => cobro.fecha.soloDia);
+    final dias = [
+      for (var i = 0; i < EstadisticasCorte.dias; i++)
+        DateTime(desde.year, desde.month, desde.day + i),
+    ];
+
+    return EstadisticasCorte(
+      corte: CorteCaja(
+        dia: hasta,
+        generado: ahora ?? DateTime.now(),
+        cobros: porDia[hasta] ?? const [],
+      ),
+      semana: [
+        for (final dia in dias)
+          (
+            dia: dia,
+            total: (porDia[dia] ?? const <CobroCorte>[])
+                .map((cobro) => cobro.monto)
+                .sum,
           ),
       ],
     );

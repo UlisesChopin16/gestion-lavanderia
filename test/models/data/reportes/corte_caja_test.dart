@@ -88,4 +88,27 @@ void main() {
     expect(vacio.efectivoCobrado, 0);
     expect(vacio.porMetodo, isEmpty);
   });
+
+  test('lo cobrado por hora junta los cobros de la misma hora', () {
+    expect(corte.porHora, {9: 200, 10: 100, 11: 80, 12: 150});
+  });
+
+  group('contra el día anterior', () {
+    EstadisticasCorte conAyer(double ayer) => EstadisticasCorte(
+      corte: corte,
+      semana: [
+        (dia: DateTime(2026, 11, 3), total: ayer),
+        (dia: dia, total: corte.total),
+      ],
+    );
+
+    test('dice cuánto cambió, como fracción', () {
+      expect(conAyer(265).cambioContraAyer, 1);
+      expect(conAyer(1060).cambioContraAyer, -0.5);
+    });
+
+    test('sin cobros el día anterior, no hay contra qué comparar', () {
+      expect(conAyer(0).cambioContraAyer, isNull);
+    });
+  });
 }

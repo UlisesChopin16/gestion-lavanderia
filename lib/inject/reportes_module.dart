@@ -1,7 +1,6 @@
 import 'package:gestion_lavanderia/datasource/local/reportes_local_datasource.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/services/guardado_archivo.dart';
-import 'package:gestion_lavanderia/services/reportes/corte_caja_pdf.dart';
 import 'package:gestion_lavanderia/services/reportes/reporte_ventas_excel.dart';
 import 'package:gestion_lavanderia/services/reportes/reporte_ventas_pdf.dart';
 
@@ -22,7 +21,6 @@ class ReportesModule extends ModuleInject {
       )
       ..registerLazySingleton<ReporteVentasPdf>(ReporteVentasPdf.new)
       ..registerLazySingleton<ReporteVentasExcel>(ReporteVentasExcel.new)
-      ..registerLazySingleton<CorteCajaPdf>(CorteCajaPdf.new)
       ..registerLazySingleton<GuardadoArchivo>(GuardadoArchivo.new);
   }
 }

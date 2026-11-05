@@ -99,6 +99,19 @@ class CorteCaja {
 
   double get cambioEntregado => efectivoRecibido - efectivoCobrado;
 
+  /// Lo cobrado en cada hora del día —la 9 es de 9:00 a 9:59—, sólo las que
+  /// tuvieron cobros.
+  Map<int, double> get porHora {
+    final totales = <int, double>{};
+
+    for (final cobro in cobros) {
+      final hora = cobro.fecha.hour;
+      totales[hora] = (totales[hora] ?? 0) + cobro.monto;
+    }
+
+    return totales;
+  }
+
   /// Lo cobrado por método de pago, en el orden en que la aplicación lista
   /// los métodos. Sólo los que tuvieron cobros; un cobro viejo con crédito
   /// sale como crédito.
@@ -118,3 +131,35 @@ class CorteCaja {
 
 double _suma(Iterable<double> importes) =>
     importes.fold(0, (suma, importe) => suma + importe);
+
+/// Lo cobrado en un día, para comparar el del corte con los anteriores.
+typedef CobradoDelDia = ({DateTime dia, double total});
+
+/// Lo que enseña la pantalla del corte de caja: el corte del día y lo que se
+/// cobró en los días anteriores, para ver si fue un buen día.
+@immutable
+class EstadisticasCorte {
+  const EstadisticasCorte({required this.corte, required this.semana});
+
+  /// Cuántos días se comparan, contando el del corte.
+  static const dias = 7;
+
+  final CorteCaja corte;
+
+  /// Lo cobrado en cada uno de los [dias] que terminan en el del corte, del
+  /// más antiguo al más reciente: el último es el del corte. Los días sin
+  /// cobros van en cero.
+  final List<CobradoDelDia> semana;
+
+  /// Cuánto cambió lo cobrado contra el día anterior, como fracción
+  /// (`0.12` es 12 % más), o `null` si el anterior no se cobró nada y no hay
+  /// contra qué comparar.
+  double? get cambioContraAyer {
+    if (semana.length < 2) return null;
+
+    final ayer = semana[semana.length - 2].total;
+    if (ayer <= _margen) return null;
+
+    return (corte.total - ayer) / ayer;
+  }
+}

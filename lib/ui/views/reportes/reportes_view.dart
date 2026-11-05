@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/ui/shared/widgets/title_container.dart';
-import 'package:gestion_lavanderia/ui/views/reportes/dialogs/corte_caja_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/corte/corte_caja_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/dialogs/reporte_ventas_dialog.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
@@ -11,13 +11,29 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// tarjetas y no en una lista porque cada uno se explica en dos renglones
 /// —qué trae y para qué sirve— y así quedan los que se agreguen después, uno
 /// junto al otro.
-class ReportesView extends StatelessWidget {
+///
+/// El corte de caja no es un archivo sino una pantalla con gráficas: se abre
+/// aquí mismo, en lugar de las tarjetas, y su flecha regresa a ellas.
+class ReportesView extends StatefulWidget {
   const ReportesView({super.key});
 
+  @override
+  State<ReportesView> createState() => _ReportesViewState();
+}
+
+class _ReportesViewState extends State<ReportesView> {
   static const double _margen = 16;
+
+  bool _corteAbierto = false;
+
+  void _verCorte(bool abierto) => setState(() => _corteAbierto = abierto);
 
   @override
   Widget build(BuildContext context) {
+    if (_corteAbierto) {
+      return Scaffold(body: CorteCajaView(onVolver: () => _verCorte(false)));
+    }
+
     return Scaffold(
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(_margen),
@@ -38,10 +54,13 @@ class ReportesView extends StatelessWidget {
                   titulo: 'Corte de caja',
                   descripcion:
                       'Todo lo que se cobró en un día, de cualquier orden: '
-                      'el total, lo cobrado por método de pago y cuánto '
-                      'efectivo debe haber en la caja. Al final, cada cobro.',
-                  nota: 'Sale en PDF.',
-                  onGenerar: () => _abrir(context, const CorteCajaDialog()),
+                      'el total, cuánto efectivo debe haber en la caja y '
+                      'gráficas por hora, por método de pago y contra los '
+                      'días anteriores. Al final, cada cobro.',
+                  nota: 'Se ve en pantalla, día por día.',
+                  accion: 'Ver el corte',
+                  iconoAccion: Icons.insights_rounded,
+                  onGenerar: () => _verCorte(true),
                 ),
                 _TarjetaReporte(
                   icono: Icons.point_of_sale_rounded,
@@ -82,6 +101,8 @@ class _TarjetaReporte extends StatelessWidget {
     required this.titulo,
     required this.descripcion,
     required this.nota,
+    this.accion = 'Generar reporte',
+    this.iconoAccion = Icons.description_rounded,
     required this.onGenerar,
   });
 
@@ -89,6 +110,10 @@ class _TarjetaReporte extends StatelessWidget {
   final String titulo;
   final String descripcion;
   final String nota;
+
+  /// El texto del botón: un reporte se genera, el corte se ve.
+  final String accion;
+  final IconData iconoAccion;
   final VoidCallback onGenerar;
 
   /// Lo bastante ancha para que la descripción quepa en pocos renglones, y
@@ -134,8 +159,8 @@ class _TarjetaReporte extends StatelessWidget {
                 alignment: Alignment.centerRight,
                 child: FilledButton.icon(
                   onPressed: onGenerar,
-                  icon: const Icon(Icons.description_rounded),
-                  label: const Text('Generar reporte'),
+                  icon: Icon(iconoAccion),
+                  label: Text(accion),
                 ),
               ),
             ],

@@ -168,7 +168,7 @@ void main() {
         cobros: [(DateTime(2026, 11, 5), 70, MetodoPagoType.efectivo)],
       );
 
-      final corte = await reportes.corteCaja(hoy);
+      final corte = (await reportes.estadisticasCorte(hoy)).corte;
 
       expect(
         [for (final c in corte.cobros) (c.folio, c.monto, c.metodo)],
@@ -185,7 +185,7 @@ void main() {
       // `orden` deja siempre el movimiento del alta, en cero.
       await orden(dia: DateTime(2026, 11, 4, 10), total: 80);
 
-      expect((await reportes.corteCaja(hoy)).cobros, isEmpty);
+      expect((await reportes.estadisticasCorte(hoy)).corte.cobros, isEmpty);
     });
 
     test('trae con cuánto pagó el cliente', () async {
@@ -210,10 +210,52 @@ void main() {
         ),
       );
 
-      final cobro = (await reportes.corteCaja(hoy)).cobros.single;
+      final cobro = (await reportes.estadisticasCorte(hoy)).corte.cobros.single;
 
       expect(cobro.recibido, 500);
       expect(cobro.cambio, 350);
     });
+
+    test(
+      'trae lo cobrado en los siete días que terminan en el del corte',
+      () async {
+        await orden(
+          dia: DateTime(2026, 10, 29, 10),
+          total: 40,
+          cobros: [(DateTime(2026, 10, 29, 10), 40, MetodoPagoType.efectivo)],
+        );
+        await orden(
+          dia: DateTime(2026, 11, 3, 10),
+          total: 100,
+          cobros: [
+            (DateTime(2026, 11, 3, 10), 60, MetodoPagoType.efectivo),
+            (DateTime(2026, 11, 4, 12), 40, MetodoPagoType.tarjeta),
+          ],
+        );
+        // Un día antes de la semana: no entra.
+        await orden(
+          dia: DateTime(2026, 10, 28, 10),
+          total: 999,
+          cobros: [(DateTime(2026, 10, 28, 10), 999, MetodoPagoType.efectivo)],
+        );
+
+        final estadisticas = await reportes.estadisticasCorte(hoy);
+
+        expect(estadisticas.semana.map((d) => d.dia), [
+          for (var dia = 29; dia <= 35; dia++) DateTime(2026, 10, dia),
+        ]);
+        expect(estadisticas.semana.map((d) => d.total), [
+          40,
+          0,
+          0,
+          0,
+          0,
+          60,
+          40,
+        ]);
+        // El corte es sólo del último día.
+        expect(estadisticas.corte.total, 40);
+      },
+    );
   });
 }

@@ -96,16 +96,18 @@ void main() {
       expect(estado().paginacion.total, 1);
     });
 
-    test('un concepto repetido no se guarda y deja el motivo a la vista',
-        () async {
-      final categoriaId = await crearCategoria();
-      await alta(categoriaId: categoriaId);
+    test(
+      'un concepto repetido no se guarda y deja el motivo a la vista',
+      () async {
+        final categoriaId = await crearCategoria();
+        await alta(categoriaId: categoriaId);
 
-      expect(await alta(categoriaId: categoriaId), isFalse);
+        expect(await alta(categoriaId: categoriaId), isFalse);
 
-      expect(estado().mensajeError, isNotEmpty);
-      expect(estado().paginacion.total, 1);
-    });
+        expect(estado().mensajeError, isNotEmpty);
+        expect(estado().paginacion.total, 1);
+      },
+    );
 
     test('el mismo nombre en otro tamaño sí se guarda', () async {
       final categoriaId = await crearCategoria();
@@ -158,24 +160,26 @@ void main() {
       expect(estado().paginacion.total, 2);
     });
 
-    test('llegar desde una categoría dada de baja muestra sus conceptos',
-        () async {
-      final categoriaId = await crearCategoria();
-      await alta(categoriaId: categoriaId);
+    test(
+      'llegar desde una categoría dada de baja muestra sus conceptos',
+      () async {
+        final categoriaId = await crearCategoria();
+        await alta(categoriaId: categoriaId);
 
-      // La baja en cascada deja el concepto inactivo: con el filtro de
-      // omisión —sólo activos— la lista saldría vacía.
-      await db.categoriaServicioDao.deleteCategoria(categoriaId);
-      await db.preciosConceptosDao.deactivatePreciosByCategoria(categoriaId);
+        // La baja en cascada deja el concepto inactivo: con el filtro de
+        // omisión —sólo activos— la lista saldría vacía.
+        await db.categoriaServicioDao.deleteCategoria(categoriaId);
+        await db.preciosConceptosDao.deactivatePreciosByCategoria(categoriaId);
 
-      await notificador().filtrarPorCategoria(
-        categoriaId,
-        incluirInactivos: true,
-      );
+        await notificador().filtrarPorCategoria(
+          categoriaId,
+          incluirInactivos: true,
+        );
 
-      expect(conceptosEnPagina(), ['Sábana']);
-      expect(estado().filtros.estatus, isNull);
-    });
+        expect(conceptosEnPagina(), ['Sábana']);
+        expect(estado().filtros.estatus, isNull);
+      },
+    );
 
     test('el buscador filtra por el nombre del concepto', () async {
       final categoriaId = await crearCategoria();
@@ -211,10 +215,9 @@ void main() {
 
       // El filtro las ve todas; el formulario, sólo donde se puede dar de alta.
       expect(estado().categorias.length, 2);
-      expect(
-        estado().categoriasActivas.map((fila) => fila.nombre),
-        ['Ropa de cama'],
-      );
+      expect(estado().categoriasActivas.map((fila) => fila.nombre), [
+        'Ropa de cama',
+      ]);
       expect(estado().puedeAgregar, isTrue);
     });
 

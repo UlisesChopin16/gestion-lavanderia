@@ -87,15 +87,17 @@ void main() {
       expect(estado().paginacion.total, 2);
     });
 
-    test('un teléfono repetido no se guarda y deja el motivo a la vista',
-        () async {
-      await alta(nombres: 'Ana', telefono: '5512345678');
+    test(
+      'un teléfono repetido no se guarda y deja el motivo a la vista',
+      () async {
+        await alta(nombres: 'Ana', telefono: '5512345678');
 
-      expect(await alta(nombres: 'Luis', telefono: '5512345678'), isFalse);
+        expect(await alta(nombres: 'Luis', telefono: '5512345678'), isFalse);
 
-      expect(estado().mensajeError, contains('mismos datos'));
-      expect(estado().paginacion.total, 1);
-    });
+        expect(estado().mensajeError, contains('mismos datos'));
+        expect(estado().paginacion.total, 1);
+      },
+    );
   });
 
   group('al paginar', () {

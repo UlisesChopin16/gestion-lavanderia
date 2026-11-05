@@ -29,9 +29,7 @@ class EstatusChip extends StatelessWidget {
       ),
       child: Text(
         estatus.value,
-        style: Theme.of(
-          context,
-        ).textTheme.labelMedium?.copyWith(color: texto),
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(color: texto),
       ),
     );
   }

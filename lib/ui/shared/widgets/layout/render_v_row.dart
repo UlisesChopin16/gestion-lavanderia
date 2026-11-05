@@ -222,9 +222,7 @@ class RenderVRow extends RenderBox
 
     final acotado = constraints.hasBoundedWidth;
     final disponible = acotado ? constraints.maxWidth : double.infinity;
-    final punto = VBreakpoint.of(
-      _viewportWidth ?? (acotado ? disponible : 0),
-    );
+    final punto = VBreakpoint.of(_viewportWidth ?? (acotado ? disponible : 0));
 
     // El orden declarado manda sobre el orden en que se escribieron, y entre
     // columnas con el mismo orden gana la que se escribió antes: por eso una
@@ -326,8 +324,7 @@ class RenderVRow extends RenderBox
       base: base,
       minimo: minimo,
       maximo: maximo,
-      desplazamiento:
-          spec.offsetAt(punto) * (disponible + gutterX) / columns,
+      desplazamiento: spec.offsetAt(punto) * (disponible + gutterX) / columns,
       crece: crece,
     );
   }
@@ -346,7 +343,8 @@ class RenderVRow extends RenderBox
       final necesita = columna.desplazamiento + columna.hipotetico;
       final aire = actual.isEmpty ? 0.0 : gutterX;
 
-      if (actual.isNotEmpty && usado + aire + necesita > disponible + _tolerancia) {
+      if (actual.isNotEmpty &&
+          usado + aire + necesita > disponible + _tolerancia) {
         renglones.add(_Renglon(actual));
         actual = [];
         usado = necesita;
@@ -402,7 +400,9 @@ class RenderVRow extends RenderBox
       }
 
       for (final columna in pasadas) {
-        columna.ancho = parte < columna.minimo ? columna.minimo : columna.maximo;
+        columna.ancho = parte < columna.minimo
+            ? columna.minimo
+            : columna.maximo;
         resto -= columna.ancho;
         pendientes.remove(columna);
       }
@@ -472,7 +472,10 @@ class RenderVRow extends RenderBox
 
     for (final renglon in renglones) {
       final altoRenglon = renglon.alto + crecimiento;
-      final sobraAncho = math.max(0.0, size.width - _anchoUsado(renglon.columnas));
+      final sobraAncho = math.max(
+        0.0,
+        size.width - _anchoUsado(renglon.columnas),
+      );
       final (inicioX, entreColumnas) = _repartoHorizontal(
         sobraAncho,
         renglon.columnas.length,
@@ -526,7 +529,8 @@ class RenderVRow extends RenderBox
       VJustify.start => (0, 0),
       VJustify.center => (sobra / 2, 0),
       VJustify.end => (sobra, 0),
-      VJustify.spaceBetween => cuantas > 1 ? (0, sobra / (cuantas - 1)) : (0, 0),
+      VJustify.spaceBetween =>
+        cuantas > 1 ? (0, sobra / (cuantas - 1)) : (0, 0),
       VJustify.spaceAround => (sobra / cuantas / 2, sobra / cuantas),
       VJustify.spaceEvenly => (sobra / (cuantas + 1), sobra / (cuantas + 1)),
     };

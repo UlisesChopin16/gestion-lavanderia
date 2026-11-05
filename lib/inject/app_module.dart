@@ -5,6 +5,7 @@ import 'package:gestion_lavanderia/inject/empresa_module.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/inject/ordenes_module.dart';
 import 'package:gestion_lavanderia/inject/precios_module.dart';
+import 'package:gestion_lavanderia/inject/reportes_module.dart';
 import 'package:gestion_lavanderia/inject/shared_preferences_module.dart';
 
 export 'package:gestion_lavanderia/inject/module_inject.dart';
@@ -32,6 +33,7 @@ class AppModule extends ModuleInject {
     CategoriasModule(),
     PreciosModule(),
     OrdenesModule(),
+    ReportesModule(),
   ];
 
   @override

@@ -31,9 +31,7 @@ sealed class FiltrosCategoria with _$FiltrosCategoria {
   /// "sin estatus" —ver todos— no se podría distinguir al releer los filtros
   /// guardados de "aquí no había nada", y quitar el filtro se desharía solo al
   /// cerrar la aplicación.
-  static const porOmision = FiltrosCategoria(
-    estatus: EstatusType.activo,
-  );
+  static const porOmision = FiltrosCategoria(estatus: EstatusType.activo);
 
   bool get haveFilters {
     return nombre.isNotEmpty ||

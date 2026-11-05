@@ -28,8 +28,11 @@ class FiltrosStore {
   static const _llavePrecios = 'filtros_precios';
   static const _llaveOrdenes = 'filtros_ordenes';
 
-  FiltrosCategoria get categorias =>
-      _leer(_llaveCategorias, FiltrosCategoria.fromJson, FiltrosCategoria.porOmision);
+  FiltrosCategoria get categorias => _leer(
+    _llaveCategorias,
+    FiltrosCategoria.fromJson,
+    FiltrosCategoria.porOmision,
+  );
 
   FiltrosClientes get clientes =>
       _leer(_llaveClientes, FiltrosClientes.fromJson, const FiltrosClientes());

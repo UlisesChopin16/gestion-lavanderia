@@ -166,7 +166,11 @@ void main() {
     // Las tres pestañas, en el sitio donde antes iba el nombre del catálogo...
     expect(find.byType(PestanasCatalogo), findsOneWidget);
 
-    for (final nombre in ['Clientes', 'Categorías de ropa', 'Precios de ropa']) {
+    for (final nombre in [
+      'Clientes',
+      'Categorías de ropa',
+      'Precios de ropa',
+    ]) {
       final pestana = tester.getRect(
         find.descendant(
           of: find.byKey(DataTableCard.llaveEncabezado),

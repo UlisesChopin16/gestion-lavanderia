@@ -151,7 +151,11 @@ class _Renglon extends StatelessWidget {
               children: [
                 Row(
                   spacing: 8,
-                  children: [Expanded(child: nombre), importe, quitar],
+                  children: [
+                    Expanded(child: nombre),
+                    importe,
+                    quitar,
+                  ],
                 ),
                 Row(
                   spacing: 8,

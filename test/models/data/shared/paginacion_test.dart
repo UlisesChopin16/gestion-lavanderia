@@ -11,7 +11,18 @@ void main() {
     test('la primera página trae las primeras filas', () {
       const paginacion = Paginacion(porPagina: 10, total: 37);
 
-      expect(paginacion.recortar(treintaYSiete), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+      expect(paginacion.recortar(treintaYSiete), [
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+      ]);
       expect(paginacion.desde, 1);
       expect(paginacion.hasta, 10);
     });

@@ -78,8 +78,7 @@ class _DateRangePickerState extends State<DateRangePicker> {
             ? null
             : BoxConstraints(maxHeight: 40, maxWidth: widget.width!),
         prefixIcon: _Prefijo(
-          mostrarQuitar:
-              widget.showDelete ?? widget.selectedDates.isNotEmpty,
+          mostrarQuitar: widget.showDelete ?? widget.selectedDates.isNotEmpty,
           onDelete: widget.onDelete,
         ),
       ),

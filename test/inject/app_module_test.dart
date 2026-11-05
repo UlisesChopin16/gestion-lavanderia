@@ -35,6 +35,7 @@ void main() {
     expect(instance<EmpresaLocalDatasource>(), isNotNull);
     expect(instance<OrdenesLocalDatasource>(), isNotNull);
     expect(instance<PreciosLocalDatasource>(), isNotNull);
+    expect(instance<ReportesLocalDatasource>(), isNotNull);
   });
 
   test('los filtros guardados y los servicios se resuelven', () {

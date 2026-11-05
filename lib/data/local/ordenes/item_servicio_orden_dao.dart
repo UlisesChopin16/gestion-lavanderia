@@ -90,9 +90,8 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
   }
 
   Future<int> insertItem(ItemServicioOrdenCompanion row) {
-    return into(
-      itemServicioOrden,
-    ).insert(row.copyWith(fechaCreacion: Value(DateTime.now())));
+    return into(itemServicioOrden)
+        .insert(row.copyWith(fechaCreacion: Value(DateTime.now())));
   }
 
   /// Inserta todos los items de una orden en una sola operación, en lugar de un

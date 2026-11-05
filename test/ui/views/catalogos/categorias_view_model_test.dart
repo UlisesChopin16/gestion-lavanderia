@@ -34,7 +34,10 @@ void main() {
   }
 
   /// Un concepto dentro de [categoriaId], escrito por la vía normal.
-  Future<void> crearConcepto(int categoriaId, {String nombre = 'Sábana'}) async {
+  Future<void> crearConcepto(
+    int categoriaId, {
+    String nombre = 'Sábana',
+  }) async {
     final guardado = await container
         .read(preciosViewModelProvider.notifier)
         .guardar(
@@ -79,15 +82,17 @@ void main() {
       expect(estado().paginacion.total, 1);
     });
 
-    test('un nombre repetido no se guarda y deja el motivo a la vista',
-        () async {
-      await alta(nombre: 'Planchado');
+    test(
+      'un nombre repetido no se guarda y deja el motivo a la vista',
+      () async {
+        await alta(nombre: 'Planchado');
 
-      expect(await alta(nombre: 'planchado'), isFalse);
+        expect(await alta(nombre: 'planchado'), isFalse);
 
-      expect(estado().mensajeError, contains('Ya existe una categoría'));
-      expect(estado().paginacion.total, 1);
-    });
+        expect(estado().mensajeError, contains('Ya existe una categoría'));
+        expect(estado().paginacion.total, 1);
+      },
+    );
   });
 
   group('la baja', () {

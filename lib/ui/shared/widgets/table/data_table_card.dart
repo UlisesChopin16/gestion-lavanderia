@@ -261,7 +261,6 @@ class _DataTableCardState<T> extends State<DataTableCard<T>> {
       ),
     );
   }
-
 }
 
 /// La lista, el aviso de vacío o el indicador de carga: nunca dos a la vez,
@@ -307,7 +306,10 @@ class _Cuerpo<T> extends StatelessWidget {
     }
 
     if (filas.isEmpty) {
-      return _Marco(radio: _radio, child: _Vacio(mensaje: mensajeVacio));
+      return _Marco(
+        radio: _radio,
+        child: _Vacio(mensaje: mensajeVacio),
+      );
     }
 
     return _Marco(
@@ -433,10 +435,7 @@ class _Tabla<T> extends StatelessWidget {
           // la tabla se medía con ancho infinito: cada columna pedía lo que
           // midiera su texto más largo y casi siempre había que desplazarse,
           // aunque sobrara sitio en la pantalla.
-          child: SizedBox(
-            width: math.max(ancho, _anchoMinimo),
-            child: table,
-          ),
+          child: SizedBox(width: math.max(ancho, _anchoMinimo), child: table),
         ),
       ),
     );
@@ -563,11 +562,7 @@ class _Vacio extends StatelessWidget {
       child: Column(
         spacing: 12,
         children: [
-          Icon(
-            Icons.inbox_rounded,
-            size: 44,
-            color: scheme.outline,
-          ),
+          Icon(Icons.inbox_rounded, size: 44, color: scheme.outline),
           Text(
             mensaje,
             textAlign: TextAlign.center,

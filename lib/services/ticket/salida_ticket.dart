@@ -2,11 +2,11 @@ import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:file_picker/file_picker.dart';
 import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
+import 'package:gestion_lavanderia/services/guardado_archivo.dart';
 import 'package:mailer/mailer.dart';
 import 'package:mailer/smtp_server.dart';
-import 'package:path/path.dart' as p;
+import 'package:pdf/pdf.dart' show PdfPageFormat;
 import 'package:printing/printing.dart';
 
 /// Las imágenes de cada página de un PDF, para enseñarlo en pantalla.
@@ -32,33 +32,39 @@ class VistaPreviaPdf {
   }
 }
 
-/// Guarda un PDF donde el usuario elija, con el diálogo "Guardar como".
+/// Guarda el ticket donde el usuario elija, con el diálogo "Guardar como".
 ///
 /// Registrado en el contenedor porque abre un diálogo del sistema.
 class GuardadoPdf {
   const GuardadoPdf();
 
   /// Devuelve dónde quedó, o `null` si se cerró el diálogo sin guardar.
-  ///
-  /// El archivo lo escribe este método y no el selector: si el usuario borra
-  /// la extensión del nombre, se le repone, y un ticket sin `.pdf` no se abre
-  /// con doble clic.
-  Future<String?> guardar(Uint8List pdf, {required String nombre}) async {
-    final ruta = await FilePicker.platform.saveFile(
-      dialogTitle: 'Guardar el ticket',
-      fileName: nombre,
-      type: FileType.custom,
-      allowedExtensions: const ['pdf'],
-      lockParentWindow: true,
+  Future<String?> guardar(Uint8List pdf, {required String nombre}) {
+    return const GuardadoArchivo().guardar(
+      pdf,
+      nombre: nombre,
+      extension: 'pdf',
+      titulo: 'Guardar el ticket',
     );
-    if (ruta == null) return null;
+  }
+}
 
-    final destino = p.extension(ruta).toLowerCase() == '.pdf'
-        ? ruta
-        : '$ruta.pdf';
-    await File(destino).writeAsBytes(pdf, flush: true);
+/// Manda el ticket a una impresora con el diálogo de impresión del sistema.
+///
+/// Registrado en el contenedor porque abre un diálogo del sistema.
+class ImpresionPdf {
+  const ImpresionPdf();
 
-    return destino;
+  /// Devuelve si se mandó a imprimir: `false` si se cerró el diálogo.
+  Future<bool> imprimir(Uint8List pdf, {required String nombre}) {
+    return Printing.layoutPdf(
+      onLayout: (_) async => pdf,
+      name: nombre,
+      format: PdfPageFormat.roll80,
+      // El ticket ya viene armado a su medida: no se vuelve a acomodar al
+      // papel que se elija en el diálogo.
+      dynamicLayout: false,
+    );
   }
 }
 

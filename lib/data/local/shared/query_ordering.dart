@@ -32,6 +32,13 @@ extension SimpleSelectOrdering<T extends HasResultSet, D>
   /// espera funciones en lugar de expresiones.
   void orderByTerms(List<OrderingTerm> terms) {
     if (terms.isEmpty) return;
-    orderBy(terms.map((term) => (T _) => term).toList());
+    orderBy(
+      terms
+          .map(
+            (term) =>
+                (T _) => term,
+          )
+          .toList(),
+    );
   }
 }

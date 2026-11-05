@@ -29,6 +29,7 @@ environment:
 # versions available, run `flutter pub outdated`.
 dependencies:
   analyzer: ^8.1.1
+  archive: ^4.0.9
   calendar_date_picker2: ^2.0.1
   collection: ^1.19.1
   cupertino_icons: ^1.0.8

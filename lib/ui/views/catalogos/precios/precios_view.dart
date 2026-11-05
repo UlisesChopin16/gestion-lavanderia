@@ -72,7 +72,10 @@ class PreciosView extends ConsumerWidget {
               cols: 12,
               md: 4,
               sm: 6,
-              child: EstatusFilter(estatus: filtros.estatus, onChanged: notifier.filtrarEstatus),
+              child: EstatusFilter(
+                estatus: filtros.estatus,
+                onChanged: notifier.filtrarEstatus,
+              ),
             ),
             VCol(
               cols: 12,
@@ -104,7 +107,8 @@ class PreciosView extends ConsumerWidget {
                 columns: ColumnPreciosName.values,
                 selected: filtros.ordenamiento,
                 ascending: filtros.ascendente,
-                onColumnChanged: (columna) => notifier.ordenar(columna, filtros.ascendente),
+                onColumnChanged: (columna) =>
+                    notifier.ordenar(columna, filtros.ascendente),
                 onAscendingChanged: (ascendente) =>
                     notifier.ordenar(filtros.ordenamiento, ascendente),
               ),
@@ -242,7 +246,11 @@ class PreciosView extends ConsumerWidget {
     await context.showSuccessDialog('El concepto se actualizó correctamente.');
   }
 
-  Future<void> _desactivar(BuildContext context, WidgetRef ref, PrecioData precio) async {
+  Future<void> _desactivar(
+    BuildContext context,
+    WidgetRef ref,
+    PrecioData precio,
+  ) async {
     final confirmado = await context.showWarningDialog(
       message:
           '¿Desactivar "${precio.descripcion}" de la categoría '
@@ -255,7 +263,11 @@ class PreciosView extends ConsumerWidget {
     await ref.read(preciosViewModelProvider.notifier).desactivar(precio.id);
   }
 
-  Future<void> _activar(BuildContext context, WidgetRef ref, PrecioData precio) async {
+  Future<void> _activar(
+    BuildContext context,
+    WidgetRef ref,
+    PrecioData precio,
+  ) async {
     final confirmado = await context.showWarningDialog(
       message:
           '¿Activar "${precio.descripcion}" de la categoría '

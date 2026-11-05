@@ -39,6 +39,7 @@ sealed class OrdenTicketState with _$OrdenTicketState {
 
     @Default(true) bool cargando,
     @Default(false) bool guardando,
+    @Default(false) bool imprimiendo,
     @Default(false) bool enviando,
     @Default('') String mensajeError,
 
@@ -51,7 +52,7 @@ sealed class OrdenTicketState with _$OrdenTicketState {
   /// Si ya hay un ticket que descargar o enviar.
   bool get listo => pdf != null && !cargando;
 
-  bool get ocupado => guardando || enviando;
+  bool get ocupado => guardando || imprimiendo || enviando;
 
   bool get correoConfigurado => empresa?.correoEnvio.completa ?? false;
 
@@ -59,9 +60,10 @@ sealed class OrdenTicketState with _$OrdenTicketState {
   String get correoCliente => orden?.clienteCorreo ?? '';
 }
 
-/// El ticket de una orden: se ve, se descarga y se envía por correo.
+/// El ticket de una orden: se ve, se imprime, se descarga y se envía por
+/// correo.
 ///
-/// Se genera una vez al abrir, y las tres cosas usan ese mismo PDF.
+/// Se genera una vez al abrir, y todo eso usa ese mismo PDF.
 @riverpod
 class OrdenTicketViewModel extends _$OrdenTicketViewModel {
   final _ordenes = instance<OrdenesLocalDatasource>();
@@ -69,6 +71,7 @@ class OrdenTicketViewModel extends _$OrdenTicketViewModel {
   final _ticket = instance<TicketPdf>();
   final _vistaPrevia = instance<VistaPreviaPdf>();
   final _guardado = instance<GuardadoPdf>();
+  final _impresion = instance<ImpresionPdf>();
   final _correo = instance<EnvioCorreo>();
 
   @override
@@ -152,6 +155,26 @@ class OrdenTicketViewModel extends _$OrdenTicketViewModel {
     }
   }
 
+  /// Abre el diálogo de impresión con el ticket.
+  ///
+  /// No devuelve un aviso: el propio diálogo del sistema ya dice a qué
+  /// impresora salió, y otro aviso encima sería un clic más en el mostrador.
+  Future<void> imprimir() async {
+    final pdf = state.pdf;
+    final orden = state.orden;
+    if (pdf == null || orden == null || state.ocupado) return;
+
+    state = state.copyWith(imprimiendo: true, mensajeError: '');
+
+    try {
+      await _impresion.imprimir(pdf, nombre: CorreoTicket.nombreArchivo(orden));
+
+      if (ref.mounted) state = state.copyWith(imprimiendo: false);
+    } catch (error, stackTrace) {
+      _fallar(error, stackTrace, 'No se pudo imprimir el ticket.');
+    }
+  }
+
   /// Envía el ticket a [destinatario] desde la cuenta de la lavandería.
   /// Devuelve lo que se hizo, dicho para el aviso, o `null` si no salió: el
   /// porqué queda en [OrdenTicketState.errorCorreo].
@@ -222,6 +245,7 @@ class OrdenTicketViewModel extends _$OrdenTicketViewModel {
     state = state.copyWith(
       cargando: false,
       guardando: false,
+      imprimiendo: false,
       mensajeError: error is SQLException ? error.message : mensaje,
     );
   }

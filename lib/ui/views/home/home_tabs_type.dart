@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/ui/views/catalogos/catalogos_view.dart';
 import 'package:gestion_lavanderia/ui/views/configuracion_empresa/configuracion_empresa_view.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/ordenes_view.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/reportes_view.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
 /// Los módulos de la aplicación, en el orden en que aparecen en la navegación.
@@ -24,6 +25,14 @@ enum HomeTabsType {
     icon: IconsManager.selectedCatalogoIcon,
     unselectedIcon: IconsManager.unselectedCatalogoIcon,
     view: CatalogosView(),
+  ),
+  // "Reportes" y no "Reportes y estadísticas": en la barra los nombres van
+  // de una palabra. El nombre completo lo lleva la pantalla.
+  reportes(
+    title: 'Reportes',
+    icon: IconsManager.selectedReportesIcon,
+    unselectedIcon: IconsManager.unselectedReportesIcon,
+    view: ReportesView(),
   ),
   empresa(
     title: 'Empresa',

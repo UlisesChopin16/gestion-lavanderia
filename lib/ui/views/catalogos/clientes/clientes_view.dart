@@ -42,7 +42,10 @@ class ClientesView extends ConsumerWidget {
           runSpacing: 12,
           children: [
             const PestanasCatalogo(),
-            ButtonAdd(label: 'Agregar cliente', onPressed: () => _agregar(context)),
+            ButtonAdd(
+              label: 'Agregar cliente',
+              onPressed: () => _agregar(context),
+            ),
           ],
         ),
 
@@ -69,7 +72,8 @@ class ClientesView extends ConsumerWidget {
                 columns: ColumnClientesName.values,
                 selected: filtros.ordenamiento,
                 ascending: filtros.ascendente,
-                onColumnChanged: (columna) => notifier.ordenar(columna, filtros.ascendente),
+                onColumnChanged: (columna) =>
+                    notifier.ordenar(columna, filtros.ascendente),
                 onAscendingChanged: (ascendente) =>
                     notifier.ordenar(filtros.ordenamiento, ascendente),
               ),
@@ -108,8 +112,9 @@ class ClientesView extends ConsumerWidget {
           // lugar de dejar la celda en blanco, que se lee como un error.
           TableColumnDef.text(
             title: 'Correo',
-            value: (cliente) =>
-                cliente.correo.isEmpty ? ConstantsManager.emptyValue : cliente.correo,
+            value: (cliente) => cliente.correo.isEmpty
+                ? ConstantsManager.emptyValue
+                : cliente.correo,
             size: TableColumnSize.amplia,
           ),
           TableColumnDef.text(

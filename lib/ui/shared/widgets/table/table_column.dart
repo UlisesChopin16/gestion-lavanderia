@@ -118,7 +118,6 @@ class TableColumnDef<T> {
 
   /// Lo que esta columna aporta al ancho mínimo de la tabla.
   double get anchoMinimo => size.minimo;
-
 }
 
 /// Lo que una celda enseña de su fila: el widget que pidió la columna, o su

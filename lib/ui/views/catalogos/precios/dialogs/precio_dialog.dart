@@ -64,7 +64,9 @@ class _PrecioDialogState extends ConsumerState<PrecioDialog> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _Encabezado(
-                  titulo: formulario.esAlta ? 'Nuevo concepto de ropa' : 'Editar concepto',
+                  titulo: formulario.esAlta
+                      ? 'Nuevo concepto de ropa'
+                      : 'Editar concepto',
                 ),
                 Flexible(
                   child: _Campos(
@@ -80,7 +82,9 @@ class _PrecioDialogState extends ConsumerState<PrecioDialog> {
             ),
             if (estado.cargando)
               const Positioned.fill(
-                child: AbsorbPointer(child: Center(child: CircularProgressIndicator())),
+                child: AbsorbPointer(
+                  child: Center(child: CircularProgressIndicator()),
+                ),
               ),
           ],
         ),
@@ -136,7 +140,9 @@ class _PrecioDialogState extends ConsumerState<PrecioDialog> {
       return;
     }
 
-    await context.showErrorDialog(ref.read(preciosViewModelProvider).mensajeError);
+    await context.showErrorDialog(
+      ref.read(preciosViewModelProvider).mensajeError,
+    );
   }
 }
 
@@ -156,7 +162,11 @@ class _Encabezado extends StatelessWidget {
         spacing: 8,
         children: [
           Icon(IconsManager.clotheIcon, color: theme.colorScheme.secondary),
-          Text(titulo, textAlign: TextAlign.center, style: theme.textTheme.headlineSmall),
+          Text(
+            titulo,
+            textAlign: TextAlign.center,
+            style: theme.textTheme.headlineSmall,
+          ),
         ],
       ),
     );
@@ -184,7 +194,9 @@ class _Campos extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final errores = mostrarErrores ? formulario.erroresComunes : const <CampoPrecio, String>{};
+    final errores = mostrarErrores
+        ? formulario.erroresComunes
+        : const <CampoPrecio, String>{};
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(24, 8, 24, 16),
@@ -194,7 +206,8 @@ class _Campos extends StatelessWidget {
         children: [
           FormTextField(
             value: formulario.nombre,
-            onChanged: (nombre) => onCambiar((actual) => actual.conNombre(nombre)),
+            onChanged: (nombre) =>
+                onCambiar((actual) => actual.conNombre(nombre)),
             autofocus: formulario.esAlta,
             label: 'Nombre del concepto',
             hint: 'Playera, Pantalón, Sábana',
@@ -205,7 +218,8 @@ class _Campos extends StatelessWidget {
             disponibles: disponibles,
             formulario: formulario,
             error: errores[CampoPrecio.categoria],
-            onAlternar: (categoria) => onCambiar((actual) => actual.alternarCategoria(categoria)),
+            onAlternar: (categoria) =>
+                onCambiar((actual) => actual.alternarCategoria(categoria)),
           ),
           Row(
             spacing: 12,
@@ -213,14 +227,17 @@ class _Campos extends StatelessWidget {
               Expanded(
                 child: SelectorTamano(
                   tamano: formulario.tamano,
-                  onChanged: (tamano) =>
-                      onCambiar((actual) => actual.conTamano(tamano ?? ClotheSizeType.emptySize)),
+                  onChanged: (tamano) => onCambiar(
+                    (actual) =>
+                        actual.conTamano(tamano ?? ClotheSizeType.emptySize),
+                  ),
                 ),
               ),
               Expanded(
                 child: _SelectorUnidad(
                   unidad: formulario.unidad,
-                  onChanged: (unidad) => onCambiar((actual) => actual.conUnidad(unidad)),
+                  onChanged: (unidad) =>
+                      onCambiar((actual) => actual.conUnidad(unidad)),
                 ),
               ),
             ],
@@ -261,7 +278,9 @@ class _Categorias extends StatelessWidget {
 
     return _Seccion(
       titulo: formulario.esAlta ? 'Categorías' : 'Categoría',
-      ayuda: formulario.esAlta ? 'Elige una o varias. Cada una tendrá su propio precio.' : null,
+      ayuda: formulario.esAlta
+          ? 'Elige una o varias. Cada una tendrá su propio precio.'
+          : null,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         spacing: 6,
@@ -283,7 +302,12 @@ class _Categorias extends StatelessWidget {
             ],
           ),
           if (error != null)
-            Text(error, style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.error)),
+            Text(
+              error,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.error,
+              ),
+            ),
         ],
       ),
     );
@@ -308,7 +332,9 @@ class _Precios extends StatelessWidget {
   Widget build(BuildContext context) {
     final categorias = formulario.categorias;
     final primera = categorias.firstOrNull;
-    final importePrimera = primera == null ? '' : formulario.precioDe(primera).importe;
+    final importePrimera = primera == null
+        ? ''
+        : formulario.precioDe(primera).importe;
     // Copiar sólo sirve si hay de dónde y a dónde: un importe escrito en la
     // primera y alguna otra con uno distinto.
     final puedeCopiar =
@@ -341,7 +367,9 @@ class _Precios extends StatelessWidget {
                   ),
                   if (puedeCopiar)
                     TextButton.icon(
-                      onPressed: () => onCambiar((actual) => actual.conImporteEnTodas(primera)),
+                      onPressed: () => onCambiar(
+                        (actual) => actual.conImporteEnTodas(primera),
+                      ),
                       icon: const Icon(Icons.content_copy_rounded, size: 18),
                       label: Text(
                         'Usar el importe de ${primera.nombre} '
@@ -378,7 +406,9 @@ class _SinCategorias extends StatelessWidget {
           Expanded(
             child: Text(
               'Elige una categoría para ponerle precio.',
-              style: theme.textTheme.bodyMedium?.copyWith(color: scheme.onSurfaceVariant),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
           ),
         ],
@@ -416,13 +446,22 @@ class _TablaPrecios extends StatelessWidget {
     return Theme(
       // En una columna angosta el error no cabe en un renglón.
       data: theme.copyWith(
-        inputDecorationTheme: theme.inputDecorationTheme.copyWith(errorMaxLines: 3),
+        inputDecorationTheme: theme.inputDecorationTheme.copyWith(
+          errorMaxLines: 3,
+        ),
       ),
       child: ClipRRect(
         borderRadius: _radio,
         child: Table(
-          border: TableBorder.all(color: scheme.outlineVariant, borderRadius: _radio),
-          columnWidths: const {0: FlexColumnWidth(1.2), 1: FlexColumnWidth(), 2: FlexColumnWidth()},
+          border: TableBorder.all(
+            color: scheme.outlineVariant,
+            borderRadius: _radio,
+          ),
+          columnWidths: const {
+            0: FlexColumnWidth(1.2),
+            1: FlexColumnWidth(),
+            2: FlexColumnWidth(),
+          },
           defaultVerticalAlignment: TableCellVerticalAlignment.middle,
           children: [
             TableRow(
@@ -505,7 +544,9 @@ class _CeldaCategoria extends StatelessWidget {
           Text(categoria.nombre, style: theme.textTheme.titleSmall),
           Text(
             'Entrega en ${categoria.diasFormato}',
-            style: theme.textTheme.bodySmall?.copyWith(color: theme.colorScheme.onSurfaceVariant),
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: theme.colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),
@@ -538,11 +579,16 @@ class _CeldaImporte extends StatelessWidget {
         // una categoría a otra.
         key: ValueKey('importe-${categoria.id}'),
         value: formulario.precioDe(categoria).importe,
-        onChanged: (importe) => onCambiar((actual) => actual.conImporte(categoria, importe)),
+        onChanged: (importe) =>
+            onCambiar((actual) => actual.conImporte(categoria, importe)),
         hint: '00.00',
         keyboardType: const TextInputType.numberWithOptions(decimal: true),
-        inputFormatters: [FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}'))],
-        errorText: mostrarErrores ? formulario.erroresDe(categoria)[CampoPrecio.importe] : null,
+        inputFormatters: [
+          FilteringTextInputFormatter.allow(RegExp(r'^\d*\.?\d{0,2}')),
+        ],
+        errorText: mostrarErrores
+            ? formulario.erroresDe(categoria)[CampoPrecio.importe]
+            : null,
         onSubmitted: (_) => onListo(),
       ),
     );
@@ -574,14 +620,17 @@ class _CeldaDias extends StatelessWidget {
       child: FormTextField(
         key: ValueKey('dias-${categoria.id}'),
         value: formulario.precioDe(categoria).dias,
-        onChanged: (dias) => onCambiar((actual) => actual.conDias(categoria, dias)),
+        onChanged: (dias) =>
+            onCambiar((actual) => actual.conDias(categoria, dias)),
         hint: '1, 2, 3...',
         keyboardType: TextInputType.number,
         inputFormatters: [
           FilteringTextInputFormatter.digitsOnly,
           LengthLimitingTextInputFormatter(_digitosDias),
         ],
-        errorText: mostrarErrores ? formulario.erroresDe(categoria)[CampoPrecio.diasEntrega] : null,
+        errorText: mostrarErrores
+            ? formulario.erroresDe(categoria)[CampoPrecio.diasEntrega]
+            : null,
         onSubmitted: (_) => onListo(),
       ),
     );

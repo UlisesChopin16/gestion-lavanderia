@@ -106,9 +106,7 @@ void main() {
       expect(find.text('01/oct/2026 00:00'), findsOneWidget);
     });
 
-    testWidgets('las acciones son una columna más de la lista', (
-      tester,
-    ) async {
+    testWidgets('las acciones son una columna más de la lista', (tester) async {
       await mostrar(
         tester,
         DataTableCard<PrecioData>(
@@ -260,7 +258,10 @@ void main() {
 
       expect(hueco.top, filtro.top);
       expect(hueco.height, filtro.height);
-      expect(hueco.bottom, lessThan(tester.getRect(find.byType(DataTable)).top));
+      expect(
+        hueco.bottom,
+        lessThan(tester.getRect(find.byType(DataTable)).top),
+      );
     });
 
     testWidgets('sin sección de filtros no se dibuja nada', (tester) async {

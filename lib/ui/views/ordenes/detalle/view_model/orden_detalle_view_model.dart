@@ -94,11 +94,8 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
   /// Las cuentas del cobro cuando es en efectivo. Las mismas que las del
   /// adelanto del alta: viven en [CobroEnEfectivo] para que las dos pantallas
   /// no puedan decidir distinto.
-  CobroEnEfectivo get efectivo => CobroEnEfectivo(
-    metodoPago: metodoPago,
-    abono: abono,
-    recibido: recibido,
-  );
+  CobroEnEfectivo get efectivo =>
+      CobroEnEfectivo(metodoPago: metodoPago, abono: abono, recibido: recibido);
 
   /// Lo que hay que devolverle al cliente cuando paga en efectivo.
   double get cambio => efectivo.cambio;

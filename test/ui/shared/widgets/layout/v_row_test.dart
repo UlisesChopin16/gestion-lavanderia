@@ -53,10 +53,7 @@ void main() {
 
       expect(rect(tester, 'a').left, 0);
       expect(rect(tester, 'a').width, closeTo(doceavos(6), 0.01));
-      expect(
-        rect(tester, 'b').left,
-        closeTo(doceavos(6) + canalon, 0.01),
-      );
+      expect(rect(tester, 'b').left, closeTo(doceavos(6) + canalon, 0.01));
       expect(
         rect(tester, 'a').width + canalon + rect(tester, 'b').width,
         closeTo(ancho, 0.01),
@@ -105,10 +102,7 @@ void main() {
     });
 
     testWidgets('un hijo suelto cuenta como columna que crece', (tester) async {
-      await mostrar(
-        tester,
-        VRow(children: [caja('a'), caja('b')]),
-      );
+      await mostrar(tester, VRow(children: [caja('a'), caja('b')]));
 
       expect(rect(tester, 'a').width, closeTo((ancho - canalon) / 2, 0.01));
       expect(rect(tester, 'b').width, closeTo((ancho - canalon) / 2, 0.01));
@@ -153,11 +147,7 @@ void main() {
     testWidgets('offset deja columnas vacías antes', (tester) async {
       await mostrar(
         tester,
-        VRow(
-          children: [
-            VCol(cols: 6, offset: 6, child: caja('a')),
-          ],
-        ),
+        VRow(children: [VCol(cols: 6, offset: 6, child: caja('a'))]),
       );
 
       expect(rect(tester, 'a').left, closeTo(6 * (ancho + canalon) / 12, 0.01));

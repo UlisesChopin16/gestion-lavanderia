@@ -195,9 +195,9 @@ class CategoriasView extends ConsumerWidget {
           incluirInactivos: categoria.estatus != EstatusType.activo,
         );
 
-    ref.read(catalogosViewModelProvider.notifier).abrir(
-      CatalogosTabsType.precios,
-    );
+    ref
+        .read(catalogosViewModelProvider.notifier)
+        .abrir(CatalogosTabsType.precios);
   }
 
   Future<void> _agregar(BuildContext context) async {
@@ -236,9 +236,9 @@ class CategoriasView extends ConsumerWidget {
 
     if (!confirmado) return;
 
-    await ref.read(categoriasViewModelProvider.notifier).desactivar(
-      categoria.id,
-    );
+    await ref
+        .read(categoriasViewModelProvider.notifier)
+        .desactivar(categoria.id);
   }
 
   Future<void> _activar(

@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/services.dart' show rootBundle;
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
+import 'package:gestion_lavanderia/extensions/double_ext.dart';
 import 'package:gestion_lavanderia/models/data/configuracion_empresa/empresa_data.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/orden_detalle_data.dart';
+import 'package:gestion_lavanderia/services/fuentes_pdf.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 
@@ -23,8 +24,6 @@ import 'package:pdf/widgets.dart' as pw;
 class TicketPdf {
   const TicketPdf();
 
-  static const _rutaFuentes = 'assets/fonts/Poppins';
-
   Future<Uint8List> generar({
     required OrdenDetalleData orden,
     EmpresaData? empresa,
@@ -32,10 +31,7 @@ class TicketPdf {
     final documento = pw.Document(
       title: 'Ticket ${orden.folio}',
       author: empresa?.nombre,
-      theme: pw.ThemeData.withFont(
-        base: await _fuente('Regular'),
-        bold: await _fuente('SemiBold'),
-      ),
+      theme: await FuentesPdf.tema(),
     );
     final logo = await _logo(empresa);
     final nota = orden.descripcion?.trim() ?? '';
@@ -79,22 +75,9 @@ class TicketPdf {
     final cambio = movimiento.cambio;
     if (recibido == null || cambio == null) return null;
 
-    final vuelto = cambio > 0.005 ? 'Cambio ${_pesos(cambio)}' : 'Sin cambio';
+    final vuelto = cambio > 0.005 ? 'Cambio ${cambio.enPesos}' : 'Sin cambio';
 
-    return 'Pagó con ${_pesos(recibido)}  ·  $vuelto';
-  }
-
-  /// Las fuentes se leen una vez por sesión: el mismo ticket se vuelve a
-  /// generar cada vez que se abre, y la fuente no cambia.
-  static final _fuentes = <String, pw.Font>{};
-
-  Future<pw.Font> _fuente(String peso) async {
-    final cache = _fuentes[peso];
-    if (cache != null) return cache;
-
-    final datos = await rootBundle.load('$_rutaFuentes/Poppins-$peso.ttf');
-
-    return _fuentes[peso] = pw.Font.ttf(datos);
+    return 'Pagó con ${recibido.enPesos}  ·  $vuelto';
   }
 
   /// El logo de la empresa, o `null` si no tiene o el archivo ya no está. Un
@@ -245,11 +228,11 @@ class _Concepto extends pw.StatelessWidget {
               ),
             ),
             pw.SizedBox(width: 6),
-            pw.Text(_pesos(item.importe)),
+            pw.Text(item.importe.enPesos),
           ],
         ),
         _Pequeno(
-          '${_cantidad(item.cantidad)} $unidad × ${_pesos(precio.importe)}'
+          '${_cantidad(item.cantidad)} $unidad × ${precio.importe.enPesos}'
           '  ·  $entrega',
           centrado: false,
         ),
@@ -272,8 +255,8 @@ class _Cuentas extends pw.StatelessWidget {
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-        _Renglon('Total', _pesos(orden.total)),
-        _Renglon('Pagado', _pesos(orden.pagado)),
+        _Renglon('Total', orden.total.enPesos),
+        _Renglon('Pagado', orden.pagado.enPesos),
         pw.SizedBox(height: 3),
         pw.Container(
           padding: const pw.EdgeInsets.symmetric(horizontal: 6, vertical: 4),
@@ -292,7 +275,7 @@ class _Cuentas extends pw.StatelessWidget {
                 ),
               ),
               pw.Text(
-                _pesos(debe ? orden.restante : 0),
+                (debe ? orden.restante : 0.0).enPesos,
                 style: pw.TextStyle(
                   fontSize: 11,
                   fontWeight: pw.FontWeight.bold,
@@ -361,7 +344,7 @@ class _Pago extends pw.StatelessWidget {
                 style: const pw.TextStyle(fontSize: 7),
               ),
             ),
-            pw.Text(_pesos(movimiento.monto)),
+            pw.Text(movimiento.monto.enPesos),
           ],
         ),
         if (efectivo != null) _Pequeno(efectivo, centrado: false),
@@ -503,17 +486,6 @@ abstract final class _Tinta {
   static const tenue = PdfColor.fromInt(0xFF555555);
   static const linea = PdfColor.fromInt(0xFF999999);
   static const resalte = PdfColor.fromInt(0xFFEEEEEE);
-}
-
-/// `$1,250.00`: con signo y separador de miles, como en un recibo.
-String _pesos(double importe) {
-  final partes = importe.toStringAsFixed(2).split('.');
-  final enteros = partes.first.replaceAllMapped(
-    RegExp(r'\B(?=(\d{3})+(?!\d))'),
-    (_) => ',',
-  );
-
-  return '\$$enteros.${partes.last}';
 }
 
 /// `2`, no `2.0`; pero `1.5` cuando se cobra por kilo.

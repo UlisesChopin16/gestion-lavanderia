@@ -63,6 +63,30 @@ class OrdenHistoryDao extends DatabaseAccessor<AppDatabase>
     return query.getSingleOrNull();
   }
 
+  /// Los movimientos de las órdenes recibidas entre [inicio] —incluido— y
+  /// [fin] —excluido—, para el reporte de ventas.
+  ///
+  /// Van por la fecha de la orden y no por la del movimiento: el reporte es
+  /// de las órdenes del periodo, con todo lo que se les ha cobrado, aunque un
+  /// pago haya llegado después.
+  Future<List<OrdenHistoryEntry>> deOrdenesRecibidasEntre(
+    DateTime inicio,
+    DateTime fin,
+  ) async {
+    final query =
+        select(ordenHistory).join([
+          innerJoin(
+            ordenServicio,
+            ordenServicio.id.equalsExp(ordenHistory.ordenId),
+          ),
+        ])..where(
+          ordenServicio.fechaCreacion.isBiggerOrEqualValue(inicio) &
+              ordenServicio.fechaCreacion.isSmallerThanValue(fin),
+        );
+
+    return [for (final fila in await query.get()) fila.readTable(ordenHistory)];
+  }
+
   Future<int> insertHistory(OrdenHistoryCompanion row) {
     return into(ordenHistory).insert(row);
   }

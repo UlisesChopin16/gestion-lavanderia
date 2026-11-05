@@ -225,101 +225,106 @@ void main() {
     expect(find.byType(OrdenDialog), findsOneWidget);
   });
 
-  testWidgets('crear la orden enseña su ticket, luego avisa con qué folio quedó', (
-    tester,
-  ) async {
-    final categoriaId = await db.categoriaServicioDao.insertCategoria(
-      const CategoriaServicioCompanion(
-        nombre: Value('Lavandería'),
-        estatus: Value(EstatusType.activo),
-        diasEntrega: Value(1),
-      ),
-    );
+  testWidgets(
+    'crear la orden enseña su ticket, luego avisa con qué folio quedó',
+    (tester) async {
+      final categoriaId = await db.categoriaServicioDao.insertCategoria(
+        const CategoriaServicioCompanion(
+          nombre: Value('Lavandería'),
+          estatus: Value(EstatusType.activo),
+          diasEntrega: Value(1),
+        ),
+      );
 
-    await db.preciosConceptosDao.insertPrecio(
-      PreciosConceptosCompanion(
-        categoriaId: Value(categoriaId),
-        clotheSize: const Value(ClotheSizeType.emptySize),
-        nombreConcepto: const Value('Playera'),
-        diasEntrega: const Value(1),
-        tipoUnidad: const Value(UnitType.pieza),
-        importe: const Value(100),
-        estatus: const Value(EstatusType.activo),
-      ),
-    );
+      await db.preciosConceptosDao.insertPrecio(
+        PreciosConceptosCompanion(
+          categoriaId: Value(categoriaId),
+          clotheSize: const Value(ClotheSizeType.emptySize),
+          nombreConcepto: const Value('Playera'),
+          diasEntrega: const Value(1),
+          tipoUnidad: const Value(UnitType.pieza),
+          importe: const Value(100),
+          estatus: const Value(EstatusType.activo),
+        ),
+      );
 
-    final clienteId = await crearCliente(nombres: 'Lucía');
+      final clienteId = await crearCliente(nombres: 'Lucía');
 
-    await abrirModulo(tester);
+      await abrirModulo(tester);
 
-    await tester.tap(find.widgetWithText(ButtonAdd, 'Nueva orden'));
-    await tester.pumpAndSettle();
+      await tester.tap(find.widgetWithText(ButtonAdd, 'Nueva orden'));
+      await tester.pumpAndSettle();
 
-    // El alta se llena por el modelo: lo que se comprueba aquí es lo que hace
-    // el listado cuando el diálogo se cierra habiendo guardado, no la captura,
-    // que tiene sus propias pruebas.
-    final contenedor = ProviderScope.containerOf(
-      tester.element(find.byType(OrdenDialog)),
-    );
-    final alta = contenedor.read(ordenDialogViewModelProvider.notifier);
+      // El alta se llena por el modelo: lo que se comprueba aquí es lo que hace
+      // el listado cuando el diálogo se cierra habiendo guardado, no la captura,
+      // que tiene sus propias pruebas.
+      final contenedor = ProviderScope.containerOf(
+        tester.element(find.byType(OrdenDialog)),
+      );
+      final alta = contenedor.read(ordenDialogViewModelProvider.notifier);
 
-    await alta.cargar();
-    await tester.pumpAndSettle();
+      await alta.cargar();
+      await tester.pumpAndSettle();
 
-    alta.agregar(contenedor.read(ordenDialogViewModelProvider).conceptos.first);
-    alta.elegirCliente(
-      (await instance<ClientesLocalDatasource>().porId(clienteId))!,
-    );
-    await tester.pumpAndSettle();
+      alta.agregar(
+        contenedor.read(ordenDialogViewModelProvider).conceptos.first,
+      );
+      alta.elegirCliente(
+        (await instance<ClientesLocalDatasource>().porId(clienteId))!,
+      );
+      await tester.pumpAndSettle();
 
-    await tester.tap(find.widgetWithText(FilledButton, 'Crear orden · 100.00'));
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
+      await tester.tap(
+        find.widgetWithText(FilledButton, 'Crear orden · 100.00'),
+      );
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
 
-    final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
-    final folio = orden.folio;
-    final aviso = find.text('La orden $folio se creó correctamente.');
+      final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
+      final folio = orden.folio;
+      final aviso = find.text('La orden $folio se creó correctamente.');
 
-    // Lo primero es el ticket de esa misma orden, sin aviso que cerrar antes.
-    final ticket = tester.widget<OrdenTicketDialog>(
-      find.byType(OrdenTicketDialog),
-    );
-    expect(ticket.ordenId, orden.id);
-    expect(aviso, findsNothing);
+      // Lo primero es el ticket de esa misma orden, sin aviso que cerrar antes.
+      final ticket = tester.widget<OrdenTicketDialog>(
+        find.byType(OrdenTicketDialog),
+      );
+      expect(ticket.ordenId, orden.id);
+      expect(aviso, findsNothing);
 
-    await tester.runAsync(
-      () => ProviderScope.containerOf(
-        tester.element(find.byType(OrdenTicketDialog)),
-      ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
-    );
-    await tester.pumpAndSettle();
+      await tester.runAsync(
+        () => ProviderScope.containerOf(
+          tester.element(find.byType(OrdenTicketDialog)),
+        ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
+      );
+      await tester.pumpAndSettle();
 
-    expect(find.text('Ticket · Orden $folio'), findsOneWidget);
+      expect(find.text('Ticket · Orden $folio'), findsOneWidget);
 
-    // Recién creada, ni un clic fuera ni Esc la cierran...
-    await tester.tapAt(const Offset(5, 5));
-    await tester.pumpAndSettle();
-    expect(find.byType(OrdenTicketDialog), findsOneWidget);
+      // Recién creada, ni un clic fuera ni Esc la cierran...
+      await tester.tapAt(const Offset(5, 5));
+      await tester.pumpAndSettle();
+      expect(find.byType(OrdenTicketDialog), findsOneWidget);
 
-    await tester.sendKeyEvent(LogicalKeyboardKey.escape);
-    await tester.pumpAndSettle();
-    expect(find.byType(OrdenTicketDialog), findsOneWidget);
+      await tester.sendKeyEvent(LogicalKeyboardKey.escape);
+      await tester.pumpAndSettle();
+      expect(find.byType(OrdenTicketDialog), findsOneWidget);
 
-    // ...sólo su botón.
-    await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
-    // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se repite
-    // sola y nunca se queda quieta.
-    for (var i = 0; i < 10; i++) {
-      await tester.pump(const Duration(milliseconds: 50));
-    }
-    expect(find.byType(OrdenTicketDialog), findsNothing);
+      // ...sólo su botón.
+      await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
+      // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se repite
+      // sola y nunca se queda quieta.
+      for (var i = 0; i < 10; i++) {
+        await tester.pump(const Duration(milliseconds: 50));
+      }
+      expect(find.byType(OrdenTicketDialog), findsNothing);
 
-    // Al cerrar el ticket, el aviso con el folio; detrás, la orden ya está en
-    // la tabla.
-    expect(aviso, findsOneWidget);
-    expect(find.text(folio), findsWidgets);
-  });
+      // Al cerrar el ticket, el aviso con el folio; detrás, la orden ya está en
+      // la tabla.
+      expect(aviso, findsOneWidget);
+      expect(find.text(folio), findsWidgets);
+    },
+  );
 
   testWidgets('ver la orden abre su detalle', (tester) async {
     final clienteId = await crearCliente(nombres: 'Lucía');
@@ -372,10 +377,7 @@ void main() {
       detalle.cambiarAbono(abono);
       await tester.pump();
       await tester.tap(
-        find.widgetWithText(
-          FilledButton,
-          'Cobrar ${abono.toStringAsFixed(2)}',
-        ),
+        find.widgetWithText(FilledButton, 'Cobrar ${abono.toStringAsFixed(2)}'),
       );
       // Sin `pumpAndSettle`: el aviso de éxito lleva una animación que se
       // repite sola y nunca se queda quieta.
@@ -386,44 +388,48 @@ void main() {
 
     final aviso = find.textContaining('Se registró el pago');
 
-    testWidgets('si la deja pagada, vuelve a salir el ticket y luego el aviso', (
-      tester,
-    ) async {
-      final clienteId = await crearCliente(nombres: 'Lucía');
-      final folio = await crearOrden(clienteId: clienteId, restante: 50);
+    testWidgets(
+      'si la deja pagada, vuelve a salir el ticket y luego el aviso',
+      (tester) async {
+        final clienteId = await crearCliente(nombres: 'Lucía');
+        final folio = await crearOrden(clienteId: clienteId, restante: 50);
 
-      await abrirModulo(tester);
-      await cobrar(tester, 50);
+        await abrirModulo(tester);
+        await cobrar(tester, 50);
 
-      // Primero el ticket de esa orden, ya con el pago final.
-      final orden = (await instance<OrdenesLocalDatasource>().listado()).single;
-      expect(
-        tester.widget<OrdenTicketDialog>(find.byType(OrdenTicketDialog)).ordenId,
-        orden.id,
-      );
-      expect(aviso, findsNothing);
+        // Primero el ticket de esa orden, ya con el pago final.
+        final orden =
+            (await instance<OrdenesLocalDatasource>().listado()).single;
+        expect(
+          tester
+              .widget<OrdenTicketDialog>(find.byType(OrdenTicketDialog))
+              .ordenId,
+          orden.id,
+        );
+        expect(aviso, findsNothing);
 
-      await tester.runAsync(
-        () => ProviderScope.containerOf(
-          tester.element(find.byType(OrdenTicketDialog)),
-        ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
-      );
-      await tester.pumpAndSettle();
-      expect(find.text('Ticket · Orden $folio'), findsOneWidget);
+        await tester.runAsync(
+          () => ProviderScope.containerOf(
+            tester.element(find.byType(OrdenTicketDialog)),
+          ).read(ordenTicketViewModelProvider(orden.id).notifier).cargar(),
+        );
+        await tester.pumpAndSettle();
+        expect(find.text('Ticket · Orden $folio'), findsOneWidget);
 
-      // Como el de una orden nueva, sólo se cierra con su botón.
-      await tester.tapAt(const Offset(5, 5));
-      await tester.pumpAndSettle();
-      expect(find.byType(OrdenTicketDialog), findsOneWidget);
+        // Como el de una orden nueva, sólo se cierra con su botón.
+        await tester.tapAt(const Offset(5, 5));
+        await tester.pumpAndSettle();
+        expect(find.byType(OrdenTicketDialog), findsOneWidget);
 
-      await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
-      for (var i = 0; i < 10; i++) {
-        await tester.pump(const Duration(milliseconds: 50));
-      }
+        await tester.tap(find.widgetWithText(TextButton, 'Cerrar'));
+        for (var i = 0; i < 10; i++) {
+          await tester.pump(const Duration(milliseconds: 50));
+        }
 
-      expect(find.byType(OrdenTicketDialog), findsNothing);
-      expect(aviso, findsOneWidget);
-    });
+        expect(find.byType(OrdenTicketDialog), findsNothing);
+        expect(aviso, findsOneWidget);
+      },
+    );
 
     testWidgets('si todavía debe, sólo avisa', (tester) async {
       final clienteId = await crearCliente(nombres: 'Lucía');

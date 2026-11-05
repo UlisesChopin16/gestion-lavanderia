@@ -41,8 +41,7 @@ class _CampoImporteState extends State<CampoImporte> {
     text: _texto,
   );
 
-  String get _texto =>
-      widget.valor == 0 ? '' : widget.valor.toStringAsFixed(2);
+  String get _texto => widget.valor == 0 ? '' : widget.valor.toStringAsFixed(2);
 
   @override
   void didUpdateWidget(CampoImporte oldWidget) {

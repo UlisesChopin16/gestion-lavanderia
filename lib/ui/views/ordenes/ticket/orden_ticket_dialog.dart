@@ -6,11 +6,11 @@ import 'package:gestion_lavanderia/ui/views/ordenes/ticket/widgets/widgets.dart'
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/encabezado_orden.dart';
 
 /// El ticket de una orden: la vista previa y lo que se puede hacer con él,
-/// descargarlo o enviarlo por correo.
+/// imprimirlo, descargarlo o enviarlo por correo.
 ///
-/// La vista previa ocupa casi todo: es lo que se viene a ver. Las dos acciones
-/// van abajo, con la principal —descargar— rellena, como en el resto de los
-/// diálogos.
+/// La vista previa ocupa casi todo: es lo que se viene a ver. Las acciones
+/// van abajo, con la principal —imprimir, que es lo que sigue en el
+/// mostrador— rellena, como en el resto de los diálogos.
 class OrdenTicketDialog extends ConsumerWidget {
   const OrdenTicketDialog({super.key, required this.ordenId});
 
@@ -59,7 +59,7 @@ class OrdenTicketDialog extends ConsumerWidget {
   }
 }
 
-/// Cerrar, enviar por correo y descargar.
+/// Cerrar, enviar por correo, descargar e imprimir.
 class _Pie extends ConsumerWidget {
   const _Pie({required this.ordenId, required this.estado});
 
@@ -77,8 +77,8 @@ class _Pie extends ConsumerWidget {
         color: scheme.surfaceContainerLow,
         border: Border(top: BorderSide(color: scheme.outlineVariant)),
       ),
-      // En Wrap y no en Row: en una ventana angosta los tres botones no caben
-      // en un renglón, y es mejor que bajen a que se desborden.
+      // En Wrap y no en Row: en una ventana angosta los botones no caben en
+      // un renglón, y es mejor que bajen a que se desborden.
       child: Wrap(
         alignment: WrapAlignment.end,
         crossAxisAlignment: WrapCrossAlignment.center,
@@ -94,15 +94,23 @@ class _Pie extends ConsumerWidget {
             icon: const Icon(Icons.forward_to_inbox_rounded),
             label: const Text('Enviar por correo'),
           ),
-          FilledButton.icon(
+          OutlinedButton.icon(
             onPressed: disponible ? () => _descargar(context, ref) : null,
             icon: estado.guardando
-                ? const SizedBox.square(
-                    dimension: 18,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
+                ? const _Girando()
                 : const Icon(Icons.download_rounded),
             label: const Text('Descargar PDF'),
+          ),
+          FilledButton.icon(
+            onPressed: disponible
+                ? ref
+                      .read(ordenTicketViewModelProvider(ordenId).notifier)
+                      .imprimir
+                : null,
+            icon: estado.imprimiendo
+                ? const _Girando()
+                : const Icon(Icons.print_rounded),
+            label: const Text('Imprimir'),
           ),
         ],
       ),
@@ -128,5 +136,18 @@ class _Pie extends ConsumerWidget {
     if (mensaje == null || !context.mounted) return;
 
     await context.showSuccessDialog(mensaje);
+  }
+}
+
+/// El indicador que toma el lugar del icono mientras el botón trabaja.
+class _Girando extends StatelessWidget {
+  const _Girando();
+
+  @override
+  Widget build(BuildContext context) {
+    return const SizedBox.square(
+      dimension: 18,
+      child: CircularProgressIndicator(strokeWidth: 2),
+    );
   }
 }

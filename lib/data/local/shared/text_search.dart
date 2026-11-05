@@ -17,10 +17,7 @@ Expression<bool> likeAny(String texto, List<Expression<String>> columnas) {
 /// Igual que [likeAny], pero exige que *todas* las palabras del texto aparezcan
 /// en alguna de las columnas. Permite buscar "juan perez" y encontrar al
 /// cliente aunque nombre y apellido estén en columnas distintas.
-Expression<bool> likeAllWords(
-  String texto,
-  List<Expression<String>> columnas,
-) {
+Expression<bool> likeAllWords(String texto, List<Expression<String>> columnas) {
   final palabras = texto
       .trim()
       .split(RegExp(r'\s+'))

@@ -15,6 +15,26 @@ class OrdenServicioDao extends DatabaseAccessor<AppDatabase>
     return query.getSingleOrNull();
   }
 
+  /// Las órdenes recibidas entre [inicio] —incluido— y [fin] —excluido—, de
+  /// la más antigua a la más reciente.
+  Future<List<OrdenServicioEntry>> recibidasEntre(
+    DateTime inicio,
+    DateTime fin,
+  ) {
+    final query = select(ordenServicio)
+      ..where(
+        (t) =>
+            t.fechaCreacion.isBiggerOrEqualValue(inicio) &
+            t.fechaCreacion.isSmallerThanValue(fin),
+      )
+      ..orderBy([
+        (t) => OrderingTerm.asc(t.fechaCreacion),
+        (t) => OrderingTerm.asc(t.id),
+      ]);
+
+    return query.get();
+  }
+
   /// Inserta la orden asignándole folio.
   ///
   /// El folio se calcula dentro de la misma transacción que la inserción: si se

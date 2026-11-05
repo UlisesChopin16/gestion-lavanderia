@@ -44,6 +44,19 @@ class _GuardadoFalso extends GuardadoPdf {
   }
 }
 
+/// Sin impresora: anota qué le pidieron imprimir.
+class _ImpresionFalsa extends ImpresionPdf {
+  Uint8List? pdf;
+  String? nombre;
+
+  @override
+  Future<bool> imprimir(Uint8List pdf, {required String nombre}) async {
+    this.pdf = pdf;
+    this.nombre = nombre;
+    return true;
+  }
+}
+
 /// Sin servidor: anota el correo, o falla si se le pide.
 class _CorreoFalso extends EnvioCorreo {
   String? destinatario;
@@ -80,6 +93,7 @@ void main() {
 
   late AppDatabase db;
   late _GuardadoFalso guardado;
+  late _ImpresionFalsa impresion;
   late _CorreoFalso correo;
   late OrdenDetalleData orden;
 
@@ -172,10 +186,12 @@ void main() {
     await registrarDependenciasDePrueba(db: db);
 
     guardado = _GuardadoFalso();
+    impresion = _ImpresionFalsa();
     correo = _CorreoFalso();
     instance
       ..registerLazySingleton<VistaPreviaPdf>(() => const _VistaPreviaFalsa())
       ..registerLazySingleton<GuardadoPdf>(() => guardado)
+      ..registerLazySingleton<ImpresionPdf>(() => impresion)
       ..registerLazySingleton<EnvioCorreo>(() => correo);
 
     final clienteId = await db.clientesDao.insertCliente(
@@ -223,17 +239,24 @@ void main() {
     await db.close();
   });
 
-  testWidgets('enseña la vista previa y las dos acciones', (tester) async {
+  testWidgets('enseña la vista previa y sus acciones', (tester) async {
     await configurarEmpresa();
 
     await abrirTicket(tester);
 
     expect(find.text('Ticket · Orden ${orden.folio}'), findsOneWidget);
     expect(find.bySemanticsLabel('Vista previa del ticket'), findsOneWidget);
+    // Imprimir es la principal: es lo que sigue en el mostrador.
     expect(
       tester
-          .widget<FilledButton>(
-            find.widgetWithText(FilledButton, 'Descargar PDF'),
+          .widget<FilledButton>(find.widgetWithText(FilledButton, 'Imprimir'))
+          .onPressed,
+      isNotNull,
+    );
+    expect(
+      tester
+          .widget<OutlinedButton>(
+            find.widgetWithText(OutlinedButton, 'Descargar PDF'),
           )
           .onPressed,
       isNotNull,
@@ -263,6 +286,22 @@ void main() {
       find.text('El ticket se guardó en C:/Tickets/Ticket ${orden.folio}.pdf'),
       findsOneWidget,
     );
+  });
+
+  testWidgets('imprimir manda ese mismo PDF, sin aviso de por medio', (
+    tester,
+  ) async {
+    await configurarEmpresa();
+    await abrirTicket(tester);
+
+    await tester.tap(find.text('Imprimir'));
+    await tester.pumpAndSettle();
+
+    expect(impresion.pdf, estado(tester).pdf);
+    expect(impresion.nombre, 'Ticket ${orden.folio}.pdf');
+    expect(estado(tester).imprimiendo, isFalse);
+    // El diálogo de impresión del sistema ya dijo lo que pasó.
+    expect(find.byType(OrdenTicketDialog), findsOneWidget);
   });
 
   testWidgets('sin cuenta de correo, dice dónde configurarla', (tester) async {

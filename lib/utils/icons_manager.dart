@@ -18,6 +18,10 @@ abstract final class IconsManager {
   static const selectedCatalogoIcon = Icons.menu_book_rounded;
   static const unselectedCatalogoIcon = Icons.menu_book_outlined;
 
+  // Reportes y estadísticas
+  static const selectedReportesIcon = Icons.insights_rounded;
+  static const unselectedReportesIcon = Icons.insights_outlined;
+
   // Clientes
   static const selectedClientesIcon = Icons.people_rounded;
   static const unselectedClientesIcon = Icons.people_outlined;

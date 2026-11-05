@@ -59,7 +59,11 @@ class CatalogoConceptos extends StatelessWidget {
             VCol(
               cols: 12,
               sm: 6,
-              child: SearchFilter(label: 'Buscar concepto', value: busqueda, onChanged: onBuscar),
+              child: SearchFilter(
+                label: 'Buscar concepto',
+                value: busqueda,
+                onChanged: onBuscar,
+              ),
             ),
             VCol(
               cols: 12,
@@ -76,7 +80,11 @@ class CatalogoConceptos extends StatelessWidget {
         Expanded(
           child: conceptos.isEmpty
               ? const _SinConceptos()
-              : _Lista(conceptos: conceptos, cantidadDe: cantidadDe, onAgregar: onAgregar),
+              : _Lista(
+                  conceptos: conceptos,
+                  cantidadDe: cantidadDe,
+                  onAgregar: onAgregar,
+                ),
         ),
       ],
     );
@@ -84,7 +92,11 @@ class CatalogoConceptos extends StatelessWidget {
 }
 
 class _Lista extends StatelessWidget {
-  const _Lista({required this.conceptos, required this.cantidadDe, required this.onAgregar});
+  const _Lista({
+    required this.conceptos,
+    required this.cantidadDe,
+    required this.onAgregar,
+  });
 
   final List<PrecioData> conceptos;
   final double Function(PrecioData concepto) cantidadDe;
@@ -110,7 +122,11 @@ class _Lista extends StatelessWidget {
 }
 
 class _Concepto extends StatelessWidget {
-  const _Concepto({required this.concepto, required this.cantidad, required this.onAgregar});
+  const _Concepto({
+    required this.concepto,
+    required this.cantidad,
+    required this.onAgregar,
+  });
 
   final PrecioData concepto;
 
@@ -139,7 +155,10 @@ class _Concepto extends StatelessWidget {
         mainAxisSize: MainAxisSize.min,
         spacing: 8,
         children: [
-          Text(concepto.importe.toStringAsFixed(2), style: theme.textTheme.titleSmall),
+          Text(
+            concepto.importe.toStringAsFixed(2),
+            style: theme.textTheme.titleSmall,
+          ),
           if (elegido)
             // La cantidad que ya lleva la orden, en el sitio donde estaría el
             // botón: ya se agregó, y lo que importa ahora es cuánto va.
@@ -182,7 +201,11 @@ class _SinConceptos extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           spacing: 8,
           children: [
-            Icon(Icons.search_off_rounded, size: 36, color: theme.colorScheme.outline),
+            Icon(
+              Icons.search_off_rounded,
+              size: 36,
+              color: theme.colorScheme.outline,
+            ),
             Text(
               'Ningún concepto coincide con la búsqueda.',
               textAlign: TextAlign.center,

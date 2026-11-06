@@ -259,17 +259,19 @@ class _Resumen extends ConsumerWidget {
 
   final OrdenDialogState estado;
 
-  /// Cuántos conceptos lleva y para cuándo queda, en una línea.
+  /// Para cuándo queda y cuánto lleva, en una línea: `Lista el 08/nov/2026 ·
+  /// 5 Piezas · 3 Kgs`. La fecha va primero porque es lo que se le dice al
+  /// cliente, y si el renglón no alcanza se corta lo que también se ve en la
+  /// lista. Se cuenta por unidad y no por renglón: las piezas van una por
+  /// renglón, y un renglón de kilos no es una prenda.
   String get _cuenta {
-    final cuantos = estado.items.length;
-    if (cuantos == 0) return 'Sin prendas';
+    if (estado.items.isEmpty) return 'Sin prendas';
 
-    final conceptos = cuantos == 1 ? '1 concepto' : '$cuantos conceptos';
     final entrega = estado.entregaEstimada;
 
-    if (entrega == null) return conceptos;
+    if (entrega == null) return estado.cantidades;
 
-    return '$conceptos · lista el ${entrega.formatDate}';
+    return 'Lista el ${entrega.formatDate} · ${estado.cantidades}';
   }
 
   @override
@@ -280,6 +282,7 @@ class _Resumen extends ConsumerWidget {
     final renglones = RenglonesOrden(
       items: estado.items.toList(),
       onCantidad: notifier.cambiarCantidad,
+      onDescripcion: notifier.describir,
       onEntrega: notifier.cambiarEntrega,
       onQuitar: notifier.quitar,
     );

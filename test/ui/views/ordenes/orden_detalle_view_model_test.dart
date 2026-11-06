@@ -119,7 +119,7 @@ void main() {
     test('una parte de la ropa sale aunque no esté pagada', () async {
       final id = await abrirOrden();
 
-      notificador(id).alternarEntrega(item(id, 'Sábana'));
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
 
       expect(estado(id).entregaTodo, isFalse);
       expect(estado(id).faltaPagarParaEntregarTodo, isFalse);
@@ -129,7 +129,7 @@ void main() {
     test('toda la ropa no sale si la orden no queda pagada', () async {
       final id = await abrirOrden(abono: 20);
 
-      notificador(id).marcarTodo(true);
+      notificador(id).llevarTodoA(PasoPrenda.entregada);
 
       expect(estado(id).entregaTodo, isTrue);
       expect(estado(id).faltaPagarParaEntregarTodo, isTrue);
@@ -149,7 +149,7 @@ void main() {
     test('si ya está pagada, toda la ropa sale sin cobrar nada', () async {
       final id = await abrirOrden(abono: 170);
 
-      notificador(id).marcarTodo(true);
+      notificador(id).llevarTodoA(PasoPrenda.entregada);
 
       expect(estado(id).pagada, isTrue);
       expect(estado(id).puedeRegistrar, isTrue);
@@ -163,12 +163,63 @@ void main() {
       );
       await notificador(id).cargar();
 
-      notificador(id).alternarEntrega(item(id, 'Sábana'));
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
       expect(estado(id).aEntregar, isEmpty);
 
       // Marcar todo es marcar lo que falta: sólo la cobija.
-      notificador(id).marcarTodo(true);
+      notificador(id).llevarTodoA(PasoPrenda.entregada);
       expect(estado(id).aEntregar, [item(id, 'Cobija').id]);
+    });
+
+    test('lo que se va a entregar queda también como lista', () async {
+      final id = await abrirOrden();
+      final sabana = item(id, 'Sábana');
+
+      notificador(id).cambiarPaso(sabana, PasoPrenda.entregada);
+      expect(estado(id).seMarcaLista(sabana), isTrue);
+      expect(estado(id).pasoDe(sabana), PasoPrenda.entregada);
+
+      // Regresarla a "Lista" la deja lista, sin entregar...
+      notificador(id).cambiarPaso(sabana, PasoPrenda.lista);
+      expect(estado(id).seEntrega(sabana), isFalse);
+      expect(estado(id).seMarcaLista(sabana), isTrue);
+
+      // ...y a "En proceso", como estaba.
+      notificador(id).cambiarPaso(sabana, PasoPrenda.enProceso);
+      expect(estado(id).hayPasosElegidos, isFalse);
+      expect(estado(id).cambiaDePaso(sabana), isFalse);
+    });
+
+    test('"Todo listo" no regresa lo que ya se iba a entregar', () async {
+      final id = await abrirOrden();
+
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
+      notificador(id).llevarTodoA(PasoPrenda.lista);
+
+      expect(estado(id).pasoDe(item(id, 'Sábana')), PasoPrenda.entregada);
+      expect(estado(id).pasoDe(item(id, 'Cobija')), PasoPrenda.lista);
+      expect(estado(id).puedeLlevarTodoA(PasoPrenda.lista), isFalse);
+
+      notificador(id).deshacerPasos();
+      expect(estado(id).aEntregar, isEmpty);
+      expect(estado(id).aMarcarListos, isEmpty);
+    });
+
+    test('lo que ya está listo no vuelve a estar en proceso', () async {
+      final id = await abrirOrden();
+      await ordenes().marcarListos(
+        ordenId: id,
+        itemIds: [item(id, 'Sábana').id],
+      );
+      await notificador(id).cargar();
+
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.enProceso);
+      expect(estado(id).pasoDe(item(id, 'Sábana')), PasoPrenda.lista);
+
+      // Entregarla no la vuelve a marcar como lista: ya lo estaba.
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
+      expect(estado(id).aMarcarListos, isEmpty);
+      expect(estado(id).aEntregar, [item(id, 'Sábana').id]);
     });
   });
 
@@ -214,7 +265,7 @@ void main() {
       final id = await abrirOrden();
 
       notificador(id).abonarTodo();
-      notificador(id).marcarTodo(true);
+      notificador(id).llevarTodoA(PasoPrenda.entregada);
 
       final registrado = await notificador(id).registrar();
 
@@ -256,7 +307,7 @@ void main() {
     test('entregar ropa de una orden ya pagada no la salda otra vez', () async {
       final id = await abrirOrden(abono: 170);
 
-      notificador(id).alternarEntrega(item(id, 'Sábana'));
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
       final registrado = await notificador(id).registrar();
 
       expect(registrado?.saldoLaOrden, isFalse);
@@ -302,7 +353,7 @@ void main() {
         metodoPago: MetodoPagoType.tarjeta,
       );
 
-      notificador(id).alternarEntrega(item(id, 'Sábana'));
+      notificador(id).cambiarPaso(item(id, 'Sábana'), PasoPrenda.entregada);
       await notificador(id).registrar();
 
       // El listado enseña el método del último movimiento: recoger ropa no
@@ -333,7 +384,7 @@ void main() {
       expect(estado(id).admiteMovimientos, isFalse);
 
       // Y ya no se puede marcar nada.
-      notificador(id).marcarTodo(true);
+      notificador(id).llevarTodoA(PasoPrenda.entregada);
       expect(estado(id).aEntregar, isEmpty);
     });
   });

@@ -87,19 +87,23 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// La casilla del renglón que muestra [concepto]. Es la del renglón más
-  /// cercano al nombre: los de afuera —las columnas del diálogo— también son
-  /// filas y llevan todas las casillas dentro.
-  Checkbox casilla(WidgetTester tester, String concepto) {
-    return tester.widget<Checkbox>(
-      find.descendant(
-        of: find
-            .ancestor(of: find.text(concepto), matching: find.byType(Row))
-            .first,
-        matching: find.byType(Checkbox),
-      ),
-    );
-  }
+  /// El renglón que muestra [concepto]: el recuadro más cercano al nombre.
+  Finder renglon(String concepto) => find
+      .ancestor(
+        of: find.text(concepto),
+        matching: find.byType(AnimatedContainer),
+      )
+      .first;
+
+  /// Los pasos del renglón de [concepto]. No hay cuando la prenda ya no se
+  /// mueve: entregada, o de una orden que sólo se resume.
+  Finder pasos(String concepto) => find.descendant(
+    of: renglon(concepto),
+    matching: find.byType(SegmentedButton<PasoPrenda>),
+  );
+
+  Set<PasoPrenda> elegido(WidgetTester tester, String concepto) =>
+      tester.widget<SegmentedButton<PasoPrenda>>(pasos(concepto)).selected;
 
   FilledButton botonPrincipal(WidgetTester tester) =>
       tester.widget<FilledButton>(find.byType(FilledButton).last);
@@ -184,13 +188,37 @@ void main() {
 
     await abrirDetalle(tester, orden.id);
 
-    expect(casilla(tester, 'Sábana').value, isTrue);
-    expect(casilla(tester, 'Sábana').onChanged, isNull);
+    expect(pasos('Sábana'), findsNothing);
+    expect(
+      find.descendant(of: renglon('Sábana'), matching: find.text('Entregada')),
+      findsOneWidget,
+    );
 
-    expect(casilla(tester, 'Cobija').value, isFalse);
-    expect(casilla(tester, 'Cobija').onChanged, isNotNull);
+    expect(elegido(tester, 'Cobija'), {PasoPrenda.enProceso});
 
     expect(find.text('1 de 2 entregadas'), findsOneWidget);
+  });
+
+  testWidgets('entregar una prenda la deja también lista', (tester) async {
+    final orden = await crearOrden(abono: 170);
+
+    await abrirDetalle(tester, orden.id);
+
+    await tester.tap(
+      find.descendant(of: renglon('Sábana'), matching: find.text('Entregar')),
+    );
+    await tester.pumpAndSettle();
+
+    expect(elegido(tester, 'Sábana'), {PasoPrenda.entregada});
+    expect(elegido(tester, 'Cobija'), {PasoPrenda.enProceso});
+    // Lo que sale se marca listo solo: el botón sólo habla de entregar.
+    expect(find.text('Entregar 1 concepto'), findsOneWidget);
+
+    // Y se puede deshacer antes de guardar.
+    await tester.tap(find.byTooltip('Deshacer lo que se marcó'));
+    await tester.pumpAndSettle();
+    expect(elegido(tester, 'Sábana'), {PasoPrenda.enProceso});
+    expect(botonPrincipal(tester).onPressed, isNull);
   });
 
   testWidgets('en efectivo dice cuánto cambio dar', (tester) async {
@@ -220,7 +248,7 @@ void main() {
 
     await abrirDetalle(tester, orden.id);
 
-    await tester.tap(find.text('Marcar lo pendiente'));
+    await tester.tap(find.text('Entregar todo'));
     await tester.pumpAndSettle();
 
     expect(find.byType(AvisoEntregaSinPagar), findsOneWidget);
@@ -243,9 +271,9 @@ void main() {
 
     expect(find.byType(CobroDetalle), findsNothing);
     expect(find.byType(OrdenYaPagada), findsOneWidget);
-    expect(casilla(tester, 'Sábana').onChanged, isNotNull);
+    expect(pasos('Sábana'), findsOneWidget);
 
-    await tester.tap(find.text('Marcar lo pendiente'));
+    await tester.tap(find.text('Entregar todo'));
     await tester.pumpAndSettle();
 
     expect(find.text('Entregar 2 conceptos'), findsOneWidget);
@@ -267,9 +295,8 @@ void main() {
 
     // Nada que cobrar, nada que marcar, y un solo botón: el de cerrar.
     expect(find.byType(CobroDetalle), findsNothing);
-    expect(find.text('Marcar lo pendiente'), findsNothing);
-    expect(casilla(tester, 'Sábana').onChanged, isNull);
-    expect(casilla(tester, 'Cobija').onChanged, isNull);
+    expect(find.text('Entregar todo'), findsNothing);
+    expect(find.byType(SegmentedButton<PasoPrenda>), findsNothing);
     expect(find.byType(FilledButton), findsOneWidget);
     expect(find.widgetWithText(FilledButton, 'Cerrar'), findsOneWidget);
   });
@@ -308,7 +335,7 @@ void main() {
 
     await abrirDetalle(tester, orden.id);
 
-    await tester.tap(find.text('Marcar lo pendiente'));
+    await tester.tap(find.text('Entregar todo'));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Cobrar lo que falta'));
     await tester.pumpAndSettle();

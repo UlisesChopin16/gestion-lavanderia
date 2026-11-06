@@ -4,12 +4,14 @@ import 'package:gestion_lavanderia/datasource/local/datasources.dart';
 import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/cobro_en_efectivo.dart';
+import 'package:gestion_lavanderia/models/data/ordenes/paso_prenda.dart';
 import 'package:gestion_lavanderia/models/data/shared/filas.dart';
 import 'package:gestion_lavanderia/services/avisos/aviso_ropa_lista.dart';
 import 'package:gestion_lavanderia/services/ticket/salida_ticket.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 export 'package:gestion_lavanderia/models/data/ordenes/orden_detalle_data.dart';
+export 'package:gestion_lavanderia/models/data/ordenes/paso_prenda.dart';
 export 'package:gestion_lavanderia/models/data/shared/filas.dart';
 
 part 'orden_detalle_view_model.freezed.dart';
@@ -32,7 +34,8 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
     /// Los renglones pendientes que se marcaron para entregar ahora.
     @Default(Filas<int>()) Filas<int> aEntregar,
 
-    /// Los renglones que se marcaron como listos para recogerse.
+    /// Los renglones que se marcaron como listos para recogerse. Incluye los
+    /// que se van a entregar: lo que sale ya estaba listo.
     @Default(Filas<int>()) Filas<int> aMarcarListos,
 
     /// La lavandería, para el aviso por correo. Sólo se lee si el aviso está
@@ -94,13 +97,25 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
 
   bool seMarcaLista(ItemOrdenData item) => aMarcarListos.contains(item.id);
 
-  /// La ropa que falta terminar: ni lista ni entregada.
-  List<ItemOrdenData> get porTerminar =>
-      pendientes.where((item) => !item.estaListo).toList();
+  /// El paso en el que quedará [item] al guardar: el de la base, o el que se
+  /// le eligió ahora.
+  PasoPrenda pasoDe(ItemOrdenData item) {
+    if (item.estaEntregado || seEntrega(item)) return PasoPrenda.entregada;
+    if (item.estaListo || seMarcaLista(item)) return PasoPrenda.lista;
 
-  /// Si se marcó como lista toda la ropa que faltaba terminar.
-  bool get todoListoMarcado =>
-      porTerminar.isNotEmpty && porTerminar.every(seMarcaLista);
+    return PasoPrenda.enProceso;
+  }
+
+  /// Si a [item] se le eligió un paso que todavía no está guardado.
+  bool cambiaDePaso(ItemOrdenData item) => pasoDe(item) != PasoPrenda.de(item);
+
+  /// Si alguna prenda pendiente puede avanzar hasta [paso].
+  bool puedeLlevarTodoA(PasoPrenda paso) =>
+      pendientes.any((item) => !pasoDe(item).alcanza(paso));
+
+  /// Si se eligió algo para alguna prenda, que es cuando tiene sentido
+  /// deshacerlo.
+  bool get hayPasosElegidos => aEntregar.isNotEmpty || aMarcarListos.isNotEmpty;
 
   /// Lo que se marcará como listo al guardar. Lo que además se entrega no
   /// cuenta: al salir se marca listo solo.
@@ -235,51 +250,49 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
     }
   }
 
-  /// Marca o desmarca un renglón para entregarlo. Uno ya entregado no se
-  /// toca: su entrega quedó fechada en el historial.
-  void alternarEntrega(ItemOrdenData item) {
+  /// Lleva una prenda pendiente hasta [paso].
+  ///
+  /// Entregar la deja también lista: lo que sale del mostrador ya estaba
+  /// terminado, y así lo dice el renglón antes de guardar. Lo que la base ya
+  /// tiene no se deshace —una prenda lista no vuelve a estar en proceso—, así
+  /// que un paso anterior al guardado la deja en el guardado.
+  void cambiarPaso(ItemOrdenData item, PasoPrenda paso) {
     if (!state.admiteMovimientos || item.estaEntregado) return;
 
-    final ids = state.aEntregar.toList();
-    if (!ids.remove(item.id)) ids.add(item.id);
-
-    state = state.copyWith(aEntregar: Filas(ids));
-  }
-
-  /// Marca toda la ropa pendiente, o ninguna.
-  void marcarTodo(bool todo) {
-    if (!state.admiteMovimientos) return;
-
     state = state.copyWith(
-      aEntregar: Filas([
-        if (todo)
-          for (final item in state.pendientes) item.id,
-      ]),
+      aEntregar: _con(state.aEntregar, item, paso == PasoPrenda.entregada),
+      aMarcarListos: _con(
+        state.aMarcarListos,
+        item,
+        !item.estaListo && paso.alcanza(PasoPrenda.lista),
+      ),
     );
   }
 
-  /// Marca o desmarca un renglón como listo para recogerse. Uno que ya está
-  /// listo —o ya salió— no se toca: su fecha es la de cuando se terminó.
-  void alternarLista(ItemOrdenData item) {
-    if (!state.admiteMovimientos || item.estaListo || item.estaEntregado) {
-      return;
-    }
-
-    final ids = state.aMarcarListos.toList();
-    if (!ids.remove(item.id)) ids.add(item.id);
-
-    state = state.copyWith(aMarcarListos: Filas(ids));
-  }
-
-  /// Marca como lista toda la ropa que falta terminar, o ninguna.
-  void marcarTodoListo(bool todo) {
+  /// Lleva toda la ropa pendiente hasta [paso], sin regresar ninguna: con
+  /// "Todo listo", la que ya se iba a entregar se sigue entregando.
+  void llevarTodoA(PasoPrenda paso) {
     if (!state.admiteMovimientos) return;
 
+    for (final item in state.pendientes) {
+      if (!state.pasoDe(item).alcanza(paso)) cambiarPaso(item, paso);
+    }
+  }
+
+  /// Deja la ropa como está en la base: nada por entregar ni por marcar.
+  void deshacerPasos() {
     state = state.copyWith(
-      aMarcarListos: Filas([
-        if (todo)
-          for (final item in state.porTerminar) item.id,
-      ]),
+      aEntregar: const Filas(),
+      aMarcarListos: const Filas(),
+    );
+  }
+
+  /// [ids] con [item] dentro o fuera.
+  Filas<int> _con(Filas<int> ids, ItemOrdenData item, bool dentro) {
+    if (ids.contains(item.id) == dentro) return ids;
+
+    return Filas(
+      dentro ? [...ids, item.id] : ids.where((id) => id != item.id).toList(),
     );
   }
 

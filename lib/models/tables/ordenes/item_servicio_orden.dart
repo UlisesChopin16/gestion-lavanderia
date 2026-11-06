@@ -25,6 +25,14 @@ class ItemServicioOrden extends Table {
   IntColumn get precioConceptoId =>
       integer().references(PreciosConceptos, #id)();
   RealColumn get cantidad => real()();
+
+  /// Lo que distingue a esta prenda de otras iguales: el color, la marca, una
+  /// mancha. Nula cuando no se anotó nada.
+  ///
+  /// Sirve sobre todo en lo que se cobra por pieza, que se guarda una por
+  /// renglón: dos playeras son dos renglones, y es esto lo que dice cuál es
+  /// cuál al entregarlas.
+  TextColumn get descripcion => text().nullable()();
   RealColumn get importe => real()();
   BoolColumn get estaEntregado =>
       boolean().withDefault(const Constant(false))();

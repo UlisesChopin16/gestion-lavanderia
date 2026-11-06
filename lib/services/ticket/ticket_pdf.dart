@@ -179,7 +179,8 @@ class _Conceptos extends pw.StatelessWidget {
   }
 }
 
-/// Una prenda: qué es y lo que cuesta; debajo, cuánto, a cómo y para cuándo.
+/// Una prenda: qué es y lo que cuesta; debajo, lo que la distingue si se
+/// anotó, y cuánto, a cómo y para cuándo.
 class _Concepto extends pw.StatelessWidget {
   _Concepto({required this.item});
 
@@ -211,6 +212,10 @@ class _Concepto extends pw.StatelessWidget {
             pw.Text(item.importe.enPesos),
           ],
         ),
+        // Es lo que dice cuál de las playeras es al recogerlas: va a la vista
+        // y no entre las cifras de abajo.
+        if (item.detalle.isNotEmpty)
+          pw.Text(item.detalle, style: const pw.TextStyle(fontSize: 8)),
         _Pequeno(
           '${_cantidad(item.cantidad)} $unidad × ${precio.importe.enPesos}'
           '  ·  $entrega',

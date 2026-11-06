@@ -39,7 +39,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 6;
+  int get schemaVersion => 7;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -49,6 +49,7 @@ class AppDatabase extends _$AppDatabase {
       if (from < 4) await _migrarAVersion4(m);
       if (from < 5) await _migrarAVersion5(m);
       if (from < 6) await _migrarAVersion6(m);
+      if (from < 7) await _migrarAVersion7(m);
     },
     beforeOpen: (details) async {
       // Las tablas declaran `references`, pero SQLite no las hace cumplir si
@@ -116,6 +117,14 @@ class AppDatabase extends _$AppDatabase {
       'UPDATE item_servicio_orden SET fecha_lista = fecha_entregado '
       'WHERE esta_entregado = 1',
     );
+  }
+
+  /// Versión 7: cada item puede llevar una descripción —color, marca, una
+  /// mancha— que lo distinga de otros del mismo concepto.
+  ///
+  /// La columna nace nula: lo anterior no se describió.
+  Future<void> _migrarAVersion7(Migrator m) async {
+    await m.addColumn(itemServicioOrden, itemServicioOrden.descripcion);
   }
 
   /// Los índices que el esquema tenía en la versión 2.

@@ -574,7 +574,9 @@ class _Prenda extends StatelessWidget {
               // Un renglón cada texto: así las celdas de una misma fila
               // miden lo mismo y la cuadrícula no queda escalonada.
               Text(
-                precio.descripcion,
+                item.detalle.isEmpty
+                    ? precio.descripcion
+                    : '${precio.descripcion} · ${item.detalle}',
                 style: theme.textTheme.bodyMedium,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,

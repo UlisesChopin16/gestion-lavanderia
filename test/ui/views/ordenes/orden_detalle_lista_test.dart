@@ -123,13 +123,17 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  /// La etiqueta "Lista" del renglón de [concepto].
-  Finder etiquetaLista(String concepto) => find.descendant(
-    of: find
-        .ancestor(of: find.text(concepto), matching: find.byType(Row))
-        .first,
-    matching: find.widgetWithText(FilterChip, 'Lista'),
-  );
+  /// El renglón que muestra [concepto]: el recuadro más cercano al nombre.
+  Finder renglon(String concepto) => find
+      .ancestor(
+        of: find.text(concepto),
+        matching: find.byType(AnimatedContainer),
+      )
+      .first;
+
+  /// El paso "Lista" del renglón de [concepto].
+  Finder etiquetaLista(String concepto) =>
+      find.descendant(of: renglon(concepto), matching: find.text('Lista'));
 
   /// Guarda, y espera a la base y al correo, que corren fuera del reloj
   /// falso de la prueba.
@@ -282,7 +286,9 @@ void main() {
     expect(correo.html, isNull);
   });
 
-  testWidgets('lo ya listo lo dice y no ofrece la etiqueta', (tester) async {
+  testWidgets('lo ya listo lo dice y no vuelve a estar en proceso', (
+    tester,
+  ) async {
     await ordenes().marcarListos(
       ordenId: orden.id,
       itemIds: [orden.items.first.id],
@@ -290,6 +296,22 @@ void main() {
     await abrirDetalle(tester);
 
     expect(find.textContaining('Lista desde el'), findsOneWidget);
-    expect(find.widgetWithText(FilterChip, 'Lista'), findsOneWidget);
+
+    final lista = orden.items.first.precio.nombreConcepto;
+    final pasos = tester.widget<SegmentedButton<PasoPrenda>>(
+      find.descendant(
+        of: renglon(lista),
+        matching: find.byType(SegmentedButton<PasoPrenda>),
+      ),
+    );
+    expect(pasos.selected, {PasoPrenda.lista});
+    expect(
+      {for (final segmento in pasos.segments) segmento.value: segmento.enabled},
+      {
+        PasoPrenda.enProceso: false,
+        PasoPrenda.lista: true,
+        PasoPrenda.entregada: true,
+      },
+    );
   });
 }

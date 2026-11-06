@@ -6,6 +6,12 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// La ropa que lleva la orden, con lo que se puede cambiar de cada renglón:
 /// cuánta, para cuándo y si se queda.
 ///
+/// Lo que se cobra por pieza va una pieza por renglón, con un campo para
+/// describirla —el color, la marca, una mancha—: es lo que al entregar dice
+/// cuál de las dos playeras es la que falta. Lo que se mide —kilos, litros—
+/// lleva su cantidad en el renglón, porque tres kilos no se describen de uno
+/// en uno.
+///
 /// La fecha sale calculada de los días que pide el concepto, y se puede
 /// correr renglón por renglón: una prenda que el cliente necesita antes no
 /// obliga a cambiar el catálogo.
@@ -20,11 +26,14 @@ class RenglonesOrden extends StatefulWidget {
     super.key,
     required this.items,
     required this.onCantidad,
+    required this.onDescripcion,
     required this.onEntrega,
     required this.onQuitar,
   });
 
   final List<ItemOrdenData> items;
+
+  final void Function(int indice, String descripcion) onDescripcion;
 
   /// La cantidad nueva de un renglón. Por debajo de una unidad el renglón se
   /// quita, que es lo que significa bajar de uno.
@@ -63,27 +72,57 @@ class _RenglonesOrdenState extends State<RenglonesOrden> {
         padding: const EdgeInsets.only(right: 8),
         itemCount: widget.items.length,
         separatorBuilder: (context, _) => const Divider(height: 1),
-        itemBuilder: (context, indice) => _Renglon(
-          item: widget.items[indice],
-          onCantidad: (cantidad) => widget.onCantidad(indice, cantidad),
-          onEntrega: (fecha) => widget.onEntrega(indice, fecha),
-          onQuitar: () => widget.onQuitar(indice),
-        ),
+        itemBuilder: (context, indice) {
+          final item = widget.items[indice];
+
+          return _Renglon(
+            item: item,
+            pieza: item.esPorPieza ? _piezaDe(indice) : null,
+            onCantidad: (cantidad) => widget.onCantidad(indice, cantidad),
+            onDescripcion: (texto) => widget.onDescripcion(indice, texto),
+            onEntrega: (fecha) => widget.onEntrega(indice, fecha),
+            onQuitar: () => widget.onQuitar(indice),
+          );
+        },
       ),
     );
+  }
+
+  /// Qué número es la pieza del renglón [indice] entre las de su concepto, y
+  /// cuántas son: `(2, 3)` es la segunda de tres playeras.
+  (int, int) _piezaDe(int indice) {
+    final concepto = widget.items[indice].precio.id;
+    var numero = 0;
+    var total = 0;
+
+    for (final (i, item) in widget.items.indexed) {
+      if (item.precio.id != concepto) continue;
+      total++;
+      if (i <= indice) numero = total;
+    }
+
+    return (numero, total);
   }
 }
 
 class _Renglon extends StatelessWidget {
   const _Renglon({
     required this.item,
+    required this.pieza,
     required this.onCantidad,
+    required this.onDescripcion,
     required this.onEntrega,
     required this.onQuitar,
   });
 
   final ItemOrdenData item;
+
+  /// Qué pieza es entre las de su concepto y cuántas son; `null` si el
+  /// renglón no se cobra por pieza.
+  final (int, int)? pieza;
+
   final ValueChanged<double> onCantidad;
+  final ValueChanged<String> onDescripcion;
   final ValueChanged<DateTime> onEntrega;
   final VoidCallback onQuitar;
 
@@ -108,7 +147,12 @@ class _Renglon extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         Text(
-          precio.categoria,
+          switch (pieza) {
+            // Con una sola no hace falta contarla.
+            (_, 1) || null => precio.categoria,
+            (final numero, final total) =>
+              '${precio.categoria} · $numero de $total',
+          },
           style: theme.textTheme.bodySmall?.copyWith(
             color: theme.colorScheme.onSurfaceVariant,
           ),
@@ -118,11 +162,15 @@ class _Renglon extends StatelessWidget {
       ],
     );
 
-    final cantidad = _Cantidad(
-      cantidad: item.cantidad,
-      unidad: precio.tipoUnidad.value,
-      onCambiar: onCantidad,
-    );
+    // La pieza se describe y no se cuenta: es una sola. Lo que se mide lleva
+    // su cantidad.
+    final Widget dato = pieza == null
+        ? _Cantidad(
+            cantidad: item.cantidad,
+            unidad: precio.tipoUnidad.value,
+            onCambiar: onCantidad,
+          )
+        : _Descripcion(texto: item.descripcion ?? '', onCambiar: onDescripcion);
 
     final importe = Text(
       precio.importePor(item.cantidad).toStringAsFixed(2),
@@ -160,7 +208,7 @@ class _Renglon extends StatelessWidget {
                 Row(
                   spacing: 8,
                   children: [
-                    cantidad,
+                    if (pieza == null) dato else Expanded(child: dato),
                     Expanded(
                       child: Align(
                         alignment: Alignment.centerRight,
@@ -179,8 +227,10 @@ class _Renglon extends StatelessWidget {
           return Row(
             spacing: 8,
             children: [
-              Expanded(child: nombre),
-              cantidad,
+              // Junto a la descripción el nombre cede: es la descripción lo
+              // que se escribe, y lo que necesita sitio para leerse.
+              Expanded(flex: 2, child: nombre),
+              if (pieza == null) dato else Expanded(flex: 3, child: dato),
               // El importe y la entrega, uno debajo del otro: son las dos
               // cifras del renglón y se leen en columna al recorrer la orden.
               Column(
@@ -280,6 +330,64 @@ class _CantidadState extends State<_Cantidad> {
         ),
         Text(widget.unidad, style: Theme.of(context).textTheme.bodySmall),
       ],
+    );
+  }
+}
+
+/// Lo que distingue a una pieza de las otras iguales.
+///
+/// Opcional y de una línea: en el mostrador se anota "blanca, manga larga"
+/// mientras se revisa la prenda, no se redacta. El texto vive en la orden y
+/// el campo sólo lo refleja, como la cantidad.
+class _Descripcion extends StatefulWidget {
+  const _Descripcion({required this.texto, required this.onCambiar});
+
+  final String texto;
+  final ValueChanged<String> onCambiar;
+
+  @override
+  State<_Descripcion> createState() => _DescripcionState();
+}
+
+class _DescripcionState extends State<_Descripcion> {
+  late final TextEditingController _controller = TextEditingController(
+    text: widget.texto,
+  );
+
+  @override
+  void didUpdateWidget(_Descripcion oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    // Cuando se quita un renglón de arriba, este campo pasa a mostrar la
+    // pieza de abajo: se reescribe sólo si el texto discrepa, para no mover
+    // el cursor mientras se teclea.
+    if (_controller.text != widget.texto) _controller.text = widget.texto;
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return TextField(
+      controller: _controller,
+      style: theme.textTheme.bodyMedium,
+      textCapitalization: TextCapitalization.sentences,
+      decoration: InputDecoration(
+        isDense: true,
+        hintText: 'Color, marca, detalle…',
+        hintStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: theme.colorScheme.outline,
+        ),
+        prefixIcon: const Icon(Icons.edit_note_rounded, size: 18),
+        prefixIconConstraints: const BoxConstraints(minWidth: 28),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
+      ),
+      onChanged: widget.onCambiar,
     );
   }
 }

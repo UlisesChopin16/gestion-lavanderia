@@ -78,14 +78,27 @@ sealed class OrdenDialogState with _$OrdenDialogState {
     }).toList();
   }
 
-  /// Cuántas unidades de un concepto lleva ya la orden. `0` si no lleva
-  /// ninguna, que es lo que distingue un concepto por agregar de uno agregado.
-  double cantidadDe(PrecioData concepto) {
+  /// Cuántas unidades de un concepto lleva ya la orden, sumando sus
+  /// renglones: las piezas van una por renglón. `0` si no lleva ninguna, que
+  /// es lo que distingue un concepto por agregar de uno agregado.
+  double cantidadDe(PrecioData concepto) => items
+      .where((item) => item.precio.id == concepto.id)
+      .fold(0, (suma, item) => suma + item.cantidad);
+
+  /// Lo que lleva la orden por unidad, en el orden en que aparece cada una:
+  /// `5 Piezas · 3.5 Kgs`.
+  String get cantidades {
+    final porUnidad = <UnitType, double>{};
     for (final item in items) {
-      if (item.precio.id == concepto.id) return item.cantidad;
+      final unidad = item.precio.tipoUnidad;
+      porUnidad[unidad] = (porUnidad[unidad] ?? 0) + item.cantidad;
     }
 
-    return 0;
+    return [
+      for (final MapEntry(key: unidad, value: cantidad) in porUnidad.entries)
+        '${_cantidadCorta(cantidad)} '
+            '${cantidad == 1 ? unidad.value : unidad.plural}',
+    ].join(' · ');
   }
 
   double get total => items.fold(
@@ -122,6 +135,11 @@ sealed class OrdenDialogState with _$OrdenDialogState {
       !efectivo.insuficiente &&
       !guardando;
 }
+
+/// `2`, no `2.0`; pero `3.5` cuando se cobra por kilo.
+String _cantidadCorta(double cantidad) => cantidad == cantidad.roundToDouble()
+    ? cantidad.toStringAsFixed(0)
+    : cantidad.toString();
 
 /// El alta de una orden: a quién es, qué ropa trae y cuánto se cobra de
 /// entrada.
@@ -230,19 +248,24 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     if (encontrados.length == 1) elegirCliente(encontrados.first);
   }
 
-  /// Agrega una prenda a la orden, o una más si el concepto ya estaba.
+  /// Agrega una prenda a la orden.
   ///
-  /// Repetir el concepto suma cantidad en lugar de abrir otro renglón: dos
-  /// renglones del mismo concepto con la misma fecha son el mismo renglón, y
-  /// agregar tres sábanas son tres toques sobre lo mismo.
+  /// Lo que se cobra por pieza abre un renglón por pieza, cada uno con su
+  /// descripción: dos playeras son dos prendas que se terminan, se entregan y
+  /// se reconocen por separado —la blanca y la negra—. El renglón nuevo se
+  /// pone detrás de los de su concepto, para que las iguales queden juntas, y
+  /// toma la fecha de la última de ellas: si se corrió la entrega de una, la
+  /// siguiente no vuelve a la del catálogo.
+  ///
+  /// Lo demás —kilos, litros, metros— se mide y no se cuenta: repetir el
+  /// concepto suma una unidad al renglón que ya estaba.
   void agregar(PrecioData concepto) {
     final items = state.items.toList();
-    final indice = items.indexWhere((item) => item.precio.id == concepto.id);
+    final ultimo = items.lastIndexWhere(
+      (item) => item.precio.id == concepto.id,
+    );
 
-    if (indice >= 0) {
-      final item = items[indice];
-      items[indice] = _conCantidad(item, item.cantidad + 1);
-    } else {
+    if (ultimo < 0) {
       items.add(
         ItemOrdenData(
           precio: concepto,
@@ -251,7 +274,28 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
           fechaEntrega: _entregaDe(concepto),
         ),
       );
+    } else if (concepto.tipoUnidad == UnitType.pieza) {
+      items.insert(
+        ultimo + 1,
+        ItemOrdenData(
+          precio: concepto,
+          cantidad: 1,
+          importe: concepto.importePor(1),
+          fechaEntrega: items[ultimo].fechaEntrega,
+        ),
+      );
+    } else {
+      final item = items[ultimo];
+      items[ultimo] = _conCantidad(item, item.cantidad + 1);
     }
+
+    _conItems(items);
+  }
+
+  /// Anota lo que distingue a una prenda: el color, la marca, una mancha.
+  void describir(int indice, String descripcion) {
+    final items = state.items.toList();
+    items[indice] = items[indice].copyWith(descripcion: descripcion);
 
     _conItems(items);
   }
@@ -330,7 +374,13 @@ class OrdenDialogViewModel extends _$OrdenDialogViewModel {
     try {
       final orden = await _ordenes.crearOrden(
         clienteId: cliente.id,
-        items: state.items.toList(),
+        // Una descripción en blanco no es una descripción: se guarda nula.
+        items: [
+          for (final item in state.items)
+            item.copyWith(
+              descripcion: item.detalle.isEmpty ? null : item.detalle,
+            ),
+        ],
         descripcion: state.descripcion.trim().isEmpty
             ? null
             : state.descripcion.trim(),

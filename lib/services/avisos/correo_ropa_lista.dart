@@ -44,7 +44,7 @@ abstract final class CorreoRopaLista {
         '<td style="padding:10px 12px;$rayado">'
         '${_escapar.convert(item.concepto)}'
         '<div style="font-size:12px;color:#57606a;">'
-        '${_escapar.convert(item.precio.categoria)}</div></td>'
+        '${_escapar.convert(_debajo(item))}</div></td>'
         '<td align="right" style="padding:10px 12px;white-space:nowrap;'
         '$rayado">${_cantidad(item)}</td>'
         '</tr>',
@@ -98,6 +98,13 @@ ${dondeEstamos.isEmpty ? '' : '<p style="margin:16px 0 0;">Te esperamos en:<br>$
 </div>
 ''';
   }
+
+  /// Lo que va debajo del nombre: la categoría y, si se anotó, lo que
+  /// distingue a la prenda —"Lavandería · blanca, manga larga"—, para que el
+  /// cliente sepa cuál de sus playeras ya está.
+  static String _debajo(ItemOrdenData item) => item.detalle.isEmpty
+      ? item.precio.categoria
+      : '${item.precio.categoria} · ${item.detalle}';
 
   /// `2 Piezas`, `3.5 Kgs`.
   static String _cantidad(ItemOrdenData item) {

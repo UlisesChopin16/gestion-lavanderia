@@ -1,96 +1,88 @@
 import 'package:flutter/material.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/item_orden_data.dart';
+import 'package:gestion_lavanderia/models/data/ordenes/paso_prenda.dart';
 
 /// La ropa de la orden en una sola lista: lo que ya salió y lo que falta.
 ///
 /// Una sola y no dos —pendientes arriba, entregadas abajo— porque lo que se
 /// compara al entregar es la orden entera contra lo que hay en el mostrador.
-/// La casilla de cada renglón dice en qué punto está: marcada y apagada si ya
-/// se entregó, que no se puede desmarcar porque su entrega quedó fechada en el
-/// historial; libre si falta, para marcarla y entregarla ahora.
 ///
-/// Antes de entregarse, la ropa se termina: la etiqueta "Lista" de cada
-/// renglón por terminar lo marca como listo para que el cliente pase por él.
-/// Lo que ya está listo lo dice debajo de su nombre.
+/// Cada prenda dice en qué paso está y deja elegir hasta dónde llega ahora:
+/// `En proceso | Lista | Entregar`. Antes eran una casilla para entregar y una
+/// etiqueta "Lista" sueltas, que no decían qué eran y se podían contradecir
+/// —una prenda por entregar que no estaba lista—. Con los pasos en fila, lo
+/// que se elige incluye lo de antes: entregar es también dejarla lista.
+///
+/// Lo que la base ya tiene no se puede regresar: el paso guardado y los de
+/// antes se ven apagados. Lo que se eligió y todavía no se guarda se ve sobre
+/// fondo, para que al pulsar el botón de abajo se sepa qué va a cambiar.
 class PrendasDetalle extends StatelessWidget {
   const PrendasDetalle({
     super.key,
     required this.items,
     required this.editable,
-    required this.seEntrega,
-    required this.todoMarcado,
-    required this.onAlternar,
-    required this.onMarcarTodo,
-    required this.seMarcaLista,
-    required this.todoListoMarcado,
-    required this.onAlternarLista,
-    required this.onMarcarTodoListo,
+    required this.pasoDe,
+    required this.cambiaDePaso,
+    required this.puedeLlevarTodoA,
+    required this.hayPasosElegidos,
+    required this.onPaso,
+    required this.onTodo,
+    required this.onDeshacer,
   });
 
   final List<ItemOrdenData> items;
 
-  /// Si se puede marcar ropa. En una orden cerrada o cancelada la lista sólo
-  /// se mira.
+  /// Si se puede mover la ropa. En una orden cerrada o cancelada la lista
+  /// sólo se mira.
   final bool editable;
 
-  /// Si un renglón pendiente está marcado para entregarse ahora.
-  final bool Function(ItemOrdenData item) seEntrega;
+  /// El paso en el que quedará cada prenda al guardar.
+  final PasoPrenda Function(ItemOrdenData item) pasoDe;
 
-  /// Si está marcada toda la ropa que faltaba.
-  final bool todoMarcado;
+  /// Si a una prenda se le eligió un paso que todavía no está guardado.
+  final bool Function(ItemOrdenData item) cambiaDePaso;
 
-  final ValueChanged<ItemOrdenData> onAlternar;
-  final ValueChanged<bool> onMarcarTodo;
+  /// Si alguna prenda puede avanzar hasta un paso: es lo que decide si se
+  /// ofrece "Todo listo" o "Entregar todo".
+  final bool Function(PasoPrenda paso) puedeLlevarTodoA;
 
-  /// Si un renglón por terminar está marcado como listo.
-  final bool Function(ItemOrdenData item) seMarcaLista;
+  final bool hayPasosElegidos;
 
-  /// Si está marcada como lista toda la ropa que faltaba terminar.
-  final bool todoListoMarcado;
-
-  final ValueChanged<ItemOrdenData> onAlternarLista;
-  final ValueChanged<bool> onMarcarTodoListo;
+  final void Function(ItemOrdenData item, PasoPrenda paso) onPaso;
+  final ValueChanged<PasoPrenda> onTodo;
+  final VoidCallback onDeshacer;
 
   @override
   Widget build(BuildContext context) {
-    final entregadas = items.where((item) => item.estaEntregado).length;
-    final hayPendientes = entregadas < items.length;
-    final hayPorTerminar = items.any(
-      (item) => item.estaPendiente && !item.estaListo,
-    );
-
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       spacing: 8,
       children: [
         _Encabezado(
-          entregadas: entregadas,
+          entregadas: items.where((item) => item.estaEntregado).length,
+          listas: items.where((item) => item.esperaAlCliente).length,
           total: items.length,
-          puedeMarcar: editable && hayPendientes,
-          todoMarcado: todoMarcado,
-          onMarcarTodo: onMarcarTodo,
-          puedeMarcarListo: editable && hayPorTerminar,
-          todoListoMarcado: todoListoMarcado,
-          onMarcarTodoListo: onMarcarTodoListo,
+          todoListo: editable && puedeLlevarTodoA(PasoPrenda.lista),
+          entregarTodo: editable && puedeLlevarTodoA(PasoPrenda.entregada),
+          deshacer: editable && hayPasosElegidos,
+          onTodo: onTodo,
+          onDeshacer: onDeshacer,
         ),
         Expanded(
           child: ListView.separated(
             padding: EdgeInsets.zero,
             itemCount: items.length,
-            separatorBuilder: (context, _) => const Divider(height: 1),
+            separatorBuilder: (context, _) => const SizedBox(height: 4),
             itemBuilder: (context, indice) {
               final item = items[indice];
 
               return _Renglon(
                 item: item,
-                marcado: item.estaEntregado || seEntrega(item),
-                editable: editable && !item.estaEntregado,
-                onAlternar: () => onAlternar(item),
-                marcadaLista: seMarcaLista(item),
-                puedeMarcarLista:
-                    editable && item.estaPendiente && !item.estaListo,
-                onAlternarLista: () => onAlternarLista(item),
+                paso: pasoDe(item),
+                cambia: cambiaDePaso(item),
+                editable: editable && item.estaPendiente,
+                onPaso: (paso) => onPaso(item, paso),
               );
             },
           ),
@@ -100,33 +92,43 @@ class PrendasDetalle extends StatelessWidget {
   }
 }
 
+/// El título con la cuenta de la ropa, y los atajos para moverla toda.
 class _Encabezado extends StatelessWidget {
   const _Encabezado({
     required this.entregadas,
+    required this.listas,
     required this.total,
-    required this.puedeMarcar,
-    required this.todoMarcado,
-    required this.onMarcarTodo,
-    required this.puedeMarcarListo,
-    required this.todoListoMarcado,
-    required this.onMarcarTodoListo,
+    required this.todoListo,
+    required this.entregarTodo,
+    required this.deshacer,
+    required this.onTodo,
+    required this.onDeshacer,
   });
 
   final int entregadas;
+
+  /// Las que están listas y esperan al cliente.
+  final int listas;
   final int total;
-  final bool puedeMarcar;
-  final bool todoMarcado;
-  final ValueChanged<bool> onMarcarTodo;
-  final bool puedeMarcarListo;
-  final bool todoListoMarcado;
-  final ValueChanged<bool> onMarcarTodoListo;
+
+  /// Qué atajos se ofrecen: sólo los que harían algo.
+  final bool todoListo;
+  final bool entregarTodo;
+  final bool deshacer;
+
+  final ValueChanged<PasoPrenda> onTodo;
+  final VoidCallback onDeshacer;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    // Los botones bajan de renglón cuando no caben junto al título: con los
-    // dos a la vista, la columna de la ropa no da para todo en una línea.
+    final cuenta = [
+      if (listas > 0) listas == 1 ? '1 lista' : '$listas listas',
+      '$entregadas de $total entregadas',
+    ].join(' · ');
+
+    // Los botones bajan de renglón cuando no caben junto al título.
     return Wrap(
       alignment: WrapAlignment.spaceBetween,
       crossAxisAlignment: WrapCrossAlignment.center,
@@ -139,39 +141,34 @@ class _Encabezado extends StatelessWidget {
           children: [
             Text('Prendas', style: theme.textTheme.titleMedium),
             Text(
-              '$entregadas de $total entregadas',
+              cuenta,
               style: theme.textTheme.bodySmall?.copyWith(
                 color: theme.colorScheme.onSurfaceVariant,
               ),
             ),
           ],
         ),
-        Wrap(
+        Row(
+          mainAxisSize: MainAxisSize.min,
           spacing: 4,
           children: [
-            if (puedeMarcarListo)
+            if (todoListo)
               TextButton.icon(
-                onPressed: () => onMarcarTodoListo(!todoListoMarcado),
-                icon: Icon(
-                  todoListoMarcado
-                      ? Icons.remove_circle_outline_rounded
-                      : Icons.inventory_2_outlined,
-                  size: 18,
-                ),
-                label: Text(todoListoMarcado ? 'Quitar listos' : 'Todo listo'),
+                onPressed: () => onTodo(PasoPrenda.lista),
+                icon: const Icon(Icons.inventory_2_outlined, size: 18),
+                label: const Text('Todo listo'),
               ),
-            if (puedeMarcar)
+            if (entregarTodo)
               TextButton.icon(
-                onPressed: () => onMarcarTodo(!todoMarcado),
-                icon: Icon(
-                  todoMarcado
-                      ? Icons.remove_done_rounded
-                      : Icons.done_all_rounded,
-                  size: 18,
-                ),
-                label: Text(
-                  todoMarcado ? 'Desmarcar todo' : 'Marcar lo pendiente',
-                ),
+                onPressed: () => onTodo(PasoPrenda.entregada),
+                icon: const Icon(Icons.shopping_bag_outlined, size: 18),
+                label: const Text('Entregar todo'),
+              ),
+            if (deshacer)
+              IconButton(
+                onPressed: onDeshacer,
+                icon: const Icon(Icons.undo_rounded, size: 20),
+                tooltip: 'Deshacer lo que se marcó',
               ),
           ],
         ),
@@ -183,81 +180,239 @@ class _Encabezado extends StatelessWidget {
 class _Renglon extends StatelessWidget {
   const _Renglon({
     required this.item,
-    required this.marcado,
+    required this.paso,
+    required this.cambia,
     required this.editable,
-    required this.onAlternar,
-    required this.marcadaLista,
-    required this.puedeMarcarLista,
-    required this.onAlternarLista,
+    required this.onPaso,
   });
 
   final ItemOrdenData item;
-  final bool marcado;
 
-  /// Si la casilla se puede tocar: sólo la ropa pendiente de una orden que
-  /// todavía admite movimientos.
+  /// El paso en el que quedará al guardar.
+  final PasoPrenda paso;
+
+  /// Si ese paso todavía no está guardado.
+  final bool cambia;
+
+  /// Si se puede mover: sólo la ropa pendiente de una orden que todavía
+  /// admite movimientos.
   final bool editable;
 
-  final VoidCallback onAlternar;
+  final ValueChanged<PasoPrenda> onPaso;
 
-  final bool marcadaLista;
+  /// Lo que mide el lugar de los pasos, el mismo en todos los renglones para
+  /// que los importes queden a plomo.
+  static const double _anchoPasos = 252;
 
-  /// Si se ofrece la etiqueta "Lista": sólo en la ropa que falta terminar.
-  final bool puedeMarcarLista;
+  /// Lo que el renglón necesita para llevar los pasos al lado: los pasos más
+  /// lo que pide el nombre para leerse. Por debajo, van debajo.
+  static const double _anchoEnLinea = _anchoPasos + 210;
 
-  final VoidCallback onAlternarLista;
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    final datos = _Datos(item: item);
+    final pasos = SizedBox(
+      width: _anchoPasos,
+      child: editable
+          ? _SelectorPaso(item: item, paso: paso, onPaso: onPaso)
+          : _PasoFijo(paso: paso),
+    );
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 150),
+      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 10),
+      decoration: BoxDecoration(
+        color: cambia
+            ? scheme.primaryContainer.withValues(alpha: 0.35)
+            : scheme.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: cambia
+              ? scheme.primary.withValues(alpha: 0.5)
+              : Colors.transparent,
+        ),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < _anchoEnLinea) {
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              spacing: 8,
+              children: [datos, pasos],
+            );
+          }
+
+          return Row(
+            spacing: 12,
+            children: [
+              Expanded(child: datos),
+              pasos,
+            ],
+          );
+        },
+      ),
+    );
+  }
+}
+
+/// Qué es la prenda, cuánto cuesta y cómo va.
+class _Datos extends StatelessWidget {
+  const _Datos({required this.item});
+
+  final ItemOrdenData item;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
     final precio = item.precio;
+    final detalle = item.detalle;
 
-    return InkWell(
-      // Todo el renglón marca, no sólo la casilla: en el mostrador se toca
-      // el nombre de la prenda, que es lo que se está leyendo.
-      onTap: editable ? onAlternar : null,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
-        child: Row(
+    // Una pieza sola no se cuenta —es una—; lo demás dice cuánto lleva.
+    final unaPieza = item.esPorPieza && item.cantidad == 1;
+    final cantidad =
+        '${_cantidad(item.cantidad)} '
+        '${item.cantidad == 1 ? precio.tipoUnidad.value : precio.tipoUnidad.plural}';
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      spacing: 2,
+      children: [
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           spacing: 8,
           children: [
-            Checkbox(
-              value: marcado,
-              // Sin `onChanged` la casilla se pinta apagada: es lo que dice
-              // que una prenda ya entregada no se puede volver a tocar.
-              onChanged: editable ? (_) => onAlternar() : null,
-            ),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                spacing: 2,
-                children: [
-                  Text(precio.descripcion, style: theme.textTheme.titleSmall),
-                  Text(
-                    '${precio.categoria} · ${_cantidad(item.cantidad)} '
-                    '${item.cantidad == 1 ? precio.tipoUnidad.value : precio.tipoUnidad.plural}',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: theme.colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                  _Fecha(item: item),
-                ],
+              // La descripción va junto al nombre, que es donde se busca
+              // cuál de las playeras es: "Playera  blanca, manga larga".
+              child: Text.rich(
+                TextSpan(
+                  text: precio.descripcion,
+                  style: theme.textTheme.titleSmall,
+                  children: [
+                    if (detalle.isNotEmpty)
+                      TextSpan(
+                        text: '  $detalle',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
-            if (puedeMarcarLista)
-              FilterChip(
-                label: const Text('Lista'),
-                tooltip: 'Marcar como lista para recoger',
-                selected: marcadaLista,
-                onSelected: (_) => onAlternarLista(),
-              ),
             Text(
               item.importe.toStringAsFixed(2),
               style: theme.textTheme.titleSmall,
             ),
           ],
         ),
+        Text(
+          unaPieza ? precio.categoria : '${precio.categoria} · $cantidad',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: scheme.onSurfaceVariant,
+          ),
+        ),
+        _Fecha(item: item),
+      ],
+    );
+  }
+}
+
+/// Los tres pasos, para elegir hasta dónde llega la prenda ahora.
+///
+/// Los que ya pasaron se ven apagados: una prenda lista no vuelve a estar en
+/// proceso. El color del elegido es el del paso, el mismo con el que el
+/// renglón lo dice debajo del nombre.
+class _SelectorPaso extends StatelessWidget {
+  const _SelectorPaso({
+    required this.item,
+    required this.paso,
+    required this.onPaso,
+  });
+
+  final ItemOrdenData item;
+  final PasoPrenda paso;
+  final ValueChanged<PasoPrenda> onPaso;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final guardado = PasoPrenda.de(item);
+
+    final (fondo, texto) = switch (paso) {
+      PasoPrenda.enProceso => (
+        scheme.secondaryContainer,
+        scheme.onSecondaryContainer,
       ),
+      PasoPrenda.lista => (
+        scheme.tertiaryContainer,
+        scheme.onTertiaryContainer,
+      ),
+      PasoPrenda.entregada => (scheme.primary, scheme.onPrimary),
+    };
+
+    return SegmentedButton<PasoPrenda>(
+      segments: [
+        for (final opcion in PasoPrenda.values)
+          ButtonSegment(
+            value: opcion,
+            label: Text(opcion.etiqueta, maxLines: 1, softWrap: false),
+            enabled: opcion.alcanza(guardado),
+          ),
+      ],
+      selected: {paso},
+      onSelectionChanged: (elegidos) => onPaso(elegidos.single),
+      // Sin la palomita: cambia el ancho del elegido y el fondo ya lo dice.
+      showSelectedIcon: false,
+      style: SegmentedButton.styleFrom(
+        selectedBackgroundColor: fondo,
+        selectedForegroundColor: texto,
+        textStyle: theme.textTheme.labelMedium,
+        padding: const EdgeInsets.symmetric(horizontal: 6),
+        visualDensity: VisualDensity.compact,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+    );
+  }
+}
+
+/// El paso de una prenda que ya no se mueve: entregada, o de una orden
+/// cerrada o cancelada.
+class _PasoFijo extends StatelessWidget {
+  const _PasoFijo({required this.paso});
+
+  final PasoPrenda paso;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+
+    final (icono, texto, color) = switch (paso) {
+      PasoPrenda.enProceso => (
+        Icons.hourglass_empty_rounded,
+        'En proceso',
+        scheme.onSurfaceVariant,
+      ),
+      PasoPrenda.lista => (Icons.inventory_2_rounded, 'Lista', scheme.tertiary),
+      PasoPrenda.entregada => (
+        Icons.check_circle_rounded,
+        'Entregada',
+        scheme.primary,
+      ),
+    };
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.end,
+      spacing: 6,
+      children: [
+        Icon(icono, size: 18, color: color),
+        Text(texto, style: theme.textTheme.labelLarge?.copyWith(color: color)),
+      ],
     );
   }
 }
@@ -284,12 +439,12 @@ class _Fecha extends StatelessWidget {
     final (icono, texto, color) = switch (item) {
       ItemOrdenData(estaEntregado: true, :final fechaEntregado) => (
         Icons.check_circle_rounded,
-        'Entregado el ${fechaEntregado.formatDate}',
+        'Entregada el ${fechaEntregado.formatDate}',
         scheme.primary,
       ),
       ItemOrdenData(:final fechaLista?) => (
         Icons.inventory_2_rounded,
-        'Lista desde el ${fechaLista.formatDate} · espera al cliente',
+        'Lista desde el ${fechaLista.formatDate}',
         scheme.tertiary,
       ),
       _ when _atrasada => (

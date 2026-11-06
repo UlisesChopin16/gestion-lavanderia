@@ -21,6 +21,10 @@ sealed class ItemOrdenData with _$ItemOrdenData {
     required PrecioData precio,
     @Default(1.0) double cantidad,
 
+    /// Lo que distingue a esta prenda de otras del mismo concepto: el color,
+    /// la marca, una mancha. Nula cuando no se anotó nada.
+    String? descripcion,
+
     /// Lo que cuesta el renglón. Quien crea ropa no tiene que calcularlo:
     /// `OrdenesLocalDatasource` lo recalcula con [PrecioData.importePor] antes
     /// de guardar, para que el total de la orden no pueda discrepar de su ropa.
@@ -42,6 +46,13 @@ sealed class ItemOrdenData with _$ItemOrdenData {
   bool get esNuevo => id == 0;
 
   String get concepto => precio.descripcion;
+
+  /// La descripción sin espacios de más; vacía si no hay.
+  String get detalle => descripcion?.trim() ?? '';
+
+  /// Si se cobra por pieza: lo que se registra una por renglón, para poder
+  /// describir cada una.
+  bool get esPorPieza => precio.tipoUnidad == UnitType.pieza;
 
   /// Si el renglón sigue pendiente de salir.
   bool get estaPendiente => !estaEntregado;

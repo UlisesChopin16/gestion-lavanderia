@@ -38,6 +38,7 @@ void main() {
     String nombre = 'Sábana',
     double importe = 50,
     int diasEntrega = 2,
+    UnitType unidad = UnitType.pieza,
     EstatusType estatus = EstatusType.activo,
   }) async {
     final id = await db.preciosConceptosDao.insertPrecio(
@@ -46,7 +47,7 @@ void main() {
         clotheSize: const Value(ClotheSizeType.emptySize),
         nombreConcepto: Value(nombre),
         diasEntrega: Value(diasEntrega),
-        tipoUnidad: const Value(UnitType.pieza),
+        tipoUnidad: Value(unidad),
         importe: Value(importe),
         estatus: Value(estatus),
       ),
@@ -151,20 +152,65 @@ void main() {
         nombre: 'Cobija',
         importe: 120,
       );
+      await crearConcepto(
+        categoriaId: categoriaId,
+        nombre: 'Ropa por kilo',
+        importe: 30,
+        unidad: UnitType.kilo,
+      );
 
       await notificador().cargar();
     });
 
-    test('agregar el mismo concepto suma cantidad', () async {
+    test('cada pieza va en su renglón, junto a las de su concepto', () async {
       notificador().agregar(concepto('Sábana'));
+      notificador().agregar(concepto('Cobija'));
       notificador().agregar(concepto('Sábana'));
 
       final items = estado().items;
 
-      expect(items, hasLength(1));
-      expect(items.single.cantidad, 2);
-      expect(estado().total, 100);
+      expect(items.map((item) => item.concepto), [
+        'Sábana',
+        'Sábana',
+        'Cobija',
+      ]);
+      expect(items.map((item) => item.cantidad), [1, 1, 1]);
+      expect(estado().total, 220);
       expect(estado().cantidadDe(concepto('Sábana')), 2);
+      expect(estado().cantidades, '3 Piezas');
+    });
+
+    test('la pieza nueva toma la fecha de la última de su concepto', () async {
+      notificador().agregar(concepto('Sábana'));
+      final manana = DateTime.now().add(const Duration(days: 1));
+      notificador().cambiarEntrega(0, manana);
+
+      notificador().agregar(concepto('Sábana'));
+
+      expect(estado().items.last.fechaEntrega, manana);
+    });
+
+    test('cada pieza se describe por su lado', () async {
+      notificador().agregar(concepto('Sábana'));
+      notificador().agregar(concepto('Sábana'));
+
+      notificador().describir(1, 'Azul, con encaje');
+
+      expect(estado().items.map((item) => item.descripcion), [
+        null,
+        'Azul, con encaje',
+      ]);
+    });
+
+    test('lo que se mide suma cantidad en su renglón', () async {
+      notificador().agregar(concepto('Ropa por kilo'));
+      notificador().agregar(concepto('Ropa por kilo'));
+      notificador().agregar(concepto('Sábana'));
+
+      expect(estado().items, hasLength(2));
+      expect(estado().items.first.cantidad, 2);
+      expect(estado().cantidadDe(concepto('Ropa por kilo')), 2);
+      expect(estado().cantidades, '2 Kgs · 1 Pieza');
     });
 
     test('la entrega sale de los días que pide el concepto', () async {
@@ -410,7 +456,9 @@ void main() {
 
       notificador().elegirCliente(cliente!);
       notificador().agregar(concepto('Sábana'));
-      notificador().cambiarCantidad(0, 2);
+      notificador().agregar(concepto('Sábana'));
+      notificador().describir(0, '  Blanca  ');
+      notificador().describir(1, '   ');
       notificador().elegirMetodoPago(MetodoPagoType.tarjeta);
       notificador().cambiarAbono(40);
       notificador().cambiarDescripcion('  Una mancha de café  ');
@@ -437,8 +485,10 @@ void main() {
         orden.id,
       );
 
-      expect(detalle?.items, hasLength(1));
-      expect(detalle?.items.single.cantidad, 2);
+      // Una pieza por renglón, con su descripción sin espacios de más; la
+      // que se dejó en blanco queda sin descripción.
+      expect(detalle?.items.map((item) => item.cantidad), [1, 1]);
+      expect(detalle?.items.map((item) => item.descripcion), ['Blanca', null]);
     });
 
     test('pagada completa nace como pagada', () async {

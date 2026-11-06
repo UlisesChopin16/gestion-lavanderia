@@ -653,6 +653,18 @@ void main() {
     await tester.tap(find.text('Sábana').first);
     await tester.pumpAndSettle();
 
+    // Cada una en su renglón, contada y con su descripción.
+    expect(find.text('Ropa de cama · 1 de 2'), findsOneWidget);
+    expect(find.text('Ropa de cama · 2 de 2'), findsOneWidget);
+    await tester.enterText(
+      find.ancestor(
+        of: find.text('Color, marca, detalle…').last,
+        matching: find.byType(TextField),
+      ),
+      'Con encaje',
+    );
+    await tester.pumpAndSettle();
+
     // El cliente se busca por teléfono y se elige de la lista.
     await buscar(tester, 'Buscar por nombre, teléfono o correo', '5559998888');
     await tester.tap(find.text('Lucía Pérez'));
@@ -679,5 +691,11 @@ void main() {
     expect(orden.total, 100);
     expect(orden.restante, 0);
     expect(orden.estatus, EstatusOrdenType.pagado);
+
+    final detalle = await instance<OrdenesLocalDatasource>().detalle(orden.id);
+    expect(detalle?.items.map((item) => item.descripcion), [
+      null,
+      'Con encaje',
+    ]);
   });
 }

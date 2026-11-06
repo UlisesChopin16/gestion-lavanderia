@@ -126,10 +126,14 @@ class _Cuerpo extends StatelessWidget {
           );
         }
 
+        // La ropa se lleva más de la mitad: cada prenda lleva su nombre, su
+        // descripción y sus tres pasos en una línea, mientras que el dinero
+        // son cifras cortas y campos uno debajo de otro.
         return Row(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Expanded(
+              flex: 3,
               child: Padding(
                 padding: const EdgeInsets.all(OrdenDetalleDialog._relleno),
                 child: _Ropa(ordenId: ordenId, estado: estado, orden: orden),
@@ -137,6 +141,7 @@ class _Cuerpo extends StatelessWidget {
             ),
             const VerticalDivider(width: 1),
             Expanded(
+              flex: 2,
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(OrdenDetalleDialog._relleno),
                 child: _Dinero(ordenId: ordenId, estado: estado, orden: orden),
@@ -175,14 +180,13 @@ class _Ropa extends ConsumerWidget {
     final prendas = PrendasDetalle(
       items: orden.items,
       editable: estado.admiteMovimientos,
-      seEntrega: estado.seEntrega,
-      todoMarcado: estado.entregaTodo,
-      onAlternar: notifier.alternarEntrega,
-      onMarcarTodo: notifier.marcarTodo,
-      seMarcaLista: estado.seMarcaLista,
-      todoListoMarcado: estado.todoListoMarcado,
-      onAlternarLista: notifier.alternarLista,
-      onMarcarTodoListo: notifier.marcarTodoListo,
+      pasoDe: estado.pasoDe,
+      cambiaDePaso: estado.cambiaDePaso,
+      puedeLlevarTodoA: estado.puedeLlevarTodoA,
+      hayPasosElegidos: estado.hayPasosElegidos,
+      onPaso: notifier.cambiarPaso,
+      onTodo: notifier.llevarTodoA,
+      onDeshacer: notifier.deshacerPasos,
     );
 
     return Column(

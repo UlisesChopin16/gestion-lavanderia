@@ -113,9 +113,18 @@ void main() {
     return orden.id;
   }
 
-  /// Deja la base como la versión 5: sin la fecha en que quedó lista cada
-  /// prenda.
+  /// Deja la base como la versión 6: sin la descripción de cada prenda.
+  Future<void> degradarAVersion6(AppDatabase db) async {
+    await db.customStatement(
+      'ALTER TABLE item_servicio_orden DROP COLUMN descripcion',
+    );
+    await db.customStatement('PRAGMA user_version = 6');
+  }
+
+  /// Deja la base como la versión 5: además de lo anterior, sin la fecha en
+  /// que quedó lista cada prenda.
   Future<void> degradarAVersion5(AppDatabase db) async {
+    await degradarAVersion6(db);
     await db.customStatement(
       'ALTER TABLE item_servicio_orden DROP COLUMN fecha_lista',
     );
@@ -168,6 +177,37 @@ void main() {
     await db.customStatement('PRAGMA user_version = 1');
   }
 
+  test('migra de la versión 6 a la 7: la ropa nace sin descripción', () async {
+    var db = abrir();
+    final ordenId = await sembrar(db);
+    await degradarAVersion6(db);
+    await db.close();
+
+    db = abrir();
+    addTearDown(db.close);
+
+    expect(await versionDe(db), 7);
+    expect(
+      await columnasDe(db, 'item_servicio_orden'),
+      contains('descripcion'),
+    );
+
+    final item = (await db.itemServicioOrdenDao.getItemsByOrden(ordenId))
+        .single
+        .item;
+    expect(item.descripcion, isNull);
+
+    // Y se puede escribir: la columna existe de verdad, no sólo se lee nula.
+    await db.customStatement(
+      "UPDATE item_servicio_orden SET descripcion = 'Blanca' "
+      'WHERE id = ${item.id}',
+    );
+    final descrita = (await db.itemServicioOrdenDao.getItemsByOrden(ordenId))
+        .single
+        .item;
+    expect(descrita.descripcion, 'Blanca');
+  });
+
   test(
     'migra de la versión 5 a la 6: lo entregado queda listo el día que salió',
     () async {
@@ -191,7 +231,7 @@ void main() {
       db = abrir();
       addTearDown(db.close);
 
-      expect(await versionDe(db), 6);
+      expect(await versionDe(db), 7);
       expect(
         await columnasDe(db, 'item_servicio_orden'),
         contains('fecha_lista'),
@@ -208,7 +248,7 @@ void main() {
   );
 
   test(
-    'migra de la versión 4 a la 6 sin tocar los datos de la empresa',
+    'migra de la versión 4 a la 7 sin tocar los datos de la empresa',
     () async {
       var db = abrir();
       await db.configuracionEmpresaDao.insertConfig(
@@ -228,7 +268,7 @@ void main() {
       db = abrir();
       addTearDown(db.close);
 
-      expect(await versionDe(db), 6);
+      expect(await versionDe(db), 7);
       expect(
         await columnasDe(db, 'configuracion_empresa'),
         containsAll(['smtp_servidor', 'smtp_puerto', 'smtp_usuario']),
@@ -245,7 +285,7 @@ void main() {
     },
   );
 
-  test('migra de la versión 3 a la 6 sin tocar los pagos de antes', () async {
+  test('migra de la versión 3 a la 7 sin tocar los pagos de antes', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await db.ordenHistoryDao.insertHistory(
@@ -263,7 +303,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 6);
+    expect(await versionDe(db), 7);
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
     expect(
       await columnasDe(db, 'configuracion_empresa'),
@@ -292,7 +332,7 @@ void main() {
     expect(despues.first.recibido, 100);
   });
 
-  test('migra de la versión 2 a la 6', () async {
+  test('migra de la versión 2 a la 7', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion2(db);
@@ -301,7 +341,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 6);
+    expect(await versionDe(db), 7);
     expect(await indicesDe(db), contains('idx_item_history'));
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
     expect(
@@ -320,7 +360,7 @@ void main() {
     expect(items.single.item.ordenHistoryId, isNull);
   });
 
-  test('migra de la versión 1 a la 6 y crea todos los índices', () async {
+  test('migra de la versión 1 a la 7 y crea todos los índices', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion1(db);
@@ -329,7 +369,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 6);
+    expect(await versionDe(db), 7);
     expect(
       await indicesDe(db),
       containsAll([
@@ -354,11 +394,11 @@ void main() {
     expect(items.single.item.fechaEntregado, DateTime(2026, 10, 17, 9, 30));
   });
 
-  test('una base nueva nace en la versión 6 y no migra', () async {
+  test('una base nueva nace en la versión 7 y no migra', () async {
     final db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 6);
+    expect(await versionDe(db), 7);
     expect(await indicesDe(db), contains('idx_item_history'));
   });
 }

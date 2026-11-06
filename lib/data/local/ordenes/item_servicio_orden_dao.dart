@@ -9,9 +9,9 @@ export 'package:gestion_lavanderia/data/local/ordenes/item_con_precio_entry.dart
 
 part 'item_servicio_orden_dao.g.dart';
 
-/// Un item que falta por entregar, con su orden y el cliente al que hay que
-/// avisarle.
-typedef ItemPendienteEntry = ({
+/// Un item con su concepto, su orden y el cliente: lo que los reportes de
+/// entregas necesitan para decir de quién es cada renglón de ropa.
+typedef ItemConOrdenEntry = ({
   ItemConPrecioEntry item,
   OrdenServicioEntry orden,
   ClienteEntry cliente,
@@ -61,7 +61,23 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
   /// Toda la ropa que falta por entregar, de cualquier orden, con su orden y
   /// su cliente: la ropa pendiente. La de las órdenes canceladas no, porque
   /// ya no se va a entregar.
-  Future<List<ItemPendienteEntry>> pendientesDeEntrega() async {
+  Future<List<ItemConOrdenEntry>> pendientesDeEntrega() {
+    return _conOrden(itemServicioOrden.estaEntregado.equals(false));
+  }
+
+  /// La ropa que quedó lista entre [inicio] —incluido— y [fin] —excluido—,
+  /// se haya entregado o no, con su orden y su cliente: si se terminó a
+  /// tiempo. La de las órdenes canceladas no.
+  Future<List<ItemConOrdenEntry>> listosEntre(DateTime inicio, DateTime fin) {
+    return _conOrden(
+      itemServicioOrden.fechaLista.isBiggerOrEqualValue(inicio) &
+          itemServicioOrden.fechaLista.isSmallerThanValue(fin),
+    );
+  }
+
+  /// Los items que cumplen [condicion], de órdenes que no estén canceladas,
+  /// con su orden y su cliente.
+  Future<List<ItemConOrdenEntry>> _conOrden(Expression<bool> condicion) async {
     final query =
         _queryJoined().join([
             innerJoin(
@@ -71,7 +87,7 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
             innerJoin(cliente, cliente.id.equalsExp(ordenServicio.clienteId)),
           ])
           ..where(
-            itemServicioOrden.estaEntregado.equals(false) &
+            condicion &
                 ordenServicio.estatus
                     .equalsValue(EstatusOrdenType.cancelada)
                     .not(),
@@ -103,13 +119,18 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
   /// La condición incluye [ordenId] y no sólo los ids: sin él, un id de otra
   /// orden se marcaría como entregado y quedaría colgado de un movimiento que no
   /// es suyo.
+  ///
+  /// Lo que sale sin haberse marcado listo se marca listo en ese momento: lo
+  /// que se entrega ya estaba terminado.
   Future<int> entregarItems({
     required int ordenId,
     required Iterable<int> itemIds,
     required int ordenHistoryId,
     required DateTime fecha,
-  }) {
-    if (itemIds.isEmpty) return Future.value(0);
+  }) async {
+    if (itemIds.isEmpty) return 0;
+
+    await marcarListos(ordenId: ordenId, itemIds: itemIds, fecha: fecha);
 
     final statement = update(itemServicioOrden)
       ..where(
@@ -125,6 +146,31 @@ class ItemServicioOrdenDao extends DatabaseAccessor<AppDatabase>
         fechaEntregado: Value(fecha),
         ordenHistoryId: Value(ordenHistoryId),
       ),
+    );
+  }
+
+  /// Marca como listos para recogerse los items indicados de la orden, con
+  /// la [fecha] en que se terminaron. Devuelve cuántos se marcaron.
+  ///
+  /// Los que ya estaban listos —o entregados— quedan fuera: su fecha es la
+  /// de cuando se terminaron, y volver a marcarlos la movería.
+  Future<int> marcarListos({
+    required int ordenId,
+    required Iterable<int> itemIds,
+    required DateTime fecha,
+  }) {
+    if (itemIds.isEmpty) return Future.value(0);
+
+    final statement = update(itemServicioOrden)
+      ..where(
+        (t) =>
+            t.ordenId.equals(ordenId) &
+            t.id.isIn(itemIds) &
+            t.fechaLista.isNull(),
+      );
+
+    return statement.write(
+      ItemServicioOrdenCompanion(fechaLista: Value(fecha)),
     );
   }
 

@@ -4,6 +4,7 @@ import 'package:gestion_lavanderia/ui/shared/widgets/title_container.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/corte/corte_caja_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/cuentas/cuentas_por_cobrar_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/dialogs/reporte_ventas_dialog.dart';
+import 'package:gestion_lavanderia/ui/views/reportes/entregas/entregas_a_tiempo_view.dart';
 import 'package:gestion_lavanderia/ui/views/reportes/ropa/ropa_pendiente_view.dart';
 import 'package:gestion_lavanderia/utils/icons_manager.dart';
 
@@ -14,8 +15,8 @@ import 'package:gestion_lavanderia/utils/icons_manager.dart';
 /// —qué trae y para qué sirve— y así quedan los que se agreguen después, uno
 /// junto al otro.
 ///
-/// El corte de caja, las cuentas por cobrar y la ropa pendiente no son
-/// archivos sino pantallas con gráficas: se abren aquí mismo, en lugar de las
+/// El corte de caja, las cuentas por cobrar, la ropa pendiente y las entregas
+/// a tiempo no son archivos sino pantallas con gráficas: se abren aquí mismo, en lugar de las
 /// tarjetas, y su flecha regresa a ellas.
 class ReportesView extends StatefulWidget {
   const ReportesView({super.key});
@@ -42,6 +43,7 @@ class _ReportesViewState extends State<ReportesView> {
           _Pantalla.corte => CorteCajaView(onVolver: volver),
           _Pantalla.cuentas => CuentasPorCobrarView(onVolver: volver),
           _Pantalla.ropa => RopaPendienteView(onVolver: volver),
+          _Pantalla.entregas => EntregasATiempoView(onVolver: volver),
         },
       );
     }
@@ -90,13 +92,26 @@ class _ReportesViewState extends State<ReportesView> {
                   icono: Icons.local_laundry_service_rounded,
                   titulo: 'Ropa pendiente',
                   descripcion:
-                      'La ropa que ya pasó su fecha de entrega, la de hoy y '
-                      'la de los próximos días, y las órdenes pagadas que '
-                      'nadie ha venido a recoger.',
+                      'La ropa que no se terminó a tiempo, la de hoy y la '
+                      'de los próximos días, y la que ya está lista y nadie '
+                      'ha venido a recoger.',
                   nota: 'Se ve en pantalla.',
                   accion: 'Ver la ropa',
                   iconoAccion: Icons.insights_rounded,
                   onGenerar: () => _abrir(_Pantalla.ropa),
+                ),
+                _TarjetaReporte(
+                  icono: Icons.verified_rounded,
+                  titulo: 'Entregas a tiempo',
+                  descripcion:
+                      'Qué parte de la ropa queda lista el día prometido, por '
+                      'categoría, qué se terminó tarde y cuánto tardan los '
+                      'clientes en recogerla. Para saber si los días de '
+                      'entrega del catálogo son realistas.',
+                  nota: 'Se ve en pantalla, por semana, mes o año.',
+                  accion: 'Ver las entregas',
+                  iconoAccion: Icons.insights_rounded,
+                  onGenerar: () => _abrir(_Pantalla.entregas),
                 ),
                 _TarjetaReporte(
                   icono: Icons.point_of_sale_rounded,
@@ -132,7 +147,7 @@ class _ReportesViewState extends State<ReportesView> {
 }
 
 /// Las pantallas de estadísticas que se abren en lugar de las tarjetas.
-enum _Pantalla { corte, cuentas, ropa }
+enum _Pantalla { corte, cuentas, ropa, entregas }
 
 /// Un reporte: qué es, qué trae y el botón para sacarlo.
 class _TarjetaReporte extends StatelessWidget {

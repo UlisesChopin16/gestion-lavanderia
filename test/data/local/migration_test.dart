@@ -113,8 +113,19 @@ void main() {
     return orden.id;
   }
 
-  /// Deja la base como la versión 4: sin la cuenta de correo de la empresa.
+  /// Deja la base como la versión 5: sin la fecha en que quedó lista cada
+  /// prenda.
+  Future<void> degradarAVersion5(AppDatabase db) async {
+    await db.customStatement(
+      'ALTER TABLE item_servicio_orden DROP COLUMN fecha_lista',
+    );
+    await db.customStatement('PRAGMA user_version = 5');
+  }
+
+  /// Deja la base como la versión 4: además de lo anterior, sin la cuenta de
+  /// correo de la empresa.
   Future<void> degradarAVersion4(AppDatabase db) async {
+    await degradarAVersion5(db);
     for (final columna in ['smtp_servidor', 'smtp_puerto', 'smtp_usuario']) {
       await db.customStatement(
         'ALTER TABLE configuracion_empresa DROP COLUMN $columna',
@@ -158,7 +169,46 @@ void main() {
   }
 
   test(
-    'migra de la versión 4 a la 5 sin tocar los datos de la empresa',
+    'migra de la versión 5 a la 6: lo entregado queda listo el día que salió',
+    () async {
+      var db = abrir();
+      final ordenId = await sembrar(db);
+      final pendiente = await db.itemServicioOrdenDao.insertItem(
+        ItemServicioOrdenCompanion.insert(
+          ordenId: ordenId,
+          precioConceptoId: (await db.itemServicioOrdenDao.getItemsByOrden(
+            ordenId,
+          )).single.item.precioConceptoId,
+          cantidad: 1,
+          importe: 50,
+          fechaEntrega: DateTime(2026, 10, 20),
+          fechaCreacion: DateTime.now(),
+        ),
+      );
+      await degradarAVersion5(db);
+      await db.close();
+
+      db = abrir();
+      addTearDown(db.close);
+
+      expect(await versionDe(db), 6);
+      expect(
+        await columnasDe(db, 'item_servicio_orden'),
+        contains('fecha_lista'),
+      );
+
+      final items = await db.itemServicioOrdenDao.getItemsByOrden(ordenId);
+      final entregado = items.firstWhere((i) => i.item.estaEntregado).item;
+      final sinEntregar = items.firstWhere((i) => i.item.id == pendiente).item;
+      // Lo que ya salió se da por listo el día que salió...
+      expect(entregado.fechaLista, DateTime(2026, 10, 17, 9, 30));
+      // ...y de lo que no ha salido no se sabe si ya está.
+      expect(sinEntregar.fechaLista, isNull);
+    },
+  );
+
+  test(
+    'migra de la versión 4 a la 6 sin tocar los datos de la empresa',
     () async {
       var db = abrir();
       await db.configuracionEmpresaDao.insertConfig(
@@ -178,7 +228,7 @@ void main() {
       db = abrir();
       addTearDown(db.close);
 
-      expect(await versionDe(db), 5);
+      expect(await versionDe(db), 6);
       expect(
         await columnasDe(db, 'configuracion_empresa'),
         containsAll(['smtp_servidor', 'smtp_puerto', 'smtp_usuario']),
@@ -195,7 +245,7 @@ void main() {
     },
   );
 
-  test('migra de la versión 3 a la 5 sin tocar los pagos de antes', () async {
+  test('migra de la versión 3 a la 6 sin tocar los pagos de antes', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await db.ordenHistoryDao.insertHistory(
@@ -213,7 +263,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 5);
+    expect(await versionDe(db), 6);
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
     expect(
       await columnasDe(db, 'configuracion_empresa'),
@@ -242,7 +292,7 @@ void main() {
     expect(despues.first.recibido, 100);
   });
 
-  test('migra de la versión 2 a la 5', () async {
+  test('migra de la versión 2 a la 6', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion2(db);
@@ -251,7 +301,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 5);
+    expect(await versionDe(db), 6);
     expect(await indicesDe(db), contains('idx_item_history'));
     expect(await columnasDe(db, 'orden_history'), contains('recibido'));
     expect(
@@ -263,13 +313,14 @@ void main() {
     expect(items, hasLength(1));
     expect(items.single.item.estaEntregado, isTrue);
     expect(items.single.item.fechaEntregado, DateTime(2026, 10, 17, 9, 30));
+    expect(items.single.item.fechaLista, DateTime(2026, 10, 17, 9, 30));
 
     // La entrega de antes no sabe a qué movimiento pertenece, pero la columna
     // ya está lista para las siguientes.
     expect(items.single.item.ordenHistoryId, isNull);
   });
 
-  test('migra de la versión 1 a la 5 y crea todos los índices', () async {
+  test('migra de la versión 1 a la 6 y crea todos los índices', () async {
     var db = abrir();
     final ordenId = await sembrar(db);
     await degradarAVersion1(db);
@@ -278,7 +329,7 @@ void main() {
     db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 5);
+    expect(await versionDe(db), 6);
     expect(
       await indicesDe(db),
       containsAll([
@@ -303,11 +354,11 @@ void main() {
     expect(items.single.item.fechaEntregado, DateTime(2026, 10, 17, 9, 30));
   });
 
-  test('una base nueva nace en la versión 5 y no migra', () async {
+  test('una base nueva nace en la versión 6 y no migra', () async {
     final db = abrir();
     addTearDown(db.close);
 
-    expect(await versionDe(db), 5);
+    expect(await versionDe(db), 6);
     expect(await indicesDe(db), contains('idx_item_history'));
   });
 }

@@ -72,8 +72,8 @@ class _CorreoFalso extends EnvioCorreo {
     required String destinatario,
     required String asunto,
     required String html,
-    required Uint8List adjunto,
-    required String nombreAdjunto,
+    Uint8List? adjunto,
+    String nombreAdjunto = '',
   }) async {
     final falla = this.falla;
     if (falla != null) throw EnvioCorreoException(falla);

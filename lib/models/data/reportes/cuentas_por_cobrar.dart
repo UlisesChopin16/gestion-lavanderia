@@ -1,5 +1,6 @@
 import 'package:collection/collection.dart';
 import 'package:flutter/foundation.dart' show immutable;
+import 'package:gestion_lavanderia/models/data/reportes/concepto_reporte.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart'
     show compararFolios;
 
@@ -53,7 +54,7 @@ class SaldoPendiente {
   double get pagado => total - saldo;
 
   /// Cuántos días completos van desde que se recibió hasta [hoy].
-  int diasHasta(DateTime hoy) => _dias(recibida, hoy);
+  int diasHasta(DateTime hoy) => diasEntre(recibida, hoy);
 
   AntiguedadSaldo antiguedadAl(DateTime hoy) =>
       AntiguedadSaldo.de(diasHasta(hoy));
@@ -129,11 +130,3 @@ class CuentasPorCobrar {
       ? saldos
       : saldos.where((s) => s.antiguedadAl(hoy) == antiguedad).toList();
 }
-
-/// Días de calendario entre dos fechas, sin contar la hora: una orden de
-/// anoche lleva un día aunque no hayan pasado veinticuatro horas.
-int _dias(DateTime desde, DateTime hasta) => DateTime.utc(
-  hasta.year,
-  hasta.month,
-  hasta.day,
-).difference(DateTime.utc(desde.year, desde.month, desde.day)).inDays;

@@ -13,9 +13,9 @@ import 'package:gestion_lavanderia/ui/views/reportes/widgets/tarjeta_estadistica
 import 'package:gestion_lavanderia/utils/constants_manager.dart';
 import 'package:intl/intl.dart';
 
-/// La ropa que falta por entregar: lo vencido, lo de hoy, lo que viene en
-/// la semana y lo que ya se pagó y nadie ha venido a recoger, con el
-/// teléfono para avisarle al cliente.
+/// La ropa que falta por entregar: lo atrasado —lo que no se terminó a
+/// tiempo—, lo de hoy, lo que viene en la semana y lo que ya está listo y
+/// nadie ha venido a recoger, con el teléfono para avisarle al cliente.
 ///
 /// [onVolver] regresa a las tarjetas de la sección de reportes.
 class RopaPendienteView extends ConsumerWidget {
@@ -62,20 +62,20 @@ class _Contenido extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final vencidas = ropa.en(EstadoEntrega.vencida);
+    final atrasadas = ropa.en(EstadoEntrega.atrasada);
 
     final porVenir = TarjetaEstadistica(
-      titulo: 'Lo que hay que entregar',
+      titulo: 'Lo que hay que terminar',
       nota:
-          'Conceptos prometidos para cada uno de los próximos '
+          'Conceptos sin terminar prometidos para cada uno de los próximos '
           '${RopaPendiente.diasPorVenir} días. Hoy va en color.',
       child: _GraficaPorVenir(ropa: ropa),
     );
     final retraso = TarjetaEstadistica(
-      titulo: 'Retraso de lo vencido',
-      nota: 'Cuántas órdenes llevan ese tiempo esperando.',
-      child: vencidas.isEmpty
-          ? const SinDatos(texto: 'No hay ropa vencida.', alto: 220)
+      titulo: 'Retraso de lo atrasado',
+      nota: 'Cuántas órdenes sin terminar llevan ese tiempo de retraso.',
+      child: atrasadas.isEmpty
+          ? const SinDatos(texto: 'No hay ropa atrasada.', alto: 220)
           : _BarrasRetraso(ropa: ropa),
     );
 
@@ -109,7 +109,8 @@ class _Contenido extends StatelessWidget {
         TarjetaEstadistica(
           titulo: 'Órdenes con ropa pendiente',
           nota:
-              'Por folio. "Prometida" es la fecha más próxima de lo que falta.',
+              'Por folio. "Prometida" es la fecha más próxima de lo que '
+              'falta terminar.',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             spacing: 16,
@@ -142,15 +143,16 @@ class _Indicadores extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final sinRecoger = ropa.pagadasSinRecoger;
+    final conAlgoListo = ropa.conAlgoListo;
+    final pagadas = conAlgoListo.where((orden) => orden.pagada).length;
 
     return FilaIndicadores(
       indicadores: [
         _IndicadorEstado(
           ropa: ropa,
-          estado: EstadoEntrega.vencida,
+          estado: EstadoEntrega.atrasada,
           icono: Icons.running_with_errors_rounded,
-          titulo: 'Ropa vencida',
+          titulo: 'Ropa atrasada',
           principal: true,
         ),
         _IndicadorEstado(
@@ -167,16 +169,22 @@ class _Indicadores extends StatelessWidget {
         ),
         IndicadorEstadistica(
           icono: Icons.inventory_2_rounded,
-          titulo: 'Pagadas sin recoger',
-          valor: '${sinRecoger.length} ${_ordenes(sinRecoger.length)}',
-          pie: const NotaIndicador('Ya pagadas y con la fecha vencida'),
+          titulo: 'Lista para recoger',
+          valor: _conceptos(ropa.conceptosEn(EstadoEntrega.lista)),
+          pie: NotaIndicador(
+            conAlgoListo.isEmpty
+                ? 'Ninguna orden'
+                : 'En ${conAlgoListo.length} '
+                      '${_ordenes(conAlgoListo.length)} · $pagadas ya '
+                      '${pagadas == 1 ? 'pagada' : 'pagadas'}',
+          ),
         ),
       ],
     );
   }
 }
 
-/// Cuántos conceptos faltan en un estado, y en cuántas órdenes.
+/// Cuántos conceptos están en un estado, y en cuántas órdenes.
 class _IndicadorEstado extends StatelessWidget {
   const _IndicadorEstado({
     required this.ropa,
@@ -208,8 +216,9 @@ class _IndicadorEstado extends StatelessWidget {
   }
 }
 
-/// Cuántos conceptos se prometieron para cada uno de los próximos días: la
-/// carga de trabajo que viene. Hoy resaltado, los demás en gris.
+/// Cuántos conceptos sin terminar se prometieron para cada uno de los
+/// próximos días: la carga de trabajo que viene. Hoy resaltado, los demás en
+/// gris.
 class _GraficaPorVenir extends StatelessWidget {
   const _GraficaPorVenir({required this.ropa});
 
@@ -236,7 +245,7 @@ class _GraficaPorVenir extends StatelessWidget {
   }
 }
 
-/// Cuántas órdenes vencidas hay en cada grupo de retraso, de lo reciente a
+/// Cuántas órdenes atrasadas hay en cada grupo de retraso, de lo reciente a
 /// lo viejo.
 class _BarrasRetraso extends StatelessWidget {
   const _BarrasRetraso({required this.ropa});
@@ -278,7 +287,7 @@ class _TablaOrdenes extends StatelessWidget {
         'Teléfono',
         'Falta entregar',
         'Prometida',
-        'Retraso',
+        'Estado',
         'Saldo',
       ],
       alineaciones: const [
@@ -290,31 +299,48 @@ class _TablaOrdenes extends StatelessWidget {
         TextAlign.right,
         TextAlign.right,
       ],
-      anchos: const [1, 1.6, 1.2, 2.4, 1.1, 0.9, 1],
-      anchoMinimo: 960,
+      anchos: const [1, 1.5, 1.1, 2.4, 1.1, 1.3, 0.9],
+      anchoMinimo: 1000,
       filas: [
         for (final orden in ordenes)
           [
             orden.folio,
             orden.cliente,
             orden.telefono,
-            orden.conceptos.map((c) => c.descripcion).join(', '),
-            orden.prometida.formatDate,
-            _retraso(orden.diasDeRetraso(hoy)),
+            orden.conceptos
+                .map(
+                  (c) =>
+                      c.estaLista ? '${c.descripcion} (lista)' : c.descripcion,
+                )
+                .join(', '),
+            orden.prometida?.formatDate ?? '—',
+            _estado(orden, hoy),
             orden.pagada ? 'Pagada' : orden.saldo.enPesos,
           ],
       ],
     );
   }
 
-  /// `3 días`, `Hoy`, `En 2 días`.
-  static String _retraso(int dias) => switch (dias) {
-    0 => 'Hoy',
-    1 => '1 día',
-    > 1 => '$dias días',
-    -1 => 'En 1 día',
-    _ => 'En ${-dias} días',
-  };
+  /// `Atrasada 3 días`, `Para hoy`, `En 2 días`, `Lista hace 2 días`.
+  static String _estado(OrdenConRopaPendiente orden, DateTime hoy) {
+    if (orden.estadoAl(hoy) == EstadoEntrega.lista) {
+      final dias = orden.diasEsperando(hoy);
+      return switch (dias) {
+        <= 0 => 'Lista hoy',
+        1 => 'Lista hace 1 día',
+        _ => 'Lista hace $dias días',
+      };
+    }
+
+    final dias = orden.diasDeRetraso(hoy);
+    return switch (dias) {
+      0 => 'Para hoy',
+      1 => 'Atrasada 1 día',
+      > 1 => 'Atrasada $dias días',
+      -1 => 'En 1 día',
+      _ => 'En ${-dias} días',
+    };
+  }
 }
 
 String _ordenes(int cuantas) => cuantas == 1 ? 'orden' : 'órdenes';

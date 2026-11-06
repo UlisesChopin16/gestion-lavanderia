@@ -4,6 +4,7 @@ import 'package:gestion_lavanderia/data/local/ordenes/orden_history_dao.dart';
 import 'package:gestion_lavanderia/data/local/ordenes/orden_servicio_dao.dart';
 import 'package:gestion_lavanderia/datasource/local/ordenes_local_datasource.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
+import 'package:gestion_lavanderia/services/avisos/aviso_ropa_lista.dart';
 import 'package:gestion_lavanderia/services/ticket/salida_ticket.dart';
 import 'package:gestion_lavanderia/services/ticket/ticket_pdf.dart';
 
@@ -50,6 +51,9 @@ class OrdenesModule extends ModuleInject {
       ..registerLazySingleton<VistaPreviaPdf>(VistaPreviaPdf.new)
       ..registerLazySingleton<GuardadoPdf>(GuardadoPdf.new)
       ..registerLazySingleton<ImpresionPdf>(ImpresionPdf.new)
-      ..registerLazySingleton<EnvioCorreo>(EnvioCorreo.new);
+      ..registerLazySingleton<EnvioCorreo>(EnvioCorreo.new)
+      // El aviso de ropa lista está apagado hasta que el dueño lo pida: se
+      // enciende con `habilitado: true`.
+      ..registerLazySingleton<AvisoRopaLista>(() => AvisoRopaLista(instance()));
   }
 }

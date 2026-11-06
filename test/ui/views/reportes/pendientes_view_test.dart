@@ -30,12 +30,14 @@ void main() {
   var clientes = 0;
 
   /// Una orden de un cliente nuevo, recibida hace [hace] días, con [saldo] y
-  /// un renglón de ropa prometido para dentro de [entrega] días.
+  /// un renglón de ropa prometido para dentro de [entrega] días; lista desde
+  /// hace [listaHace] días, si se da.
   Future<void> orden({
     required String nombre,
     required int hace,
     required double saldo,
     int? entrega,
+    int? listaHace,
   }) async {
     clientes++;
     final clienteId = await db.clientesDao.insertCliente(
@@ -68,6 +70,7 @@ void main() {
           cantidad: 2,
           importe: 50,
           fechaEntrega: dia(entrega),
+          fechaLista: Value(listaHace == null ? null : dia(-listaHace)),
           fechaCreacion: DateTime.now(),
         ),
       );
@@ -158,28 +161,32 @@ void main() {
   });
 
   group('ropa pendiente', () {
-    testWidgets('de entrada lo vencido; los filtros cambian la lista', (
+    testWidgets('de entrada lo atrasado; los filtros cambian la lista', (
       tester,
     ) async {
-      await orden(nombre: 'Ana', hace: 5, saldo: 0, entrega: -2);
+      // Ana: ya pasó la fecha, pero está lista desde ayer. No es atraso.
+      await orden(nombre: 'Ana', hace: 5, saldo: 0, entrega: -2, listaHace: 1);
       await orden(nombre: 'Luis', hace: 4, saldo: 80, entrega: -1);
       await orden(nombre: 'Rosa', hace: 1, saldo: 80, entrega: 0);
       await orden(nombre: 'Juan', hace: 1, saldo: 80, entrega: 3);
 
       await abrir(tester, 'Ropa pendiente');
 
-      expect(find.text('Ana Pérez'), findsOneWidget);
       expect(find.text('Luis Pérez'), findsOneWidget);
+      expect(find.text('Ana Pérez'), findsNothing);
       expect(find.text('Rosa Pérez'), findsNothing);
       expect(find.text('2 Piezas Camisa'), findsWidgets);
+      expect(find.text('Atrasada 1 día'), findsOneWidget);
 
       await tester.tap(
-        find.widgetWithText(ChoiceChip, 'Pagadas sin recoger (1)'),
+        find.widgetWithText(ChoiceChip, 'Lista para recoger (1)'),
       );
       await tester.pumpAndSettle();
       expect(find.text('Ana Pérez'), findsOneWidget);
       expect(find.text('Luis Pérez'), findsNothing);
       expect(find.text('Pagada'), findsOneWidget);
+      expect(find.text('Lista hace 1 día'), findsOneWidget);
+      expect(find.text('2 Piezas Camisa (lista)'), findsOneWidget);
 
       await tester.tap(find.widgetWithText(ChoiceChip, 'Para hoy (1)'));
       await tester.pumpAndSettle();

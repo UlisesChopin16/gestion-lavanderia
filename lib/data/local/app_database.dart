@@ -39,7 +39,7 @@ class AppDatabase extends _$AppDatabase {
   AppDatabase.forTesting(super.connection);
 
   @override
-  int get schemaVersion => 5;
+  int get schemaVersion => 6;
 
   @override
   MigrationStrategy get migration => MigrationStrategy(
@@ -48,6 +48,7 @@ class AppDatabase extends _$AppDatabase {
       if (from < 3) await _migrarAVersion3(m);
       if (from < 4) await _migrarAVersion4(m);
       if (from < 5) await _migrarAVersion5(m);
+      if (from < 6) await _migrarAVersion6(m);
     },
     beforeOpen: (details) async {
       // Las tablas declaran `references`, pero SQLite no las hace cumplir si
@@ -102,6 +103,19 @@ class AppDatabase extends _$AppDatabase {
     await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpServidor);
     await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpPuerto);
     await m.addColumn(configuracionEmpresa, configuracionEmpresa.smtpUsuario);
+  }
+
+  /// Versión 6: cada item guarda cuándo quedó listo para recogerse.
+  ///
+  /// Lo que ya se entregó se da por listo el día en que se entregó: es lo más
+  /// cercano que se sabe, y dejarlo nulo lo contaría como ropa sin terminar.
+  /// Lo que no se ha entregado nace sin fecha: no se sabe si ya está.
+  Future<void> _migrarAVersion6(Migrator m) async {
+    await m.addColumn(itemServicioOrden, itemServicioOrden.fechaLista);
+    await customStatement(
+      'UPDATE item_servicio_orden SET fecha_lista = fecha_entregado '
+      'WHERE esta_entregado = 1',
+    );
   }
 
   /// Los índices que el esquema tenía en la versión 2.

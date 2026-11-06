@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:gestion_lavanderia/extensions/build_context_ext.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/view_model/orden_detalle_view_model.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/detalle/widgets/widgets.dart';
 import 'package:gestion_lavanderia/ui/views/ordenes/widgets/encabezado_orden.dart';
@@ -178,6 +179,10 @@ class _Ropa extends ConsumerWidget {
       todoMarcado: estado.entregaTodo,
       onAlternar: notifier.alternarEntrega,
       onMarcarTodo: notifier.marcarTodo,
+      seMarcaLista: estado.seMarcaLista,
+      todoListoMarcado: estado.todoListoMarcado,
+      onAlternarLista: notifier.alternarLista,
+      onMarcarTodoListo: notifier.marcarTodoListo,
     );
 
     return Column(
@@ -309,6 +314,26 @@ class _Pie extends ConsumerWidget {
   }
 
   Future<void> _registrar(BuildContext context, WidgetRef ref) async {
+    // Avisar al cliente no se puede deshacer: se pregunta antes de guardar,
+    // y sólo cuando de verdad saldrá un correo.
+    if (estado.confirmaAviso) {
+      final listos = estado.listosNuevos.length;
+      final cuantos = listos == 1
+          ? '1 concepto está listo'
+          : '$listos conceptos están listos';
+      final confirmado = await context.showWarningDialog(
+        title: 'Avisar al cliente',
+        actionText: 'Marcar y avisar',
+        message:
+            'Al guardar se le enviará un correo a '
+            '${estado.orden?.clienteCorreo.trim()} avisándole que $cuantos '
+            'para recoger.\n\nEl correo no se puede deshacer, y '
+            'la ropa quedará marcada como lista.',
+      );
+
+      if (!confirmado || !context.mounted) return;
+    }
+
     final registrado = await ref
         .read(ordenDetalleViewModelProvider(ordenId).notifier)
         .registrar();

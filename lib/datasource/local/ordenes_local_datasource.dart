@@ -171,7 +171,8 @@ class OrdenesLocalDatasource {
   /// puede fechar.
   ///
   /// Se puede abonar sin entregar y entregar sin abonar: ninguno de los dos
-  /// argumentos es obligatorio.
+  /// argumentos es obligatorio. [itemsListos] marca ropa como terminada en
+  /// la misma operación; sin cobro ni entrega, es [marcarListos].
   ///
   /// [recibido] es con cuánto pagó el cliente, y sólo se guarda en un cobro en
   /// efectivo —con tarjeta no hay billete ni cambio—. Lo que esta clase no
@@ -183,6 +184,7 @@ class OrdenesLocalDatasource {
     MetodoPagoType metodoPago = MetodoPagoType.efectivo,
     double? recibido,
     Iterable<int> itemsAEntregar = const [],
+    Iterable<int> itemsListos = const [],
   }) {
     return _db.transaction(() async {
       final orden = await _ordenVigente(ordenId);
@@ -208,6 +210,13 @@ class OrdenesLocalDatasource {
         ),
       );
 
+      // Primero lo que se terminó y luego lo que sale; entregar, además,
+      // marca listo lo que no lo estaba. Todo con la fecha del movimiento.
+      await _items.marcarListos(
+        ordenId: ordenId,
+        itemIds: itemsListos,
+        fecha: fecha,
+      );
       await _items.entregarItems(
         ordenId: ordenId,
         itemIds: itemsAEntregar,
@@ -222,6 +231,30 @@ class OrdenesLocalDatasource {
           fecha: fecha,
         ),
       );
+    });
+  }
+
+  /// Marca como listos para recogerse los items indicados: la ropa ya está
+  /// terminada y el cliente puede pasar por ella. Devuelve la orden como
+  /// quedó.
+  ///
+  /// No es un movimiento del historial —no cobra ni saca ropa—, así que no
+  /// cambia el saldo ni el estatus. Una orden cerrada o cancelada no admite
+  /// cambios, igual que con los cobros.
+  Future<OrdenDetalleData> marcarListos({
+    required int ordenId,
+    required Iterable<int> itemIds,
+  }) {
+    return _db.transaction(() async {
+      final orden = await _ordenVigente(ordenId);
+
+      await _items.marcarListos(
+        ordenId: ordenId,
+        itemIds: itemIds,
+        fecha: DateTime.now(),
+      );
+
+      return _detalleDe(orden);
     });
   }
 

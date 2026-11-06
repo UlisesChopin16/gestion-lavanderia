@@ -68,7 +68,8 @@ class ImpresionPdf {
   }
 }
 
-/// Envía un correo con un PDF adjunto desde la cuenta de la lavandería.
+/// Envía un correo desde la cuenta de la lavandería, con un PDF adjunto o
+/// sin él.
 ///
 /// Registrado en el contenedor porque sale a internet.
 class EnvioCorreo {
@@ -85,8 +86,8 @@ class EnvioCorreo {
     required String destinatario,
     required String asunto,
     required String html,
-    required Uint8List adjunto,
-    required String nombreAdjunto,
+    Uint8List? adjunto,
+    String nombreAdjunto = '',
   }) async {
     final usuario = cuenta.usuario.trim();
     final servidor = SmtpServer(
@@ -102,11 +103,12 @@ class EnvioCorreo {
       ..subject = asunto
       ..html = html
       ..attachments = [
-        StreamAttachment(
-          Stream.value(adjunto),
-          'application/pdf',
-          fileName: nombreAdjunto,
-        ),
+        if (adjunto != null)
+          StreamAttachment(
+            Stream.value(adjunto),
+            'application/pdf',
+            fileName: nombreAdjunto,
+          ),
       ];
 
     try {

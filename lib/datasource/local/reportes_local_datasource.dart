@@ -6,12 +6,14 @@ import 'package:gestion_lavanderia/data/local/ordenes/orden_servicio_dao.dart';
 import 'package:gestion_lavanderia/extensions/date_time_ext.dart';
 import 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 import 'package:gestion_lavanderia/models/data/reportes/cuentas_por_cobrar.dart';
+import 'package:gestion_lavanderia/models/data/reportes/entregas_a_tiempo.dart';
 import 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 import 'package:gestion_lavanderia/models/data/reportes/ropa_pendiente.dart';
 import 'package:gestion_lavanderia/types/estatus_orden_type.dart';
 
 export 'package:gestion_lavanderia/models/data/reportes/corte_caja.dart';
 export 'package:gestion_lavanderia/models/data/reportes/cuentas_por_cobrar.dart';
+export 'package:gestion_lavanderia/models/data/reportes/entregas_a_tiempo.dart';
 export 'package:gestion_lavanderia/models/data/reportes/reporte_ventas.dart';
 export 'package:gestion_lavanderia/models/data/reportes/ropa_pendiente.dart';
 
@@ -143,8 +145,35 @@ class ReportesLocalDatasource {
                   cantidad: item.item.cantidad,
                   unidad: item.precio.precio.tipoUnidad,
                   prometida: item.item.fechaEntrega,
+                  lista: item.item.fechaLista,
                 ),
             ],
+          ),
+      ],
+    );
+  }
+
+  /// La ropa que quedó lista en [rango], cada renglón con su fecha
+  /// prometida, la de cuando se terminó y la de cuando se entregó.
+  Future<EntregasATiempo> entregasATiempo(RangoReporte rango) async {
+    return EntregasATiempo(
+      rango: rango,
+      terminados: [
+        for (final (:item, :orden, :cliente) in await _items.listosEntre(
+          rango.inicio,
+          rango.fin,
+        ))
+          ConceptoTerminado(
+            folio: orden.folio,
+            cliente: _nombre(cliente),
+            concepto: item.precio.precio.nombreConcepto,
+            cantidad: item.item.cantidad,
+            unidad: item.precio.precio.tipoUnidad,
+            categoria: item.precio.categoria.nombre,
+            prometida: item.item.fechaEntrega,
+            // La consulta sólo trae los que tienen fecha de lista.
+            lista: item.item.fechaLista!,
+            entregada: item.item.fechaEntregado,
           ),
       ],
     );

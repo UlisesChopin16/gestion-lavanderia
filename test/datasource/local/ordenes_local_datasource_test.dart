@@ -2,6 +2,7 @@ import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:gestion_lavanderia/data/local/app_database.dart';
 import 'package:gestion_lavanderia/datasource/local/datasources.dart';
+import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// Comprueba las operaciones atómicas de las órdenes: que las escrituras que
@@ -198,6 +199,96 @@ void main() {
       );
 
       expect(await ordenes.listado(), isEmpty);
+    });
+  });
+
+  group('marcarListos', () {
+    test('marca la ropa como lista sin cobrar ni mover el historial', () async {
+      var orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana), renglon(sabana)],
+      );
+      final [primera, segunda] = orden.items;
+
+      orden = await ordenes.marcarListos(
+        ordenId: orden.id,
+        itemIds: [primera.id],
+      );
+
+      final lista = orden.items.firstWhere((i) => i.id == primera.id);
+      expect(lista.estaListo, isTrue);
+      expect(lista.esperaAlCliente, isTrue);
+      expect(
+        orden.items.firstWhere((i) => i.id == segunda.id).estaListo,
+        isFalse,
+      );
+      expect(orden.restante, 100, reason: 'marcar lista no cobra');
+      expect(orden.historial, hasLength(1), reason: 'no es un movimiento');
+    });
+
+    test('lo que ya estaba listo conserva su fecha', () async {
+      var orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+      );
+      final id = orden.items.single.id;
+
+      orden = await ordenes.marcarListos(ordenId: orden.id, itemIds: [id]);
+      final primeraVez = orden.items.single.fechaLista;
+      await Future<void>.delayed(const Duration(milliseconds: 5));
+      orden = await ordenes.marcarListos(ordenId: orden.id, itemIds: [id]);
+
+      expect(orden.items.single.fechaLista, primeraVez);
+    });
+
+    test(
+      'entregar algo que no se marcó lo marca listo en ese momento',
+      () async {
+        var orden = await ordenes.crearOrden(
+          clienteId: clienteId,
+          items: [renglon(sabana), renglon(sabana)],
+        );
+        final [antes, sinMarcar] = orden.items;
+        orden = await ordenes.marcarListos(
+          ordenId: orden.id,
+          itemIds: [antes.id],
+        );
+        final listaAntes = orden.items
+            .firstWhere((i) => i.id == antes.id)
+            .fechaLista;
+
+        orden = await ordenes.registrarMovimiento(
+          ordenId: orden.id,
+          itemsAEntregar: [antes.id, sinMarcar.id],
+        );
+
+        final entregados = {for (final i in orden.items) i.id: i};
+        expect(entregados[antes.id]!.fechaLista, listaAntes);
+        expect(
+          entregados[sinMarcar.id]!.fechaLista,
+          entregados[sinMarcar.id]!.fechaEntregado,
+        );
+      },
+    );
+
+    test('una orden cerrada no admite cambios', () async {
+      var orden = await ordenes.crearOrden(
+        clienteId: clienteId,
+        items: [renglon(sabana)],
+      );
+      orden = await ordenes.registrarMovimiento(
+        ordenId: orden.id,
+        monto: 50,
+        itemsAEntregar: [orden.items.single.id],
+      );
+
+      expect(
+        ordenes.marcarListos(
+          ordenId: orden.id,
+          itemIds: [orden.items.single.id],
+        ),
+        throwsA(isA<SQLException>()),
+      );
     });
   });
 

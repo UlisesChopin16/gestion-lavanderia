@@ -9,6 +9,10 @@ import 'package:gestion_lavanderia/models/data/ordenes/item_orden_data.dart';
 /// La casilla de cada renglón dice en qué punto está: marcada y apagada si ya
 /// se entregó, que no se puede desmarcar porque su entrega quedó fechada en el
 /// historial; libre si falta, para marcarla y entregarla ahora.
+///
+/// Antes de entregarse, la ropa se termina: la etiqueta "Lista" de cada
+/// renglón por terminar lo marca como listo para que el cliente pase por él.
+/// Lo que ya está listo lo dice debajo de su nombre.
 class PrendasDetalle extends StatelessWidget {
   const PrendasDetalle({
     super.key,
@@ -18,6 +22,10 @@ class PrendasDetalle extends StatelessWidget {
     required this.todoMarcado,
     required this.onAlternar,
     required this.onMarcarTodo,
+    required this.seMarcaLista,
+    required this.todoListoMarcado,
+    required this.onAlternarLista,
+    required this.onMarcarTodoListo,
   });
 
   final List<ItemOrdenData> items;
@@ -35,10 +43,22 @@ class PrendasDetalle extends StatelessWidget {
   final ValueChanged<ItemOrdenData> onAlternar;
   final ValueChanged<bool> onMarcarTodo;
 
+  /// Si un renglón por terminar está marcado como listo.
+  final bool Function(ItemOrdenData item) seMarcaLista;
+
+  /// Si está marcada como lista toda la ropa que faltaba terminar.
+  final bool todoListoMarcado;
+
+  final ValueChanged<ItemOrdenData> onAlternarLista;
+  final ValueChanged<bool> onMarcarTodoListo;
+
   @override
   Widget build(BuildContext context) {
     final entregadas = items.where((item) => item.estaEntregado).length;
     final hayPendientes = entregadas < items.length;
+    final hayPorTerminar = items.any(
+      (item) => item.estaPendiente && !item.estaListo,
+    );
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -50,6 +70,9 @@ class PrendasDetalle extends StatelessWidget {
           puedeMarcar: editable && hayPendientes,
           todoMarcado: todoMarcado,
           onMarcarTodo: onMarcarTodo,
+          puedeMarcarListo: editable && hayPorTerminar,
+          todoListoMarcado: todoListoMarcado,
+          onMarcarTodoListo: onMarcarTodoListo,
         ),
         Expanded(
           child: ListView.separated(
@@ -64,6 +87,10 @@ class PrendasDetalle extends StatelessWidget {
                 marcado: item.estaEntregado || seEntrega(item),
                 editable: editable && !item.estaEntregado,
                 onAlternar: () => onAlternar(item),
+                marcadaLista: seMarcaLista(item),
+                puedeMarcarLista:
+                    editable && item.estaPendiente && !item.estaListo,
+                onAlternarLista: () => onAlternarLista(item),
               );
             },
           ),
@@ -80,6 +107,9 @@ class _Encabezado extends StatelessWidget {
     required this.puedeMarcar,
     required this.todoMarcado,
     required this.onMarcarTodo,
+    required this.puedeMarcarListo,
+    required this.todoListoMarcado,
+    required this.onMarcarTodoListo,
   });
 
   final int entregadas;
@@ -87,32 +117,64 @@ class _Encabezado extends StatelessWidget {
   final bool puedeMarcar;
   final bool todoMarcado;
   final ValueChanged<bool> onMarcarTodo;
+  final bool puedeMarcarListo;
+  final bool todoListoMarcado;
+  final ValueChanged<bool> onMarcarTodoListo;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
-    return Row(
+    // Los botones bajan de renglón cuando no caben junto al título: con los
+    // dos a la vista, la columna de la ropa no da para todo en una línea.
+    return Wrap(
+      alignment: WrapAlignment.spaceBetween,
+      crossAxisAlignment: WrapCrossAlignment.center,
       spacing: 8,
+      runSpacing: 4,
       children: [
-        Text('Prendas', style: theme.textTheme.titleMedium),
-        Expanded(
-          child: Text(
-            '$entregadas de $total entregadas',
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: theme.colorScheme.onSurfaceVariant,
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          spacing: 8,
+          children: [
+            Text('Prendas', style: theme.textTheme.titleMedium),
+            Text(
+              '$entregadas de $total entregadas',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: theme.colorScheme.onSurfaceVariant,
+              ),
             ),
-          ),
+          ],
         ),
-        if (puedeMarcar)
-          TextButton.icon(
-            onPressed: () => onMarcarTodo(!todoMarcado),
-            icon: Icon(
-              todoMarcado ? Icons.remove_done_rounded : Icons.done_all_rounded,
-              size: 18,
-            ),
-            label: Text(todoMarcado ? 'Desmarcar todo' : 'Marcar lo pendiente'),
-          ),
+        Wrap(
+          spacing: 4,
+          children: [
+            if (puedeMarcarListo)
+              TextButton.icon(
+                onPressed: () => onMarcarTodoListo(!todoListoMarcado),
+                icon: Icon(
+                  todoListoMarcado
+                      ? Icons.remove_circle_outline_rounded
+                      : Icons.inventory_2_outlined,
+                  size: 18,
+                ),
+                label: Text(todoListoMarcado ? 'Quitar listos' : 'Todo listo'),
+              ),
+            if (puedeMarcar)
+              TextButton.icon(
+                onPressed: () => onMarcarTodo(!todoMarcado),
+                icon: Icon(
+                  todoMarcado
+                      ? Icons.remove_done_rounded
+                      : Icons.done_all_rounded,
+                  size: 18,
+                ),
+                label: Text(
+                  todoMarcado ? 'Desmarcar todo' : 'Marcar lo pendiente',
+                ),
+              ),
+          ],
+        ),
       ],
     );
   }
@@ -124,6 +186,9 @@ class _Renglon extends StatelessWidget {
     required this.marcado,
     required this.editable,
     required this.onAlternar,
+    required this.marcadaLista,
+    required this.puedeMarcarLista,
+    required this.onAlternarLista,
   });
 
   final ItemOrdenData item;
@@ -134,6 +199,13 @@ class _Renglon extends StatelessWidget {
   final bool editable;
 
   final VoidCallback onAlternar;
+
+  final bool marcadaLista;
+
+  /// Si se ofrece la etiqueta "Lista": sólo en la ropa que falta terminar.
+  final bool puedeMarcarLista;
+
+  final VoidCallback onAlternarLista;
 
   @override
   Widget build(BuildContext context) {
@@ -163,7 +235,7 @@ class _Renglon extends StatelessWidget {
                   Text(precio.descripcion, style: theme.textTheme.titleSmall),
                   Text(
                     '${precio.categoria} · ${_cantidad(item.cantidad)} '
-                    '${precio.tipoUnidad.value}',
+                    '${item.cantidad == 1 ? precio.tipoUnidad.value : precio.tipoUnidad.plural}',
                     style: theme.textTheme.bodySmall?.copyWith(
                       color: theme.colorScheme.onSurfaceVariant,
                     ),
@@ -172,6 +244,13 @@ class _Renglon extends StatelessWidget {
                 ],
               ),
             ),
+            if (puedeMarcarLista)
+              FilterChip(
+                label: const Text('Lista'),
+                tooltip: 'Marcar como lista para recoger',
+                selected: marcadaLista,
+                onSelected: (_) => onAlternarLista(),
+              ),
             Text(
               item.importe.toStringAsFixed(2),
               style: theme.textTheme.titleSmall,
@@ -207,6 +286,11 @@ class _Fecha extends StatelessWidget {
         Icons.check_circle_rounded,
         'Entregado el ${fechaEntregado.formatDate}',
         scheme.primary,
+      ),
+      ItemOrdenData(:final fechaLista?) => (
+        Icons.inventory_2_rounded,
+        'Lista desde el ${fechaLista.formatDate} · espera al cliente',
+        scheme.tertiary,
       ),
       _ when _atrasada => (
         Icons.warning_amber_rounded,

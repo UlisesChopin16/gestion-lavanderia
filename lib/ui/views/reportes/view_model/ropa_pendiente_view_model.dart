@@ -12,8 +12,8 @@ part 'ropa_pendiente_view_model.g.dart';
 
 /// Qué órdenes se ven en la lista de la ropa pendiente.
 enum FiltroRopa {
-  vencida(titulo: 'Vencida'),
-  pagadasSinRecoger(titulo: 'Pagadas sin recoger'),
+  atrasada(titulo: 'Atrasada'),
+  lista(titulo: 'Lista para recoger'),
   hoy(titulo: 'Para hoy'),
   todas(titulo: 'Todo lo pendiente');
 
@@ -22,8 +22,8 @@ enum FiltroRopa {
   final String titulo;
 
   List<OrdenConRopaPendiente> de(RopaPendiente ropa) => switch (this) {
-    vencida => ropa.en(EstadoEntrega.vencida),
-    pagadasSinRecoger => ropa.pagadasSinRecoger,
+    atrasada => ropa.en(EstadoEntrega.atrasada),
+    lista => ropa.conAlgoListo,
     hoy => ropa.en(EstadoEntrega.hoy),
     todas => ropa.ordenes,
   };
@@ -35,16 +35,16 @@ sealed class RopaPendienteState with _$RopaPendienteState {
     /// En `null` mientras se carga por primera vez, o si falló la carga.
     RopaPendiente? ropa,
 
-    /// De entrada lo vencido: es por lo que se abre esta pantalla.
-    @Default(FiltroRopa.vencida) FiltroRopa filtro,
+    /// De entrada lo atrasado: es por lo que se abre esta pantalla.
+    @Default(FiltroRopa.atrasada) FiltroRopa filtro,
 
     @Default(true) bool cargando,
     @Default('') String mensajeError,
   }) = _RopaPendienteState;
 }
 
-/// La ropa pendiente en pantalla: lo vencido, lo de hoy, lo que viene y lo
-/// que ya se pagó y nadie ha recogido.
+/// La ropa pendiente en pantalla: lo atrasado, lo de hoy, lo que viene y lo
+/// que ya está listo y nadie ha recogido.
 @riverpod
 class RopaPendienteViewModel extends _$RopaPendienteViewModel {
   final _reportes = instance<ReportesLocalDatasource>();

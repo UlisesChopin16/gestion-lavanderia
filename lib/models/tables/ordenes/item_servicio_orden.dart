@@ -6,6 +6,11 @@ import 'package:gestion_lavanderia/models/tables/precios/precios_conceptos.dart'
 /// Cada renglón de ropa de una orden, ligado al concepto de precio que lo
 /// originó. No tiene fecha de actualización ni baja lógica.
 ///
+/// Antes de entregarse, un item se termina: [fechaLista] dice cuándo quedó
+/// listo para que el cliente pase por él. Es lo que dice si la lavandería
+/// cumplió con la fecha prometida; la entrega sólo dice cuándo vino el
+/// cliente.
+///
 /// La entrega se expresa con tres columnas que siempre se escriben juntas:
 /// [estaEntregado] dice si ya salió —y por lo tanto cuántos faltan—,
 /// [fechaEntregado] cuándo, y [ordenHistoryId] en qué movimiento del historial
@@ -26,6 +31,11 @@ class ItemServicioOrden extends Table {
 
   /// Fecha comprometida de entrega.
   DateTimeColumn get fechaEntrega => dateTime()();
+
+  /// Cuándo quedó listo para recogerse; null mientras se trabaja en él.
+  /// Entregar un item que no se marcó listo lo marca listo en ese momento: lo
+  /// que sale del mostrador ya estaba terminado.
+  DateTimeColumn get fechaLista => dateTime().nullable()();
 
   /// Fecha en que el item se entregó realmente; null mientras no se entregue.
   DateTimeColumn get fechaEntregado => dateTime().nullable()();

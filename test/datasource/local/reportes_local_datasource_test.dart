@@ -330,6 +330,8 @@ void main() {
       DateTime entrega, {
       double cantidad = 1,
       bool entregado = false,
+      DateTime? entregadoEl,
+      DateTime? listaEl,
     }) async {
       final ordenId = (await (db.select(
         db.ordenServicio,
@@ -340,7 +342,9 @@ void main() {
           precioConceptoId: precioId,
           cantidad: cantidad,
           importe: 25 * cantidad,
-          estaEntregado: Value(entregado),
+          estaEntregado: Value(entregado || entregadoEl != null),
+          fechaEntregado: Value(entregadoEl),
+          fechaLista: Value(listaEl ?? entregadoEl),
           fechaEntrega: entrega,
           fechaCreacion: DateTime.now(),
         ),
@@ -352,7 +356,11 @@ void main() {
       () async {
         final pendiente = await orden(dia: DateTime(2026, 11, 1), total: 75);
         await item(pendiente, DateTime(2026, 11, 3), cantidad: 2);
-        await item(pendiente, DateTime(2026, 11, 7));
+        await item(
+          pendiente,
+          DateTime(2026, 11, 7),
+          listaEl: DateTime(2026, 11, 4, 16),
+        );
         await item(pendiente, DateTime(2026, 11, 2), entregado: true);
 
         final entregada = await orden(dia: DateTime(2026, 11, 1), total: 25);
@@ -376,9 +384,52 @@ void main() {
           '1 Pieza Camisa',
         ]);
         expect(conRopa.saldo, 75);
-        expect(conRopa.estadoAl(ropa.hoy), EstadoEntrega.vencida);
+        // Una camisa lista y dos atrasadas desde el 3: atrasada.
+        expect(conRopa.listos.single.lista, DateTime(2026, 11, 4, 16));
+        expect(conRopa.estadoAl(ropa.hoy), EstadoEntrega.atrasada);
         expect(conRopa.diasDeRetraso(ropa.hoy), 2);
       },
     );
+
+    test('las entregas a tiempo van por el día en que quedó lista', () async {
+      final conRetraso = await orden(dia: DateTime(2026, 10, 1), total: 75);
+      // Prometida el 3 y lista el 5: dos días tarde, aunque el cliente no
+      // haya pasado.
+      await item(
+        conRetraso,
+        DateTime(2026, 10, 3, 18),
+        listaEl: DateTime(2026, 10, 5, 9),
+      );
+      // Lista antes del periodo, aunque se entregó dentro: no entra.
+      await item(
+        conRetraso,
+        DateTime(2026, 9, 28),
+        listaEl: DateTime(2026, 9, 30, 23),
+        entregadoEl: DateTime(2026, 10, 2),
+      );
+      // Sin terminar: no entra.
+      await item(conRetraso, DateTime(2026, 10, 4));
+
+      final cancelada = await orden(
+        dia: DateTime(2026, 10, 1),
+        total: 25,
+        estatus: EstatusOrdenType.cancelada,
+      );
+      await item(
+        cancelada,
+        DateTime(2026, 10, 3),
+        entregadoEl: DateTime(2026, 10, 3),
+      );
+
+      final entregas = await reportes.entregasATiempo(octubre);
+
+      final terminado = entregas.terminados.single;
+      expect(terminado.folio, conRetraso);
+      expect(terminado.categoria, 'Planchado');
+      expect(terminado.descripcion, '1 Pieza Camisa');
+      expect(terminado.retraso, 2);
+      expect(terminado.entregada, isNull);
+      expect(entregas.fraccionATiempo, 0);
+    });
   });
 }

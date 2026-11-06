@@ -28,6 +28,9 @@ sealed class ItemOrdenData with _$ItemOrdenData {
     @Default(false) bool estaEntregado,
     required DateTime fechaEntrega,
 
+    /// Cuándo quedó listo para recogerse; nulo mientras se trabaja en él.
+    DateTime? fechaLista,
+
     /// Cuándo se entregó realmente; nulo mientras no se entregue.
     DateTime? fechaEntregado,
 
@@ -42,4 +45,10 @@ sealed class ItemOrdenData with _$ItemOrdenData {
 
   /// Si el renglón sigue pendiente de salir.
   bool get estaPendiente => !estaEntregado;
+
+  /// Si ya está terminado, se haya entregado o no.
+  bool get estaListo => fechaLista != null;
+
+  /// Si ya está terminado y espera a que el cliente pase por él.
+  bool get esperaAlCliente => estaListo && !estaEntregado;
 }

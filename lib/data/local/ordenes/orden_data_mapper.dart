@@ -43,6 +43,7 @@ extension ItemConPrecioToData on ItemConPrecioEntry {
     importe: item.importe,
     estaEntregado: item.estaEntregado,
     fechaEntrega: item.fechaEntrega,
+    fechaLista: item.fechaLista,
     fechaEntregado: item.fechaEntregado,
     ordenHistoryId: item.ordenHistoryId,
   );
@@ -116,6 +117,7 @@ extension ItemOrdenDataToCompanion on ItemOrdenData {
       importe: Value(importe),
       estaEntregado: Value(estaEntregado),
       fechaEntrega: Value(fechaEntrega),
+      fechaLista: Value(fechaLista),
       fechaEntregado: Value(fechaEntregado),
       ordenHistoryId: Value(ordenHistoryId),
     );

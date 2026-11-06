@@ -37,18 +37,22 @@ class DatoBarra {
 /// Barras y no un pastel: comparar largos sobre una misma base se lee bien,
 /// comparar ángulos no. Y un solo color, porque lo que se compara es cuánto,
 /// no quién: el nombre de cada una va escrito a su lado. La mayor llena la
-/// pista y las demás, su parte.
+/// pista y las demás, su parte; o, con [maximo], cada una llena lo que le
+/// toca de él.
 class BarrasHorizontales extends StatelessWidget {
-  const BarrasHorizontales({super.key, required this.barras});
+  const BarrasHorizontales({super.key, required this.barras, this.maximo});
 
   final List<DatoBarra> barras;
 
+  /// Lo que llena la pista: `1` para un porcentaje, donde una barra al 60 %
+  /// no debe verse llena sólo por ser la mayor. Sin él, la mayor de la lista.
+  final double? maximo;
+
   @override
   Widget build(BuildContext context) {
-    final mayor = barras.fold<double>(
-      0,
-      (mayor, b) => math.max(mayor, b.valor),
-    );
+    final mayor =
+        maximo ??
+        barras.fold<double>(0, (mayor, b) => math.max(mayor, b.valor));
 
     return Column(
       spacing: 14,

@@ -59,13 +59,13 @@ void main() {
     );
   });
 
-  test('nace en la versión 5 del esquema', () async {
+  test('nace en la versión 6 del esquema', () async {
     final version = await db
         .customSelect('PRAGMA user_version')
         .map((fila) => fila.read<int>('user_version'))
         .getSingle();
 
-    expect(version, 5);
+    expect(version, 6);
   });
 
   test('las claves ajenas están activas', () async {

@@ -5,6 +5,8 @@ import 'package:gestion_lavanderia/exceptions/s_q_l_exception.dart';
 import 'package:gestion_lavanderia/inject/module_inject.dart';
 import 'package:gestion_lavanderia/models/data/ordenes/cobro_en_efectivo.dart';
 import 'package:gestion_lavanderia/models/data/shared/filas.dart';
+import 'package:gestion_lavanderia/services/avisos/aviso_ropa_lista.dart';
+import 'package:gestion_lavanderia/services/ticket/salida_ticket.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 export 'package:gestion_lavanderia/models/data/ordenes/orden_detalle_data.dart';
@@ -29,6 +31,18 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
 
     /// Los renglones pendientes que se marcaron para entregar ahora.
     @Default(Filas<int>()) Filas<int> aEntregar,
+
+    /// Los renglones que se marcaron como listos para recogerse.
+    @Default(Filas<int>()) Filas<int> aMarcarListos,
+
+    /// La lavandería, para el aviso por correo. Sólo se lee si el aviso está
+    /// encendido.
+    EmpresaData? empresa,
+
+    /// Si al marcar ropa como lista se le avisará al cliente por correo: el
+    /// aviso está encendido, la lavandería tiene su cuenta y el cliente su
+    /// correo.
+    @Default(false) bool avisaAlCliente,
 
     @Default(MetodoPagoType.efectivo) MetodoPagoType metodoPago,
 
@@ -78,6 +92,23 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
 
   bool seEntrega(ItemOrdenData item) => aEntregar.contains(item.id);
 
+  bool seMarcaLista(ItemOrdenData item) => aMarcarListos.contains(item.id);
+
+  /// La ropa que falta terminar: ni lista ni entregada.
+  List<ItemOrdenData> get porTerminar =>
+      pendientes.where((item) => !item.estaListo).toList();
+
+  /// Si se marcó como lista toda la ropa que faltaba terminar.
+  bool get todoListoMarcado =>
+      porTerminar.isNotEmpty && porTerminar.every(seMarcaLista);
+
+  /// Lo que se marcará como listo al guardar. Lo que además se entrega no
+  /// cuenta: al salir se marca listo solo.
+  List<int> get listosNuevos => [
+    for (final id in aMarcarListos)
+      if (!aEntregar.contains(id)) id,
+  ];
+
   /// Si con lo marcado sale toda la ropa que quedaba.
   bool get entregaTodo => pendientes.isNotEmpty && pendientes.every(seEntrega);
 
@@ -104,7 +135,12 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
   /// paga.
   bool get recibidoInsuficiente => efectivo.insuficiente;
 
-  bool get hayMovimiento => abono > margenSaldo || aEntregar.isNotEmpty;
+  bool get hayMovimiento =>
+      abono > margenSaldo || aEntregar.isNotEmpty || listosNuevos.isNotEmpty;
+
+  /// Si al guardar hay que pedir confirmación: se le enviará un correo al
+  /// cliente, y eso no se puede deshacer.
+  bool get confirmaAviso => avisaAlCliente && listosNuevos.isNotEmpty;
 
   bool get puedeRegistrar =>
       admiteMovimientos &&
@@ -114,24 +150,37 @@ sealed class OrdenDetalleState with _$OrdenDetalleState {
       !guardando;
 
   /// Lo que dice el botón: lo que va a pasar al pulsarlo, con su importe.
+  /// `Cobrar 50.00, entregar y marcar 2 listos`.
   String get etiquetaAccion {
     final cobra = abono > margenSaldo;
     final entregadas = aEntregar.length;
+    final listos = listosNuevos.length;
 
-    if (cobra && entregadas > 0) {
-      return 'Cobrar ${abono.toStringAsFixed(2)} y entregar';
-    }
-    if (cobra) return 'Cobrar ${abono.toStringAsFixed(2)}';
-    if (entregadas > 0) return 'Entregar ${_conceptos(entregadas)}';
+    final partes = [
+      if (cobra) 'cobrar ${abono.toStringAsFixed(2)}',
+      if (entregadas > 0)
+        cobra ? 'entregar' : 'entregar ${_conceptos(entregadas)}',
+      if (listos > 0)
+        cobra || entregadas > 0
+            ? 'marcar ${listos == 1 ? '1 listo' : '$listos listos'}'
+            : 'marcar ${_conceptos(listos)} como '
+                  '${listos == 1 ? 'listo' : 'listos'}',
+    ];
+    if (partes.isEmpty) return 'Registrar';
 
-    return 'Registrar';
+    final frase = partes.length == 1
+        ? partes.single
+        : '${partes.take(partes.length - 1).join(', ')} y ${partes.last}';
+
+    return frase[0].toUpperCase() + frase.substring(1);
   }
 }
 
 String _conceptos(int cuantos) =>
     cuantos == 1 ? '1 concepto' : '$cuantos conceptos';
 
-/// El detalle de una orden: se mira, se cobra y se entrega la ropa.
+/// El detalle de una orden: se mira, se cobra, se marca la ropa que ya está
+/// lista y se entrega.
 ///
 /// Cobrar y entregar son un solo movimiento —`registrarMovimiento`, que es
 /// atómico—, así que la pantalla junta las dos cosas y las escribe de una
@@ -143,6 +192,8 @@ String _conceptos(int cuantos) =>
 @riverpod
 class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
   final _ordenes = instance<OrdenesLocalDatasource>();
+  final _empresas = instance<EmpresaLocalDatasource>();
+  final _aviso = instance<AvisoRopaLista>();
 
   @override
   OrdenDetalleState build(int ordenId) {
@@ -167,7 +218,18 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
         return;
       }
 
-      state = state.copyWith(cargando: false, orden: orden);
+      // La lavandería sólo hace falta para el aviso: apagado, no se lee —ni
+      // su contraseña, que vive en el almacén cifrado—.
+      final empresa = _aviso.habilitado ? await _empresas.empresa() : null;
+
+      if (!ref.mounted) return;
+
+      state = state.copyWith(
+        cargando: false,
+        orden: orden,
+        empresa: empresa,
+        avisaAlCliente: _aviso.avisaA(orden, empresa),
+      );
     } catch (error, stackTrace) {
       _fallar(error, stackTrace, 'No se pudo leer la orden.');
     }
@@ -192,6 +254,31 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
       aEntregar: Filas([
         if (todo)
           for (final item in state.pendientes) item.id,
+      ]),
+    );
+  }
+
+  /// Marca o desmarca un renglón como listo para recogerse. Uno que ya está
+  /// listo —o ya salió— no se toca: su fecha es la de cuando se terminó.
+  void alternarLista(ItemOrdenData item) {
+    if (!state.admiteMovimientos || item.estaListo || item.estaEntregado) {
+      return;
+    }
+
+    final ids = state.aMarcarListos.toList();
+    if (!ids.remove(item.id)) ids.add(item.id);
+
+    state = state.copyWith(aMarcarListos: Filas(ids));
+  }
+
+  /// Marca como lista toda la ropa que falta terminar, o ninguna.
+  void marcarTodoListo(bool todo) {
+    if (!state.admiteMovimientos) return;
+
+    state = state.copyWith(
+      aMarcarListos: Filas([
+        if (todo)
+          for (final item in state.porTerminar) item.id,
       ]),
     );
   }
@@ -233,35 +320,52 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
         ? state.abono
         : 0.0;
     final entregadas = state.aEntregar.length;
+    final listos = state.listosNuevos;
     final recibido = state.efectivo.aGuardar;
+    final empresa = state.empresa;
+    final avisar = state.confirmaAviso;
 
     state = state.copyWith(guardando: true, mensajeError: '');
 
     try {
-      final actualizada = await _ordenes.registrarMovimiento(
-        ordenId: ordenId,
-        monto: abono,
-        // Una entrega sin cobro conserva el método del último movimiento: el
-        // listado enseña ése, y no tendría por qué cambiar porque alguien
-        // pasó a recoger ropa.
-        metodoPago: abono > 0
-            ? state.metodoPago
-            : orden.ultimoMovimiento?.metodoPago ?? state.metodoPago,
-        recibido: recibido,
-        itemsAEntregar: state.aEntregar,
-      );
+      // Sólo marcar ropa como lista no es un movimiento: no cobra ni saca
+      // nada, y no debe dejar un renglón vacío en el historial.
+      final actualizada = abono == 0 && entregadas == 0
+          ? await _ordenes.marcarListos(ordenId: ordenId, itemIds: listos)
+          : await _ordenes.registrarMovimiento(
+              ordenId: ordenId,
+              monto: abono,
+              // Una entrega sin cobro conserva el método del último
+              // movimiento: el listado enseña ése, y no tendría por qué
+              // cambiar porque alguien pasó a recoger ropa.
+              metodoPago: abono > 0
+                  ? state.metodoPago
+                  : orden.ultimoMovimiento?.metodoPago ?? state.metodoPago,
+              recibido: recibido,
+              itemsAEntregar: state.aEntregar,
+              itemsListos: listos,
+            );
+
+      // El aviso sale después de guardar, y fuera de la transacción: si el
+      // correo falla, lo marcado ya quedó y sólo se dice que no se avisó.
+      final aviso = avisar && empresa != null
+          ? await _avisar(actualizada, empresa)
+          : '';
 
       if (ref.mounted) {
         state = state.copyWith(guardando: false, orden: actualizada);
       }
 
       return (
-        mensaje: _mensaje(
-          folio: orden.folio,
-          abono: abono,
-          entregadas: entregadas,
-          cerrada: actualizada.estatus == EstatusOrdenType.cerrada,
-        ),
+        mensaje:
+            _mensaje(
+              folio: orden.folio,
+              abono: abono,
+              entregadas: entregadas,
+              listos: listos.length,
+              cerrada: actualizada.estatus == EstatusOrdenType.cerrada,
+            ) +
+            aviso,
         saldoLaOrden:
             abono > 0 && actualizada.restante <= OrdenDetalleState.margenSaldo,
       );
@@ -272,19 +376,42 @@ class OrdenDetalleViewModel extends _$OrdenDetalleViewModel {
     }
   }
 
+  /// Envía el aviso de ropa lista y devuelve cómo le fue, para sumarlo al
+  /// mensaje.
+  Future<String> _avisar(OrdenDetalleData orden, EmpresaData empresa) async {
+    try {
+      await _aviso.enviar(orden, empresa);
+
+      return ' Se le avisó por correo a ${orden.clienteCorreo.trim()}.';
+    } on EnvioCorreoException catch (error) {
+      debugPrint('No se pudo enviar el aviso de ropa lista.\n$error');
+
+      return ' No se pudo avisar por correo: ${error.mensaje}';
+    }
+  }
+
   String _mensaje({
     required String folio,
     required double abono,
     required int entregadas,
+    required int listos,
     required bool cerrada,
   }) {
     final partes = [
       if (abono > 0) 'el pago de ${abono.toStringAsFixed(2)}',
       if (entregadas > 0) 'la entrega de ${_conceptos(entregadas)}',
     ];
+    final marcados = listos == 1
+        ? 'marcó 1 concepto como listo'
+        : 'marcaron $listos conceptos como listos';
     final cierre = cerrada ? ' La orden quedó pagada y entregada.' : '';
 
-    return 'Se registró ${partes.join(' y ')} de la orden $folio.$cierre';
+    if (partes.isEmpty) return 'Se $marcados en la orden $folio.';
+
+    final tambien = listos > 0 ? ' También se $marcados.' : '';
+
+    return 'Se registró ${partes.join(' y ')} de la orden $folio.'
+        '$cierre$tambien';
   }
 
   void _fallar(Object error, StackTrace stackTrace, String mensaje) {

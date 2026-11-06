@@ -8,10 +8,15 @@ class WarningDialog extends StatelessWidget {
     super.key,
     required this.message,
     this.title = 'Advertencia',
+    this.actionText = 'Aceptar',
   });
 
   final String title;
   final String message;
+
+  /// Lo que dice el botón que confirma: mejor lo que va a pasar que
+  /// "Aceptar".
+  final String actionText;
 
   @override
   Widget build(BuildContext context) {
@@ -19,6 +24,7 @@ class WarningDialog extends StatelessWidget {
       title: title,
       message: message,
       animation: Assets.warning,
+      actionText: actionText,
       closeText: 'Cancelar',
     );
   }

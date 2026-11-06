@@ -74,7 +74,12 @@ void main() {
         ),
       ),
     );
-    await tester.tap(botonDeLaTarjeta('Reporte general de ventas'));
+    // Con varias tarjetas, la de ventas puede quedar abajo: se desplaza a la
+    // vista, como haría quien la busca.
+    final boton = botonDeLaTarjeta('Reporte general de ventas');
+    await tester.ensureVisible(boton);
+    await tester.pumpAndSettle();
+    await tester.tap(boton);
     await tester.pumpAndSettle();
   }
 

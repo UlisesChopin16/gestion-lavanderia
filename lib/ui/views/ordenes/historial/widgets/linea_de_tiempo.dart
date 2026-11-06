@@ -10,7 +10,8 @@ import 'package:gestion_lavanderia/ui/views/ordenes/historial/widgets/colores_hi
 ///
 /// Cada movimiento es un punto con el color de lo que se movió —verde el
 /// dinero, azul la ropa— y una tarjeta con el detalle: cuánto, con qué, con
-/// cuánto pagó y qué se llevó. Los días van como encabezados sobre la misma
+/// cuánto pagó y qué se llevó. La ropa que se terminó va también, en morado:
+/// es el paso entre recibirla y entregarla. Los días van como encabezados sobre la misma
 /// línea, para que se vea cuánto tiempo pasó entre una visita y otra.
 ///
 /// Arriba de todo va el desenlace: cómo se cerró la orden o, si sigue
@@ -31,12 +32,15 @@ class LineaDeTiempo extends StatelessWidget {
         for (final dia in dias) ...[
           _EncabezadoDia(dia: dia.dia),
           for (final evento in dia.eventos)
-            _Evento(
-              evento: evento,
-              // Lo de hasta abajo es el alta: ahí empezó todo y la línea
-              // no tiene a dónde seguir.
-              ultimo: identical(evento, dias.last.eventos.last),
-            ),
+            switch (evento) {
+              EventoMovimiento() => _Evento(
+                evento: evento,
+                // Lo de hasta abajo es el alta: ahí empezó todo y la línea
+                // no tiene a dónde seguir.
+                ultimo: identical(evento, dias.last.eventos.last),
+              ),
+              EventoListas() => _EventoListas(evento: evento),
+            },
         ],
       ],
     );
@@ -205,7 +209,7 @@ class _EncabezadoDia extends StatelessWidget {
 class _Evento extends StatelessWidget {
   const _Evento({required this.evento, required this.ultimo});
 
-  final EventoHistorial evento;
+  final EventoMovimiento evento;
 
   /// Si es el de hasta abajo: ahí se corta la línea.
   final bool ultimo;
@@ -237,12 +241,48 @@ class _Evento extends StatelessWidget {
                 hora: movimiento.fecha.formatTime,
               ),
               if (tipo.cobra) _Cobro(movimiento: movimiento, color: tipo.color),
+              if (evento.listas.isNotEmpty)
+                _RopaDelEvento.listas(items: evento.listas),
               if (movimiento.huboEntrega)
-                _Entregados(items: movimiento.entregados),
+                _RopaDelEvento.entregados(items: movimiento.entregados),
               // El saldo sólo donde cambió, o donde nació: en una entrega sin
               // cobro sería repetir el del movimiento anterior.
               if (tipo.cobra || tipo == TipoMovimientoType.alta)
                 _Saldo(movimiento: movimiento),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Ropa que quedó lista sin que se cobrara ni entregara nada.
+///
+/// Nunca es lo de hasta abajo: la orden empieza con su alta, y la ropa se
+/// termina después.
+class _EventoListas extends StatelessWidget {
+  const _EventoListas({required this.evento});
+
+  final EventoListas evento;
+
+  @override
+  Widget build(BuildContext context) {
+    return _Tramo(
+      nodo: const _Punto(icono: Icons.done_all_rounded, color: colorLista),
+      child: Padding(
+        padding: const EdgeInsets.only(bottom: 16),
+        child: _Tarjeta(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            spacing: 10,
+            children: [
+              _Titulo(
+                titulo: 'Ropa lista',
+                nota: 'Lista para que el cliente pase por ella',
+                hora: evento.fecha.formatTime,
+              ),
+              _RopaDelEvento.listas(items: evento.items),
             ],
           ),
         ),
@@ -509,22 +549,35 @@ class _Rejilla extends StatelessWidget {
   }
 }
 
-/// La ropa que salió en el movimiento.
-class _Entregados extends StatelessWidget {
-  const _Entregados({required this.items});
+/// La ropa de un evento, sobre el color de lo que le pasó: la que salió, o la
+/// que quedó lista.
+class _RopaDelEvento extends StatelessWidget {
+  const _RopaDelEvento.entregados({required this.items}) : listas = false;
+
+  const _RopaDelEvento.listas({required this.items}) : listas = true;
 
   final List<ItemOrdenData> items;
+
+  /// Si es la ropa que quedó lista y no la que salió.
+  final bool listas;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final scheme = theme.colorScheme;
     final cuantos = items.length;
+    final color = listas ? colorLista : TipoMovimientoType.entrega.color;
+    final titulo = switch ((listas, cuantos)) {
+      (true, 1) => 'Quedó listo 1 concepto',
+      (true, _) => 'Quedaron listos $cuantos conceptos',
+      (false, 1) => 'Se entregó 1 concepto',
+      (false, _) => 'Se entregaron $cuantos conceptos',
+    };
 
     return Container(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
       decoration: BoxDecoration(
-        color: TipoMovimientoType.entrega.color.withValues(alpha: scheme.tinte),
+        color: color.withValues(alpha: scheme.tinte),
         borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
@@ -532,9 +585,7 @@ class _Entregados extends StatelessWidget {
         spacing: 6,
         children: [
           Text(
-            cuantos == 1
-                ? 'Se entregó 1 concepto'
-                : 'Se entregaron $cuantos conceptos',
+            titulo,
             style: theme.textTheme.labelMedium?.copyWith(
               color: scheme.onSurfaceVariant,
             ),
@@ -773,8 +824,9 @@ class _LoQueFalta extends StatelessWidget {
   }
 }
 
-/// Para cuándo se prometió la prenda, en rojo si ya pasó: es la que el
-/// cliente viene a reclamar.
+/// Cómo va la prenda que falta entregar: lista y esperando al cliente, o para
+/// cuándo se prometió, en rojo si ya pasó —es la que el cliente viene a
+/// reclamar—.
 class _Promesa extends StatelessWidget {
   const _Promesa({required this.item});
 
@@ -788,11 +840,20 @@ class _Promesa extends StatelessWidget {
     final atrasada = item.fechaEntrega.isBefore(DateTime.now().soloDia);
     final fecha = item.fechaEntrega.formatDate;
 
-    return Text(
-      atrasada ? 'Atrasada · era para el $fecha' : 'Para el $fecha',
-      style: theme.textTheme.bodySmall?.copyWith(
-        color: atrasada ? scheme.error : scheme.onSurfaceVariant,
+    final (texto, color) = switch (item.fechaLista) {
+      final lista? => (
+        'Lista desde el ${lista.formatDate}',
+        scheme.legible(colorLista),
       ),
+      _ when atrasada => ('Atrasada · era para el $fecha', scheme.error),
+      _ => ('Para el $fecha', scheme.onSurfaceVariant),
+    };
+
+    return Text(
+      texto,
+      style: theme.textTheme.bodySmall?.copyWith(color: color),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
     );
   }
 }

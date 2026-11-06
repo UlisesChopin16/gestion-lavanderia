@@ -33,3 +33,8 @@ extension ColoresHistorial on ColorScheme {
   /// blanco el mismo tinte se ve el doble.
   double get tinte => _claro ? 0.06 : 0.08;
 }
+
+/// El color de la ropa que quedó lista: el morado de Material, un tono más
+/// claro que el de omisión para que en oscuro se lea igual que el verde y el
+/// azul de los movimientos.
+const Color colorLista = Color(0xFFAB47BC);

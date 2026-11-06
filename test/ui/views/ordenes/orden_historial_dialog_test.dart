@@ -48,7 +48,10 @@ void main() {
       );
     }
 
-    OrdenHistorialState conHistorial(List<MovimientoData> historial) {
+    OrdenHistorialState conHistorial(
+      List<MovimientoData> historial, {
+      List<ItemOrdenData> items = const [],
+    }) {
       return OrdenHistorialState(
         cargando: false,
         orden: OrdenDetalleData(
@@ -60,6 +63,7 @@ void main() {
           total: 100,
           restante: 0,
           fechaCreacion: DateTime(2026, 10, 20, 9),
+          items: items,
           historial: historial,
         ),
       );
@@ -84,14 +88,16 @@ void main() {
       expect(
         [
           for (final dia in dias)
-            for (final evento in dia.eventos) evento.movimiento.id,
+            for (final evento in dia.eventos.cast<EventoMovimiento>())
+              evento.movimiento.id,
         ],
         [4, 3, 2, 1],
       );
       expect(
         [
           for (final dia in dias)
-            for (final evento in dia.eventos) evento.tipo,
+            for (final evento in dia.eventos.cast<EventoMovimiento>())
+              evento.tipo,
         ],
         [
           TipoMovimientoType.pagoYEntrega,
@@ -108,12 +114,62 @@ void main() {
         movimiento(1, DateTime(2026, 10, 20, 9), monto: 20),
       ]);
 
-      final eventos = estado.dias.expand((dia) => dia.eventos).toList();
+      final eventos = estado.dias
+          .expand((dia) => dia.eventos)
+          .cast<EventoMovimiento>()
+          .toList();
 
       // Los dos cobran, pero sólo el de hasta abajo es el adelanto.
       expect(eventos.first.movimiento.id, 2);
       expect(eventos.first.tipo, TipoMovimientoType.pago);
       expect(eventos.last.tipo, TipoMovimientoType.adelanto);
+    });
+
+    test('la ropa que se marcó lista entra por su fecha', () {
+      ItemOrdenData prenda({DateTime? lista, DateTime? entregada}) =>
+          ItemOrdenData(
+            precio: sabana,
+            fechaEntrega: DateTime(2026, 10, 22),
+            fechaLista: lista,
+            estaEntregado: entregada != null,
+            fechaEntregado: entregada,
+          );
+
+      final pago = DateTime(2026, 10, 21, 11);
+      final sola = DateTime(2026, 10, 22, 16);
+      final estado = conHistorial(
+        [
+          movimiento(3, DateTime(2026, 10, 23, 18), entrega: true),
+          movimiento(2, pago, monto: 50),
+          movimiento(1, DateTime(2026, 10, 20, 9), monto: 20),
+        ],
+        items: [
+          // Dos marcadas juntas, sin cobrar ni entregar: un solo evento.
+          prenda(lista: sola),
+          prenda(lista: sola),
+          // Marcada lista al registrar el pago: va dentro de él.
+          prenda(lista: pago),
+          // Se dio por lista al entregarse: ya la cuenta la entrega.
+          prenda(
+            lista: DateTime(2026, 10, 23, 18),
+            entregada: DateTime(2026, 10, 23, 18),
+          ),
+          // Sin terminar.
+          prenda(),
+        ],
+      );
+
+      final eventos = estado.dias.expand((dia) => dia.eventos).toList();
+
+      expect(eventos.map((evento) => evento.fecha), [
+        DateTime(2026, 10, 23, 18),
+        sola,
+        pago,
+        DateTime(2026, 10, 20, 9),
+      ]);
+      expect((eventos[0] as EventoMovimiento).listas, isEmpty);
+      expect((eventos[1] as EventoListas).items, hasLength(2));
+      expect((eventos[2] as EventoMovimiento).listas, hasLength(1));
     });
 
     test('sin orden no hay días', () {
@@ -230,6 +286,34 @@ void main() {
     tearDown(() async {
       await limpiarDependenciasDePrueba();
       await db.close();
+    });
+
+    testWidgets('dice cuándo quedó lista la ropa y qué espera al cliente', (
+      tester,
+    ) async {
+      final orden = await crearOrden();
+      // Una hora después del alta. La base guarda al segundo: marcada en el
+      // mismo segundo que el alta, contaría como parte de ella.
+      await db.itemServicioOrdenDao.marcarListos(
+        ordenId: orden.id,
+        itemIds: [item(orden, 'Sábana').id],
+        fecha: orden.fechaCreacion.add(const Duration(hours: 1)),
+      );
+
+      await abrirHistorial(tester, orden.id);
+
+      expect(find.text('Ropa lista'), findsOneWidget);
+      expect(find.text('Quedó listo 1 concepto'), findsOneWidget);
+      // Arriba del alta: pasó después.
+      expect(
+        alturaDe(tester, 'Ropa lista'),
+        lessThan(alturaDe(tester, 'Alta de la orden')),
+      );
+
+      // En lo que falta, la sábana espera al cliente y la cobija sigue con
+      // su fecha prometida.
+      expect(find.textContaining('Lista desde el'), findsOneWidget);
+      expect(find.textContaining('era para el'), findsOneWidget);
     });
 
     testWidgets('cuenta la orden del cierre al adelanto', (tester) async {
